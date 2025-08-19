@@ -1,0 +1,2 @@
+org.springframework.boot.env.EnvironmentPostProcessor=\
+fit.kltn_cookinote_backend.configs.EnvConfig
