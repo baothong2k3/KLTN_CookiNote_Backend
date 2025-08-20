@@ -10,7 +10,7 @@ package fit.kltn_cookinote_backend.services;/*
  */
 
 
-import fit.kltn_cookinote_backend.dtos.OtpRateInfo;
+import fit.kltn_cookinote_backend.dtos.response.OtpRateInfo;
 import fit.kltn_cookinote_backend.dtos.request.RateWindow;
 import fit.kltn_cookinote_backend.entities.EmailOtp;
 import fit.kltn_cookinote_backend.entities.OtpPurpose;

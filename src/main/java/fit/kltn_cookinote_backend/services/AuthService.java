@@ -9,7 +9,7 @@ package fit.kltn_cookinote_backend.services;/*
  * @version: 1.0
  */
 
-import fit.kltn_cookinote_backend.dtos.OtpRateInfo;
+import fit.kltn_cookinote_backend.dtos.response.OtpRateInfo;
 import fit.kltn_cookinote_backend.dtos.request.RegisterRequest;
 import fit.kltn_cookinote_backend.dtos.request.ResendOtpRequest;
 import fit.kltn_cookinote_backend.dtos.request.VerifyOtpRequest;

@@ -9,26 +9,25 @@ package fit.kltn_cookinote_backend.controllers;/*
  * @version: 1.0
  */
 
-import fit.kltn_cookinote_backend.dtos.OtpRateInfo;
-import fit.kltn_cookinote_backend.dtos.request.RegisterRequest;
-import fit.kltn_cookinote_backend.dtos.request.ResendOtpRequest;
-import fit.kltn_cookinote_backend.dtos.request.VerifyOtpRequest;
+import fit.kltn_cookinote_backend.dtos.request.*;
+import fit.kltn_cookinote_backend.dtos.response.LoginResponse;
+import fit.kltn_cookinote_backend.dtos.response.OtpRateInfo;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
 import fit.kltn_cookinote_backend.services.AuthService;
+import fit.kltn_cookinote_backend.services.LoginService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
 
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
+    private final LoginService loginService;
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<Void>> register(@RequestBody @Valid RegisterRequest req,
@@ -59,5 +58,35 @@ public class AuthController {
                 .header("X-RateLimit-Remaining", String.valueOf(info.remaining()))
                 .header("X-RateLimit-Reset", String.valueOf(info.resetAfter()))
                 .body(ApiResponse.success("Đã gửi lại OTP.", info, httpReq.getRequestURI()));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<LoginResponse>> login(@RequestBody @Valid LoginRequest req,
+                                                            HttpServletRequest httpReq) {
+        var resp = loginService.login(req);
+        return ResponseEntity.ok(
+                ApiResponse.success("Đăng nhập thành công.", resp, httpReq.getRequestURI())
+        );
+    }
+
+    // Làm mới access token bằng refresh token
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<TokenPair>> refresh(@RequestBody @Valid RefreshRequest req,
+                                                          HttpServletRequest httpReq) {
+        var tokens = loginService.refresh(req);
+        return ResponseEntity.ok(
+                ApiResponse.success("Làm mới token thành công.", tokens, httpReq.getRequestURI())
+        );
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(@RequestBody RefreshRequest req,
+                                                    @RequestHeader(name = "Authorization") String auth,
+                                                    HttpServletRequest httpReq) {
+        String currentAccess = null;
+        if (auth != null && auth.startsWith("Bearer ")) currentAccess = auth.substring(7);
+
+        loginService.logout(req.refreshToken(), currentAccess);
+        return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công.", httpReq.getRequestURI()));
     }
 }
