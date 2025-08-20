@@ -13,6 +13,7 @@ import fit.kltn_cookinote_backend.enums.AuthProvider;
 import fit.kltn_cookinote_backend.enums.Role;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -35,10 +36,10 @@ public class User {
     @Column(name = "name", length = 100)
     private String username;
 
-    @Column(length = 255, unique = true)
+    @Column(length = 255, unique = true, nullable = false)
     private String email;
 
-    @Column(length = 255)
+    @Column(length = 255, nullable = true)
     private String password;
 
     private String displayName;
@@ -46,14 +47,24 @@ public class User {
     @Column(name = "avatar_url")
     private String avatarUrl;
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", nullable = false, updatable = false)
+    @CreationTimestamp
     private LocalDateTime createdAt;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "role", length = 20, nullable = false)
     private Role role;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "auth_provider", length = 20, nullable = false)
     private AuthProvider authProvider;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean emailVerified = false;
+
+    @Column(nullable = false)
+    private boolean enabled = false;
 
     // Relationships
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
