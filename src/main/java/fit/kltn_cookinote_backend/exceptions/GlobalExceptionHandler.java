@@ -64,8 +64,7 @@ public class GlobalExceptionHandler {
      * Lấy message cụ thể nhất ở root-cause (MySQL/Driver).
      */
     private String mostSpecificMessage(Throwable ex) {
-        Throwable root = NestedExceptionUtils.getMostSpecificCause(ex);
-        String msg = (root != null && root.getMessage() != null) ? root.getMessage() : ex.getMessage();
+        String msg = NestedExceptionUtils.getMostSpecificCause(ex).getMessage();
         return msg != null ? msg.trim() : "Unknown database error";
     }
 
