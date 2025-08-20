@@ -10,9 +10,12 @@ package fit.kltn_cookinote_backend.services;/*
  */
 
 
+import fit.kltn_cookinote_backend.dtos.OtpRateInfo;
+import fit.kltn_cookinote_backend.dtos.request.RateWindow;
 import fit.kltn_cookinote_backend.entities.EmailOtp;
 import fit.kltn_cookinote_backend.entities.OtpPurpose;
 import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.limiters.RedisOtpRateLimiter;
 import fit.kltn_cookinote_backend.repositories.EmailOtpRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -32,10 +35,15 @@ public class OtpService {
     private final PasswordEncoder encoder;
     private final MailService mailService;
     private final OtpAttemptService attemptService;
+    private final RedisOtpRateLimiter rateLimiter;
 
     private static final Duration OTP_TTL = Duration.ofMinutes(5);
 
-    public void createAndSendEmailVerifyOtp(User user) {
+    public OtpRateInfo createAndSendEmailVerifyOtp(User user) {
+        String purpose = OtpPurpose.EMAIL_VERIFY.name();
+
+        rateLimiter.consumeOrThrow(user.getUserId(), purpose);
+
         String rawOtp = generateNumericOtp(6);
         String hash = encoder.encode(rawOtp);
 
@@ -53,6 +61,15 @@ public class OtpService {
         otpRepo.saveAndFlush(otp);
 
         mailService.sendOtp(user.getEmail(), user.getUsername(), rawOtp);
+
+        RateWindow w = rateLimiter.currentWindow(user.getUserId(), purpose);
+        long remaining = Math.max(0, w.limit() - w.used());
+        return OtpRateInfo.builder()
+                .used(w.used())
+                .limit(w.limit())
+                .remaining(remaining)
+                .resetAfter(w.ttlSeconds())
+                .build();
     }
 
     public void verifyEmailOtp(User user, String inputOtp) {
@@ -78,9 +95,8 @@ public class OtpService {
         otpRepo.delete(otp);
     }
 
-    public void resendEmailVerifyOtp(User user) {
-        //nên thêm limit gửi otp
-        createAndSendEmailVerifyOtp(user);
+    public OtpRateInfo resendEmailVerifyOtp(User user) {
+        return createAndSendEmailVerifyOtp(user);
     }
 
     private String generateNumericOtp(int digits) {

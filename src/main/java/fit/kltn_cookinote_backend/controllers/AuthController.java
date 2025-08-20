@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.controllers;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.OtpRateInfo;
 import fit.kltn_cookinote_backend.dtos.request.RegisterRequest;
 import fit.kltn_cookinote_backend.dtos.request.ResendOtpRequest;
 import fit.kltn_cookinote_backend.dtos.request.VerifyOtpRequest;
@@ -50,11 +51,13 @@ public class AuthController {
     }
 
     @PostMapping("/resend-otp")
-    public ResponseEntity<ApiResponse<Void>> resend(@RequestBody @Valid ResendOtpRequest req,
-                                                    HttpServletRequest httpReq) {
-        authService.resendOtp(req);
-        return ResponseEntity.ok(
-                ApiResponse.success("Đã gửi lại OTP vào email.", httpReq.getRequestURI())
-        );
+    public ResponseEntity<ApiResponse<OtpRateInfo>> resend(@RequestBody @Valid ResendOtpRequest req,
+                                                           HttpServletRequest httpReq) {
+        OtpRateInfo info = authService.resendOtp(req);
+        return ResponseEntity.ok()
+                .header("X-RateLimit-Limit", String.valueOf(info.limit()))
+                .header("X-RateLimit-Remaining", String.valueOf(info.remaining()))
+                .header("X-RateLimit-Reset", String.valueOf(info.resetAfter()))
+                .body(ApiResponse.success("Đã gửi lại OTP.", info, httpReq.getRequestURI()));
     }
 }

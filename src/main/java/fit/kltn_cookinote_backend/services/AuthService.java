@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.services;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.OtpRateInfo;
 import fit.kltn_cookinote_backend.dtos.request.RegisterRequest;
 import fit.kltn_cookinote_backend.dtos.request.ResendOtpRequest;
 import fit.kltn_cookinote_backend.dtos.request.VerifyOtpRequest;
@@ -57,12 +58,12 @@ public class AuthService {
         otpService.verifyEmailOtp(user, req.otp());
     }
 
-    public void resendOtp(ResendOtpRequest req) {
+    public OtpRateInfo resendOtp(ResendOtpRequest req) {
         User user = userRepo.findByEmail(req.email())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng."));
         if (user.isEmailVerified()) {
             throw new IllegalStateException("Email đã xác thực.");
         }
-        otpService.resendEmailVerifyOtp(user);
+        return otpService.resendEmailVerifyOtp(user);
     }
 }

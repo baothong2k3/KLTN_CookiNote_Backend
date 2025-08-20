@@ -2,6 +2,7 @@ package fit.kltn_cookinote_backend.exceptions;
 
 
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
+import fit.kltn_cookinote_backend.limiters.TooManyRequestsException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.hibernate.PropertyValueException;
 import org.springframework.core.NestedExceptionUtils;
@@ -105,5 +106,17 @@ public class GlobalExceptionHandler {
             return 409;
         }
         return 400;
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTooMany(
+            TooManyRequestsException ex, HttpServletRequest req) {
+
+        return ResponseEntity.status(429)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .header("X-RateLimit-Limit", "5")
+                .header("X-RateLimit-Remaining", "0")
+                .header("X-RateLimit-Reset", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(ApiResponse.error(429, ex.getMessage(), req.getRequestURI()));
     }
 }
