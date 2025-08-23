@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.entities;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.enums.OtpPurpose;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
