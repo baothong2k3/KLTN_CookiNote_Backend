@@ -9,15 +9,17 @@ package fit.kltn_cookinote_backend.controllers;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.UserDto;
+import fit.kltn_cookinote_backend.dtos.request.UpdateDisplayNameRequest;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
 import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.services.UserService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
@@ -25,6 +27,7 @@ import java.util.Map;
 @RequestMapping("/user")
 @RequiredArgsConstructor
 public class UserController {
+    private final UserService userService;
 
     // Kiểm tra access token
     @GetMapping("/me")
@@ -37,5 +40,22 @@ public class UserController {
                 "role", user.getRole().name()
         );
         return ResponseEntity.ok(ApiResponse.success("OK", data, httpReq.getRequestURI()));
+    }
+
+    @PatchMapping("/display-name")
+    public ResponseEntity<ApiResponse<UserDto>> updateDisplayName(
+            @AuthenticationPrincipal User authUser,
+            @Valid @RequestBody UpdateDisplayNameRequest req,
+            HttpServletRequest httpReq) {
+
+        if (authUser == null) {
+            return ResponseEntity.status(401)
+                    .body(ApiResponse.error(401, "Token đã hết hạn hoặc không hợp lệ", httpReq.getRequestURI()));
+        }
+
+        UserDto dto = userService.updateDisplayName(authUser.getUserId(), req);
+        return ResponseEntity.ok(
+                ApiResponse.success("Cập nhật displayName thành công.", dto, httpReq.getRequestURI())
+        );
     }
 }

@@ -42,6 +42,7 @@ public class User {
     @Column(length = 255, nullable = true)
     private String password;
 
+    @Column(name = "display_name", length = 100)
     private String displayName;
 
     @Column(name = "avatar_url")
