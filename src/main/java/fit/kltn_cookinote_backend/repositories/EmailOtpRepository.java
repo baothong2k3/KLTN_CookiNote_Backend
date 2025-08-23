@@ -10,7 +10,7 @@ package fit.kltn_cookinote_backend.repositories;/*
  */
 
 import fit.kltn_cookinote_backend.entities.EmailOtp;
-import fit.kltn_cookinote_backend.entities.OtpPurpose;
+import fit.kltn_cookinote_backend.enums.OtpPurpose;
 import fit.kltn_cookinote_backend.entities.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -24,5 +24,5 @@ public interface EmailOtpRepository extends JpaRepository<EmailOtp, Long> {
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update EmailOtp e set e.attempts = e.attempts + 1 where e.id = :id")
-    int increaseAttempts(@Param("id") Long id);
+    void increaseAttempts(@Param("id") Long id);
 }

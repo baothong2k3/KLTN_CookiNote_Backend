@@ -13,7 +13,7 @@ package fit.kltn_cookinote_backend.services;/*
 import fit.kltn_cookinote_backend.dtos.response.OtpRateInfo;
 import fit.kltn_cookinote_backend.dtos.request.RateWindow;
 import fit.kltn_cookinote_backend.entities.EmailOtp;
-import fit.kltn_cookinote_backend.entities.OtpPurpose;
+import fit.kltn_cookinote_backend.enums.OtpPurpose;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.limiters.RedisOtpRateLimiter;
 import fit.kltn_cookinote_backend.repositories.EmailOtpRepository;
@@ -105,5 +105,56 @@ public class OtpService {
         int min = (int) Math.pow(10, digits - 1);
         int number = r.nextInt(bound - min) + min;
         return String.valueOf(number);
+    }
+
+    public OtpRateInfo createAndSendEmailChangeOtp(User user, String newEmail) {
+        // Rate limit theo (user, EMAIL_CHANGE)
+        rateLimiter.consumeOrThrow(user.getUserId(), OtpPurpose.EMAIL_CHANGE.name());
+
+        String rawOtp = generateNumericOtp(6);
+        String hash = encoder.encode(rawOtp);
+
+        EmailOtp otp = otpRepo.findByUserAndPurpose(user, OtpPurpose.EMAIL_CHANGE)
+                .orElseGet(() -> EmailOtp.builder()
+                        .user(user)
+                        .purpose(OtpPurpose.EMAIL_CHANGE)
+                        .build());
+
+        otp.setCodeHash(hash);
+        otp.setExpiresAt(LocalDateTime.now(ZoneOffset.UTC).plus(OTP_TTL));
+        otp.setAttempts(0);
+        otp.setMaxAttempts(5);
+        otpRepo.save(otp);
+
+        // Gửi đến EMAIL MỚI
+        mailService.sendOtp(newEmail, user.getUsername(), rawOtp);
+
+        RateWindow w = rateLimiter.currentWindow(user.getUserId(), OtpPurpose.EMAIL_CHANGE.toString());
+        long remaining = Math.max(0, w.limit() - w.used());
+        return OtpRateInfo.builder()
+                .used(w.used())
+                .limit(w.limit())
+                .remaining(remaining)
+                .resetAfter(w.ttlSeconds())
+                .build();
+    }
+
+    public void verifyEmailChangeOtp(User user, String inputOtp) {
+        EmailOtp otp = otpRepo.findByUserAndPurpose(user, OtpPurpose.EMAIL_CHANGE)
+                .orElseThrow(() -> new IllegalStateException("Không tìm thấy OTP, hãy yêu cầu gửi lại."));
+
+        if (otp.getAttempts() >= otp.getMaxAttempts()) {
+            throw new IllegalStateException("Bạn đã vượt quá số lần nhập OTP cho phép.");
+        }
+        if (LocalDateTime.now(ZoneOffset.UTC).isAfter(otp.getExpiresAt())) {
+            throw new IllegalStateException("OTP đã hết hạn, hãy yêu cầu gửi lại.");
+        }
+        if (!encoder.matches(inputOtp, otp.getCodeHash())) {
+            otp.setAttempts(otp.getAttempts() + 1); // dirty checking
+            throw new IllegalArgumentException("OTP không chính xác.");
+        }
+
+        // Thành công -> xóa OTP (đổi email sẽ được làm tại EmailChangeService)
+        otpRepo.delete(otp);
     }
 }

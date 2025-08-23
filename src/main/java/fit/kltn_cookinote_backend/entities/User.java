@@ -12,6 +12,7 @@ package fit.kltn_cookinote_backend.entities;/*
 import fit.kltn_cookinote_backend.enums.AuthProvider;
 import fit.kltn_cookinote_backend.enums.Role;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -37,6 +38,7 @@ public class User {
     private String username;
 
     @Column(length = 255, unique = true, nullable = false)
+    @Email
     private String email;
 
     @Column(length = 255, nullable = true)

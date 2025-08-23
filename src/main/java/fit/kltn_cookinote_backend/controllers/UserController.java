@@ -10,9 +10,13 @@ package fit.kltn_cookinote_backend.controllers;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.UserDto;
+import fit.kltn_cookinote_backend.dtos.request.ChangeEmailRequest;
 import fit.kltn_cookinote_backend.dtos.request.UpdateDisplayNameRequest;
+import fit.kltn_cookinote_backend.dtos.request.VerifyEmailChangeRequest;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
+import fit.kltn_cookinote_backend.dtos.response.OtpRateInfo;
 import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.services.EmailChangeService;
 import fit.kltn_cookinote_backend.services.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -28,6 +32,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
+    private final EmailChangeService emailChangeService;
 
     // Kiểm tra access token
     @GetMapping("/me")
@@ -57,5 +62,49 @@ public class UserController {
         return ResponseEntity.ok(
                 ApiResponse.success("Cập nhật displayName thành công.", dto, httpReq.getRequestURI())
         );
+    }
+
+    @PostMapping("/email-change-request")
+    public ResponseEntity<ApiResponse<OtpRateInfo>> changeRequest(@AuthenticationPrincipal User authUser,
+                                                                  @Valid @RequestBody ChangeEmailRequest req,
+                                                                  HttpServletRequest httpReq) {
+        if (authUser == null) {
+            return ResponseEntity.status(401)
+                    .body(ApiResponse.error(401, "Token đã hết hạn hoặc không hợp lệ", httpReq.getRequestURI()));
+        }
+        OtpRateInfo info = emailChangeService.requestChange(authUser, req);
+        return ResponseEntity.ok()
+                .header("X-RateLimit-Limit", String.valueOf(info.limit()))
+                .header("X-RateLimit-Remaining", String.valueOf(info.remaining()))
+                .header("X-RateLimit-Reset", String.valueOf(info.resetAfter()))
+                .body(ApiResponse.success("Đã gửi OTP đến email mới.", info, httpReq.getRequestURI()));
+    }
+
+    @PostMapping("/email-resend-otp")
+    public ResponseEntity<ApiResponse<OtpRateInfo>> resendOtp(@AuthenticationPrincipal User authUser,
+                                                              @Valid @RequestBody ChangeEmailRequest req,
+                                                              HttpServletRequest httpReq) {
+        if (authUser == null) {
+            return ResponseEntity.status(401)
+                    .body(ApiResponse.error(401, "Token đã hết hạn hoặc không hợp lệ", httpReq.getRequestURI()));
+        }
+        OtpRateInfo info = emailChangeService.resendOtp(authUser, req);
+        return ResponseEntity.ok()
+                .header("X-RateLimit-Limit", String.valueOf(info.limit()))
+                .header("X-RateLimit-Remaining", String.valueOf(info.remaining()))
+                .header("X-RateLimit-Reset", String.valueOf(info.resetAfter()))
+                .body(ApiResponse.success("Đã gửi lại OTP.", info, httpReq.getRequestURI()));
+    }
+
+    @PostMapping("/email-verify-change")
+    public ResponseEntity<ApiResponse<Void>> verifyChange(@AuthenticationPrincipal User authUser,
+                                                          @Valid @RequestBody VerifyEmailChangeRequest req,
+                                                          HttpServletRequest httpReq) {
+        if (authUser == null) {
+            return ResponseEntity.status(401)
+                    .body(ApiResponse.error(401, "Token đã hết hạn hoặc không hợp lệ", httpReq.getRequestURI()));
+        }
+        emailChangeService.verifyAndCommit(authUser, req);
+        return ResponseEntity.ok(ApiResponse.success("Đổi email thành công.", httpReq.getRequestURI()));
     }
 }
