@@ -41,8 +41,12 @@ public class User {
     @Email
     private String email;
 
-    @Column(length = 255, nullable = true)
+    @Column(length = 128, nullable = true)
     private String password;
+
+    @Column(name = "password_changed_at")
+    @CreationTimestamp
+    private LocalDateTime passwordChangedAt;
 
     @Column(name = "display_name", length = 100)
     private String displayName;

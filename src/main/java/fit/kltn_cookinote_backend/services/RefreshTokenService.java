@@ -26,6 +26,10 @@ public class RefreshTokenService {
     @Value("${app.jwt.refresh-ttl-days}")
     private long refreshTtlDays;
 
+    private String userSetKey(Long userId) {
+        return "rftu:" + userId;
+    }
+
     private String key(String token) {
         return "rft:" + token;
     }
@@ -35,6 +39,10 @@ public class RefreshTokenService {
         String k = key(token);
         // value: userId
         redis.opsForValue().set(k, String.valueOf(userId), Duration.ofDays(refreshTtlDays));
+        // lưu danh sách refresh theo user để revoke all
+        redis.opsForSet().add(userSetKey(userId), token);
+        redis.expire(userSetKey(userId), Duration.ofDays(refreshTtlDays));
+
         return token;
     }
 
@@ -47,12 +55,30 @@ public class RefreshTokenService {
      * Rotation: xoá token cũ, phát hành token mới.
      */
     public String rotate(String oldToken, Long userId) {
-        redis.delete(key(oldToken));
+        revoke(oldToken);
         return issue(userId);
     }
 
     public void revoke(String token) {
-        redis.delete(key(token));
+        String k = key(token);
+        String userId = redis.opsForValue().get(k);
+        if (userId != null) {
+            redis.opsForSet().remove(userSetKey(Long.parseLong(userId)), token);
+        }
+        redis.delete(k);
+    }
+
+    /**
+     * Revoke tất cả refresh token của 1 user.
+     */
+    public void revokeAllForUser(Long userId) {
+        String ukey = userSetKey(userId);
+        var tokens = redis.opsForSet().members(ukey);
+        if (tokens != null && !tokens.isEmpty()) {
+            var keys = tokens.stream().map(this::key).toList();
+            redis.delete(keys);
+        }
+        redis.delete(ukey);
     }
 
     public long refreshTtlSeconds() {

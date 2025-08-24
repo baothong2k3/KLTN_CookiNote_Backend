@@ -45,4 +45,11 @@ public class UserService {
 
         return userMapper.toDto(user);
     }
+
+    public void changePassword(Long userId, String newPassword) {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng."));
+        user.setPassword(newPassword);
+        userRepo.save(user);
+    }
 }
