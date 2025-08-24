@@ -46,7 +46,7 @@ public class LoginService {
         }
 
         var issue = jwtService.generateAccessToken(user);
-        sessionService.allow(issue.jti(), issue.expiresInSeconds());
+        sessionService.allow(user.getUserId(), issue.jti(), issue.expiresInSeconds());
         String refresh = refreshService.issue(user.getUserId());
 
         return LoginResponse.builder()
@@ -74,7 +74,7 @@ public class LoginService {
 
         // phát hành access mới + allow jti mới
         var issue = jwtService.generateAccessToken(user);
-        sessionService.allow(issue.jti(), issue.expiresInSeconds());
+        sessionService.allow(user.getUserId(), issue.jti(), issue.expiresInSeconds());
 
         return TokenPair.builder()
                 .accessToken(issue.token())

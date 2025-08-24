@@ -24,11 +24,19 @@ public class SessionAllowlistService {
         return "session:" + jti;
     }
 
+    private String userSetKey(Long userId) {
+        return "sessionu:" + userId;
+    }
+
     /**
      * Cho phép 1 access token (theo jti) trong ttlSeconds.
      */
-    public void allow(String jti, long ttlSeconds) {
-        redis.opsForValue().set(key(jti), "1", Duration.ofSeconds(Math.max(1, ttlSeconds)));
+    public void allow(Long userId, String jti, long ttlSeconds) {
+        long ttl = Math.max(1, ttlSeconds);
+        redis.opsForValue().set(key(jti), "1", Duration.ofSeconds(ttl));
+        // lưu danh sách jti theo user để revoke all
+        redis.opsForSet().add(userSetKey(userId), jti);
+        redis.expire(userSetKey(userId), Duration.ofSeconds(ttl));
     }
 
     /**
@@ -43,5 +51,17 @@ public class SessionAllowlistService {
      */
     public void revoke(String jti) {
         redis.delete(key(jti));
+    }
+
+    /**
+     * Revoke tất cả access token (jtis) của 1 user.
+     */
+    public void revokeAllForUser(Long userId) {
+        var jtis = redis.opsForSet().members(userSetKey(userId));
+        if (jtis != null && !jtis.isEmpty()) {
+            var keys = jtis.stream().map(this::key).toList();
+            redis.delete(keys);
+        }
+        redis.delete(userSetKey(userId));
     }
 }
