@@ -31,6 +31,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Date;
 
 @Component
 @RequiredArgsConstructor
@@ -59,13 +62,36 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
                 Long userId = Long.valueOf(jws.getPayload().getSubject());
 
+                // Lấy iat (Date) rồi chuyển sang Instant để so sánh với passwordChangedAt (LocalDateTime)
+                Date iatDate = jws.getPayload().getIssuedAt();
+                Instant iat = (iatDate != null) ? iatDate.toInstant() : null;
+
                 // Tải user & dựng Authentication
                 User user = userRepo.findById(userId).orElse(null);
-                if (user != null && user.isEnabled() && user.isEmailVerified()) {
-                    var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
-                    var authentication = new UsernamePasswordAuthenticationToken(user, null, authorities);
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                // Chủ động từ chối nếu user không hợp lệ (thay vì lờ đi và cho request đi tiếp)
+                if (user == null || !user.isEnabled() || !user.isEmailVerified()) {
+                    authEntryPoint.commence(request, response,
+                            new InsufficientAuthenticationException("user disabled or unverified"));
+                    return;
                 }
+
+                // Vô hiệu hoá access token nếu phát hành trước thời điểm đổi mật khẩu
+                if (user.getPasswordChangedAt() != null) {
+                    Instant pwdChangedAtInstant = user.getPasswordChangedAt()
+                            .atOffset(ZoneOffset.UTC)
+                            .toInstant();
+
+                    if (iat == null || iat.isBefore(pwdChangedAtInstant)) {
+                        authEntryPoint.commence(request, response,
+                                new InsufficientAuthenticationException("token invalidated by password change"));
+                        return;
+                    }
+                }
+
+                var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
+                var authentication = new UsernamePasswordAuthenticationToken(user, null, authorities);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
             } catch (ExpiredJwtException e) {
                 authEntryPoint.commence(request, response, new InsufficientAuthenticationException("token expired", e));
                 return;
