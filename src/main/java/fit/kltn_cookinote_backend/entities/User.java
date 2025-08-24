@@ -13,6 +13,8 @@ import fit.kltn_cookinote_backend.enums.AuthProvider;
 import fit.kltn_cookinote_backend.enums.Role;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -42,10 +44,14 @@ public class User {
     private String email;
 
     @Column(length = 128, nullable = true)
+    @Size(min = 6, max = 128)
+    @Pattern(
+            regexp = "^(?=.*[A-Za-z])(?=.*\\d).{6,128}$",
+            message = "Mật khẩu phải dài từ 6-128 ký tự và bao gồm cả chữ cái và số"
+    )
     private String password;
 
     @Column(name = "password_changed_at")
-    @CreationTimestamp
     private LocalDateTime passwordChangedAt;
 
     @Column(name = "display_name", length = 100)

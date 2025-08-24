@@ -4,6 +4,8 @@ package fit.kltn_cookinote_backend.exceptions;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
 import fit.kltn_cookinote_backend.limiters.TooManyRequestsException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import org.hibernate.PropertyValueException;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -12,10 +14,11 @@ import org.springframework.transaction.TransactionSystemException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.Set;
+import java.util.stream.Collectors;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-
-    // --- Giữ các handler cũ của bạn ở đây (MethodArgumentNotValid, ConstraintViolation, ...)
 
     // 1) Lỗi ràng buộc DB (NOT NULL, Unique, Data truncated...)
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -42,6 +45,13 @@ public class GlobalExceptionHandler {
     // 3) Transaction bọc các lỗi validation/persistence
     @ExceptionHandler(TransactionSystemException.class)
     public ResponseEntity<ApiResponse<Void>> handleTx(TransactionSystemException ex, HttpServletRequest req) {
+        ConstraintViolationException cve = findCause(ex, ConstraintViolationException.class);
+        if (cve != null) {
+            String message = joinViolationMessages(cve.getConstraintViolations());
+            return ResponseEntity.status(400)
+                    .body(ApiResponse.error(400, message, req.getRequestURI()));
+        }
+
         String raw = mostSpecificMessage(ex);
         String message = normalizeSqlMessage(raw);
         int code = guessStatusFromSqlMessage(raw);
@@ -56,6 +66,16 @@ public class GlobalExceptionHandler {
         String message = normalizeSqlMessage(raw);
         return ResponseEntity.status(500)
                 .body(ApiResponse.error(500, message, req.getRequestURI()));
+    }
+
+    // 5) Bắt trực tiếp lỗi Bean Validation (khi gọi Validator hoặc lúc persist/flush ném thẳng ra)
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConstraintViolation(
+            ConstraintViolationException ex, HttpServletRequest req) {
+
+        String message = joinViolationMessages(ex.getConstraintViolations());
+        return ResponseEntity.status(400)
+                .body(ApiResponse.error(400, message, req.getRequestURI()));
     }
 
     // ---------- Helpers ----------
@@ -105,6 +125,29 @@ public class GlobalExceptionHandler {
             return 409;
         }
         return 400;
+    }
+
+    /**
+     * Tìm cause theo kiểu cụ thể trong chuỗi nguyên nhân
+     */
+    private <T extends Throwable> T findCause(Throwable ex, Class<T> type) {
+        Throwable cur = ex;
+        while (cur != null) {
+            if (type.isInstance(cur)) return type.cast(cur);
+            cur = cur.getCause();
+        }
+        return null;
+    }
+
+    /**
+     * Nối các thông điệp từ các ConstraintViolation thành chuỗi gọn gàng
+     */
+    private String joinViolationMessages(Set<ConstraintViolation<?>> violations) {
+        if (violations == null || violations.isEmpty()) return "Dữ liệu không hợp lệ.";
+        return violations.stream()
+                .map(ConstraintViolation::getMessage) // chỉ lấy message, bỏ class/property dài dòng
+                .distinct()
+                .collect(Collectors.joining("; "));
     }
 
     @ExceptionHandler(TooManyRequestsException.class)
