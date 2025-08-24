@@ -11,6 +11,7 @@ package fit.kltn_cookinote_backend.controllers;/*
 
 import fit.kltn_cookinote_backend.dtos.UserDto;
 import fit.kltn_cookinote_backend.dtos.request.ChangeEmailRequest;
+import fit.kltn_cookinote_backend.dtos.request.ChangePasswordRequest;
 import fit.kltn_cookinote_backend.dtos.request.UpdateDisplayNameRequest;
 import fit.kltn_cookinote_backend.dtos.request.VerifyEmailChangeRequest;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
@@ -106,5 +107,15 @@ public class UserController {
         }
         emailChangeService.verifyAndCommit(authUser, req);
         return ResponseEntity.ok(ApiResponse.success("Đổi email thành công.", httpReq.getRequestURI()));
+    }
+
+    @PutMapping("/password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(@AuthenticationPrincipal User authUser, @Valid @RequestBody ChangePasswordRequest req, HttpServletRequest httpReq) {
+        if (authUser == null) {
+            return ResponseEntity.status(401)
+                    .body(ApiResponse.error(401, "Token đã hết hạn hoặc không hợp lệ", httpReq.getRequestURI()));
+        }
+        userService.changePassword(authUser.getUserId(), req.currentPassword(), req.newPassword());
+        return ResponseEntity.ok(ApiResponse.success("Đổi mật khẩu thành công.", httpReq.getRequestURI()));
     }
 }

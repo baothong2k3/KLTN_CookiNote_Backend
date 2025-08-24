@@ -1,4 +1,17 @@
 package fit.kltn_cookinote_backend.dtos.request;
 
-public record RegisterRequest(String email, String username, String password, String displayName) {
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
+public record RegisterRequest(
+        @NotBlank String email,
+        @NotBlank String username,
+        @NotBlank
+        @Size(min = 6, max = 128)
+        @Pattern(
+                regexp = "^(?=.*[A-Za-z])(?=.*\\d).{6,128}$",
+                message = "Mật khẩu phải dài từ 6-128 ký tự và bao gồm cả chữ cái và số"
+        ) String password,
+        @NotBlank String displayName) {
 }
