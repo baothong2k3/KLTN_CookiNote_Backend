@@ -12,17 +12,25 @@ package fit.kltn_cookinote_backend.services;/*
 import fit.kltn_cookinote_backend.dtos.UserDto;
 import fit.kltn_cookinote_backend.dtos.request.UpdateDisplayNameRequest;
 import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.enums.AuthProvider;
 import fit.kltn_cookinote_backend.mappers.UserMapper;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
     private final UserRepository userRepo;
     private final UserMapper userMapper;
+    private final PasswordEncoder encoder;
+    private final RefreshTokenService refreshService;
+    private final SessionAllowlistService sessionService;
 
     @Transactional
     public UserDto updateDisplayName(Long userId, UpdateDisplayNameRequest req) {
@@ -46,10 +54,33 @@ public class UserService {
         return userMapper.toDto(user);
     }
 
-    public void changePassword(Long userId, String newPassword) {
+    @Transactional
+    public void changePassword(Long userId, String currentPassword, String newPassword) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng."));
-        user.setPassword(newPassword);
+
+        // Chỉ cho tài khoản LOCAL đổi mật khẩu nội bộ
+        if (user.getAuthProvider() != AuthProvider.LOCAL || user.getPassword() == null) {
+            throw new IllegalStateException("Tài khoản không hỗ trợ đổi mật khẩu nội bộ.");
+        }
+
+        // Kiểm tra mật khẩu hiện tại
+        if (!encoder.matches(currentPassword, user.getPassword())) {
+            throw new IllegalArgumentException("Mật khẩu hiện tại không đúng.");
+        }
+
+        // Không cho đặt trùng
+        if (encoder.matches(newPassword, user.getPassword())) {
+            throw new IllegalArgumentException("Mật khẩu mới phải khác mật khẩu cũ.");
+        }
+
+        // Cập nhật mật khẩu
+        user.setPassword(encoder.encode(newPassword));
+        user.setPasswordChangedAt(LocalDateTime.now(ZoneOffset.UTC)); // khuyến nghị
         userRepo.save(user);
+
+        // Revoke ALL tokens của user: buộc đăng nhập lại ở mọi nơi
+        refreshService.revokeAllForUser(userId);
+        sessionService.revokeAllForUser(userId);
     }
 }
