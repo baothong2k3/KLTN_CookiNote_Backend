@@ -9,11 +9,13 @@ import jakarta.validation.ConstraintViolationException;
 import org.hibernate.PropertyValueException;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.TransactionSystemException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.io.IOException;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -160,5 +162,20 @@ public class GlobalExceptionHandler {
                 .header("X-RateLimit-Remaining", "0")
                 .header("X-RateLimit-Reset", String.valueOf(ex.getRetryAfterSeconds()))
                 .body(ApiResponse.error(429, ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalArg(IllegalArgumentException ex,
+                                                              HttpServletRequest req) {
+        HttpStatus status = HttpStatus.BAD_REQUEST; // 400
+        return ResponseEntity.status(status)
+                .body(ApiResponse.error(status.value(), ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(IOException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIO(HttpServletRequest req) {
+        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR; // 500
+        return ResponseEntity.status(status)
+                .body(ApiResponse.error(status.value(), "Không thể xử lý file ảnh.", req.getRequestURI()));
     }
 }
