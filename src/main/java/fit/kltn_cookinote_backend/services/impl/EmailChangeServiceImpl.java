@@ -37,7 +37,6 @@ public class EmailChangeServiceImpl implements EmailChangeService {
     @Transactional
     public OtpRateInfo requestChange(User user, ChangeEmailRequest req) {
         String newEmail = req.newEmail().trim().toLowerCase();
-
         if (newEmail.equalsIgnoreCase(user.getEmail())) {
             throw new IllegalArgumentException("Email mới phải khác email hiện tại.");
         }

@@ -14,6 +14,7 @@ import fit.kltn_cookinote_backend.dtos.response.LoginResponse;
 import fit.kltn_cookinote_backend.dtos.response.OtpRateInfo;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
 import fit.kltn_cookinote_backend.services.AuthService;
+import fit.kltn_cookinote_backend.services.GoogleAuthService;
 import fit.kltn_cookinote_backend.services.LoginService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
     private final AuthService authService;
     private final LoginService loginService;
+    private final GoogleAuthService googleAuthService;
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<Void>> register(@RequestBody @Valid RegisterRequest req,
@@ -88,5 +90,14 @@ public class AuthController {
 
         loginService.logout(req.refreshToken(), currentAccess);
         return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công.", httpReq.getRequestURI()));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<ApiResponse<LoginResponse>> loginWithGoogle(@RequestBody @Valid GoogleLoginRequest req,
+                                                                      HttpServletRequest httpReq) {
+        var resp = googleAuthService.loginWithGoogle(req.idToken());
+        return ResponseEntity.ok(
+                ApiResponse.success("Đăng nhập Google thành công.", resp, httpReq.getRequestURI())
+        );
     }
 }
