@@ -13,6 +13,7 @@ import fit.kltn_cookinote_backend.dtos.request.ChangeEmailRequest;
 import fit.kltn_cookinote_backend.dtos.request.VerifyEmailChangeRequest;
 import fit.kltn_cookinote_backend.dtos.response.OtpRateInfo;
 import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.enums.AuthProvider;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.EmailChangeService;
 import fit.kltn_cookinote_backend.services.OtpService;
@@ -36,6 +37,10 @@ public class EmailChangeServiceImpl implements EmailChangeService {
     @Override
     @Transactional
     public OtpRateInfo requestChange(User user, ChangeEmailRequest req) {
+        if (user.getAuthProvider() == AuthProvider.GOOGLE) {
+            throw new IllegalStateException("Tài khoản Google không thể đổi email.");
+        }
+
         String newEmail = req.newEmail().trim().toLowerCase();
         if (newEmail.equalsIgnoreCase(user.getEmail())) {
             throw new IllegalArgumentException("Email mới phải khác email hiện tại.");
@@ -66,6 +71,9 @@ public class EmailChangeServiceImpl implements EmailChangeService {
 
     @Override
     public void verifyAndCommit(User user, VerifyEmailChangeRequest req) {
+        if (user.getAuthProvider() == AuthProvider.GOOGLE) {
+            throw new IllegalStateException("Tài khoản Google không thể đổi email.");
+        }
         String pending = store.get(user.getUserId());
         if (pending == null) {
             throw new IllegalStateException("Không có yêu cầu đổi email nào đang chờ xác thực.");
