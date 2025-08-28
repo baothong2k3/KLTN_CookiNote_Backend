@@ -16,10 +16,7 @@ import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.AuthProvider;
 import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
-import fit.kltn_cookinote_backend.services.GoogleAuthService;
-import fit.kltn_cookinote_backend.services.JwtService;
-import fit.kltn_cookinote_backend.services.RefreshTokenService;
-import fit.kltn_cookinote_backend.services.SessionAllowlistService;
+import fit.kltn_cookinote_backend.services.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -35,6 +32,7 @@ public class GoogleAuthServiceImpl implements GoogleAuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final SessionAllowlistService sessionAllowlistService;
+    private final MailService mailService;
 
     @Override
     public LoginResponse loginWithGoogle(String idToken) {
@@ -69,6 +67,7 @@ public class GoogleAuthServiceImpl implements GoogleAuthService {
             u.setEmailVerified(p.emailVerified());
             u.setEnabled(true);
             u.setPassword(null);
+            mailService.sendWelcome(email, u.getDisplayName());
             return userRepo.save(u);
         });
 
