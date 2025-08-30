@@ -100,4 +100,11 @@ public class AuthController {
                 ApiResponse.success("Đăng nhập Google thành công.", resp, httpReq.getRequestURI())
         );
     }
+
+    @PostMapping("/forgot")
+    public ResponseEntity<ApiResponse<OtpRateInfo>> start(@Valid @RequestBody ForgotStartRequest req, HttpServletRequest httpReq) {
+        OtpRateInfo info = authService.startForgotPassword(req);
+        return ResponseEntity.ok(ApiResponse.success(
+                "Nếu thông tin hợp lệ, chúng tôi đã gửi mã OTP đến email của bạn.", info, httpReq.getRequestURI()));
+    }
 }

@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.request.ForgotStartRequest;
 import fit.kltn_cookinote_backend.dtos.request.RegisterRequest;
 import fit.kltn_cookinote_backend.dtos.request.ResendOtpRequest;
 import fit.kltn_cookinote_backend.dtos.request.VerifyOtpRequest;
@@ -23,6 +24,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -70,5 +73,23 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalStateException("Email đã xác thực.");
         }
         return otpService.resendEmailVerifyOtp(user);
+    }
+
+    @Override
+    public OtpRateInfo startForgotPassword(ForgotStartRequest req) {
+        Optional<User> ou = userRepo.findByUsernameAndEmail(req.username(), req.email());
+
+        if (ou.isEmpty()) {
+            // Trả OtpRateInfo “mask” (toàn số 0) — không tiết lộ user tồn tại hay không
+            return OtpRateInfo.zero();
+        }
+
+        User user = ou.get();
+
+        // Nếu là tài khoản Google → không gửi OTP, vẫn trả về thông điệp chung
+        if (user.getAuthProvider() == AuthProvider.GOOGLE) {
+            return OtpRateInfo.zero();
+        }
+        return otpService.createAndSendEmailResetPassword(user);
     }
 }

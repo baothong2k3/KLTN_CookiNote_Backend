@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.services;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.request.ForgotStartRequest;
 import fit.kltn_cookinote_backend.dtos.response.OtpRateInfo;
 import fit.kltn_cookinote_backend.dtos.request.RegisterRequest;
 import fit.kltn_cookinote_backend.dtos.request.ResendOtpRequest;
@@ -22,4 +23,6 @@ public interface AuthService {
     void verifyEmail(VerifyOtpRequest req);
 
     OtpRateInfo resendOtp(ResendOtpRequest req);
+
+    OtpRateInfo startForgotPassword(ForgotStartRequest req);
 }

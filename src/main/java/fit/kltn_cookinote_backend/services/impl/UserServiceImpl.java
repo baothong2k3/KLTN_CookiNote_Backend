@@ -96,33 +96,4 @@ public class UserServiceImpl implements UserService {
         refreshService.revokeAllForUser(userId);
         sessionService.revokeAllForUser(userId);
     }
-
-    @Override
-    @Transactional
-    public OtpRateInfo start(ForgotStartRequest req) {
-        Optional<User> ou = userRepo.findByUsernameAndEmail(req.username(), req.email());
-
-        // Bảo mật chống dò tài khoản
-        if (ou.isEmpty()) {
-            return OtpRateInfo.zero();
-        }
-
-        User user = ou.get();
-
-        // Nếu là tài khoản Google -> không cho reset password
-        if (user.getAuthProvider() == AuthProvider.GOOGLE) {
-            return OtpRateInfo.zero();
-        }
-        return null;
-    }
-
-    @Override
-    public ResetTokenResponse verifyOtp(ForgotVerifyRequest req) {
-        return null;
-    }
-
-    @Override
-    public void reset(ForgotResetRequest req) {
-
-    }
 }
