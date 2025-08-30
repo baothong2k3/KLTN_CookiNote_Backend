@@ -18,4 +18,6 @@ public interface UserService {
     UserDto updateDisplayName(Long userId, UpdateDisplayNameRequest req);
 
     void changePassword(Long userId, String currentPassword, String newPassword);
+
+    boolean checkPassword(Long userId, String currentPassword);
 }

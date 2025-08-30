@@ -133,4 +133,18 @@ public class UserController {
                 ApiResponse.success("Cập nhật avatar thành công", url, req.getRequestURI())
         );
     }
+
+    @GetMapping("/check-password")
+    public ResponseEntity<ApiResponse<Boolean>> checkPassword(@AuthenticationPrincipal User authUser,
+                                                              @RequestParam("currentPassword") String currentPassword,
+                                                              HttpServletRequest httpReq) {
+        if (authUser == null) {
+            return ResponseEntity.status(401)
+                    .body(ApiResponse.error(401, "Token đã hết hạn hoặc không hợp lệ", httpReq.getRequestURI()));
+        }
+        boolean matches = userService.checkPassword(authUser.getUserId(), currentPassword);
+        return ResponseEntity.ok(
+                ApiResponse.success("OK", matches, httpReq.getRequestURI())
+        );
+    }
 }

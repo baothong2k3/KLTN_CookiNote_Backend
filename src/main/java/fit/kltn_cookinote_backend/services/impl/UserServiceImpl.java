@@ -88,4 +88,14 @@ public class UserServiceImpl implements UserService {
         refreshService.revokeAllForUser(userId);
         sessionService.revokeAllForUser(userId);
     }
+
+    @Override
+    public boolean checkPassword(Long userId, String currentPassword) {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng."));
+        if (user.getAuthProvider() != AuthProvider.LOCAL || user.getPassword() == null) {
+            throw new IllegalStateException("Tài khoản không hỗ trợ kiểm tra mật khẩu nội bộ.");
+        }
+        return encoder.matches(currentPassword, user.getPassword());
+    }
 }
