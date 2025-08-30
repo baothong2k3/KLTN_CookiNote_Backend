@@ -15,7 +15,6 @@ import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.AuthProvider;
 import fit.kltn_cookinote_backend.mappers.UserMapper;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
-import fit.kltn_cookinote_backend.services.OtpService;
 import fit.kltn_cookinote_backend.services.RefreshTokenService;
 import fit.kltn_cookinote_backend.services.SessionAllowlistService;
 import fit.kltn_cookinote_backend.services.UserService;
