@@ -10,7 +10,12 @@ package fit.kltn_cookinote_backend.services.impl;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.UserDto;
+import fit.kltn_cookinote_backend.dtos.request.ForgotResetRequest;
+import fit.kltn_cookinote_backend.dtos.request.ForgotStartRequest;
+import fit.kltn_cookinote_backend.dtos.request.ForgotVerifyRequest;
 import fit.kltn_cookinote_backend.dtos.request.UpdateDisplayNameRequest;
+import fit.kltn_cookinote_backend.dtos.response.OtpRateInfo;
+import fit.kltn_cookinote_backend.dtos.response.ResetTokenResponse;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.AuthProvider;
 import fit.kltn_cookinote_backend.mappers.UserMapper;
@@ -87,5 +92,20 @@ public class UserServiceImpl implements UserService {
         // Revoke ALL tokens của user: buộc đăng nhập lại ở mọi nơi
         refreshService.revokeAllForUser(userId);
         sessionService.revokeAllForUser(userId);
+    }
+
+    @Override
+    public OtpRateInfo start(ForgotStartRequest req) {
+        return null;
+    }
+
+    @Override
+    public ResetTokenResponse verifyOtp(ForgotVerifyRequest req) {
+        return null;
+    }
+
+    @Override
+    public void reset(ForgotResetRequest req) {
+
     }
 }
