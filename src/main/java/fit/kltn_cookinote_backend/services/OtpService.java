@@ -39,18 +39,17 @@ public class OtpService {
 
     private static final Duration OTP_TTL = Duration.ofMinutes(5);
 
-    public OtpRateInfo createAndSendEmailVerifyOtp(User user) {
-        String purpose = OtpPurpose.EMAIL_VERIFY.name();
+    public OtpRateInfo createAndSendOtp(User user, String email, OtpPurpose purpose) {
 
-        rateLimiter.consumeOrThrow(user.getUserId(), purpose);
+        rateLimiter.consumeOrThrow(user.getUserId(), purpose.name());
 
         String rawOtp = generateNumericOtp(6);
         String hash = encoder.encode(rawOtp);
 
-        EmailOtp otp = otpRepo.findByUserAndPurpose(user, OtpPurpose.EMAIL_VERIFY)
+        EmailOtp otp = otpRepo.findByUserAndPurpose(user, purpose)
                 .orElseGet(() -> EmailOtp.builder()
                         .user(user)
-                        .purpose(OtpPurpose.EMAIL_VERIFY)
+                        .purpose(purpose)
                         .build());
 
         otp.setCodeHash(hash);
@@ -60,9 +59,9 @@ public class OtpService {
 
         otpRepo.saveAndFlush(otp);
 
-        mailService.sendOtp(user.getEmail(), user.getUsername(), rawOtp);
+        mailService.sendOtp(email, user.getUsername(), rawOtp);
 
-        RateWindow w = rateLimiter.currentWindow(user.getUserId(), purpose);
+        RateWindow w = rateLimiter.currentWindow(user.getUserId(), purpose.name());
         long remaining = Math.max(0, w.limit() - w.used());
         return OtpRateInfo.builder()
                 .used(w.used())
@@ -95,8 +94,20 @@ public class OtpService {
         otpRepo.delete(otp);
     }
 
+    public void createAndSendEmailVerifyOtp(User user) {
+        createAndSendOtp(user, user.getEmail(), OtpPurpose.EMAIL_VERIFY);
+    }
+
+    public OtpRateInfo createAndSendEmailChangeOtp(User user, String newEmail) {
+        return createAndSendOtp(user, newEmail, OtpPurpose.EMAIL_CHANGE);
+    }
+
+    public OtpRateInfo createAndSendEmailResetPassword(User user) {
+        return createAndSendOtp(user, user.getEmail(), OtpPurpose.PASSWORD_RESET);
+    }
+
     public OtpRateInfo resendEmailVerifyOtp(User user) {
-        return createAndSendEmailVerifyOtp(user);
+        return createAndSendOtp(user, user.getEmail(), OtpPurpose.EMAIL_VERIFY);
     }
 
     private String generateNumericOtp(int digits) {
@@ -105,38 +116,6 @@ public class OtpService {
         int min = (int) Math.pow(10, digits - 1);
         int number = r.nextInt(bound - min) + min;
         return String.valueOf(number);
-    }
-
-    public OtpRateInfo createAndSendEmailChangeOtp(User user, String newEmail) {
-        // Rate limit theo (user, EMAIL_CHANGE)
-        rateLimiter.consumeOrThrow(user.getUserId(), OtpPurpose.EMAIL_CHANGE.name());
-
-        String rawOtp = generateNumericOtp(6);
-        String hash = encoder.encode(rawOtp);
-
-        EmailOtp otp = otpRepo.findByUserAndPurpose(user, OtpPurpose.EMAIL_CHANGE)
-                .orElseGet(() -> EmailOtp.builder()
-                        .user(user)
-                        .purpose(OtpPurpose.EMAIL_CHANGE)
-                        .build());
-
-        otp.setCodeHash(hash);
-        otp.setExpiresAt(LocalDateTime.now(ZoneOffset.UTC).plus(OTP_TTL));
-        otp.setAttempts(0);
-        otp.setMaxAttempts(5);
-        otpRepo.save(otp);
-
-        // Gửi đến EMAIL MỚI
-        mailService.sendOtp(newEmail, user.getUsername(), rawOtp);
-
-        RateWindow w = rateLimiter.currentWindow(user.getUserId(), OtpPurpose.EMAIL_CHANGE.toString());
-        long remaining = Math.max(0, w.limit() - w.used());
-        return OtpRateInfo.builder()
-                .used(w.used())
-                .limit(w.limit())
-                .remaining(remaining)
-                .resetAfter(w.ttlSeconds())
-                .build();
     }
 
     public void verifyEmailChangeOtp(User user, String inputOtp) {

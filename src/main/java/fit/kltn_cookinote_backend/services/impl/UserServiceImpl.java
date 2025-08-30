@@ -20,6 +20,7 @@ import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.AuthProvider;
 import fit.kltn_cookinote_backend.mappers.UserMapper;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
+import fit.kltn_cookinote_backend.services.OtpService;
 import fit.kltn_cookinote_backend.services.RefreshTokenService;
 import fit.kltn_cookinote_backend.services.SessionAllowlistService;
 import fit.kltn_cookinote_backend.services.UserService;
@@ -30,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +41,7 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder encoder;
     private final RefreshTokenService refreshService;
     private final SessionAllowlistService sessionService;
+    private final OtpService otpService;
 
     @Override
     @Transactional
@@ -95,7 +98,21 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public OtpRateInfo start(ForgotStartRequest req) {
+        Optional<User> ou = userRepo.findByUsernameAndEmail(req.username(), req.email());
+
+        // Bảo mật chống dò tài khoản
+        if (ou.isEmpty()) {
+            return OtpRateInfo.zero();
+        }
+
+        User user = ou.get();
+
+        // Nếu là tài khoản Google -> không cho reset password
+        if (user.getAuthProvider() == AuthProvider.GOOGLE) {
+            return OtpRateInfo.zero();
+        }
         return null;
     }
 

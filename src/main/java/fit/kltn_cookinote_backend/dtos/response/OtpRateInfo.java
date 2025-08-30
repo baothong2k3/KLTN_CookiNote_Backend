@@ -18,4 +18,7 @@ public record OtpRateInfo(
         long remaining,  // còn lại
         long resetAfter  // còn bao giây thì reset cửa sổ
 ) {
+    public static OtpRateInfo zero() {
+        return new OtpRateInfo(0, 0, 0, 0);
+    }
 }
