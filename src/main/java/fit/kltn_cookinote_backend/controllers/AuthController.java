@@ -107,4 +107,11 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Nếu thông tin hợp lệ, chúng tôi đã gửi mã OTP đến email của bạn.", info, httpReq.getRequestURI()));
     }
+
+    @PutMapping("/forgot/reset-with-otp")
+    public ResponseEntity<ApiResponse<Void>> resetWithOtp(@Valid @RequestBody ForgotVerifyRequest req, HttpServletRequest httpReq) {
+        authService.resetPasswordWithOtp(req);
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đổi mật khẩu thành công. Vui lòng đăng nhập lại.", httpReq.getRequestURI()));
+    }
 }

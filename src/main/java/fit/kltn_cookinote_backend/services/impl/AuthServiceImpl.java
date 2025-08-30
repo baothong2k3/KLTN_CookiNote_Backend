@@ -9,17 +9,16 @@ package fit.kltn_cookinote_backend.services.impl;/*
  * @version: 1.0
  */
 
-import fit.kltn_cookinote_backend.dtos.request.ForgotStartRequest;
-import fit.kltn_cookinote_backend.dtos.request.RegisterRequest;
-import fit.kltn_cookinote_backend.dtos.request.ResendOtpRequest;
-import fit.kltn_cookinote_backend.dtos.request.VerifyOtpRequest;
+import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.OtpRateInfo;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.AuthProvider;
+import fit.kltn_cookinote_backend.enums.OtpPurpose;
 import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.AuthService;
 import fit.kltn_cookinote_backend.services.OtpService;
+import fit.kltn_cookinote_backend.services.SessionAllowlistService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -34,6 +33,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepo;
     private final PasswordEncoder encoder;
     private final OtpService otpService;
+    private final SessionAllowlistService sessionAllowlistService;
 
     @Override
     public void register(RegisterRequest req) {
@@ -91,5 +91,28 @@ public class AuthServiceImpl implements AuthService {
             return OtpRateInfo.zero();
         }
         return otpService.createAndSendEmailResetPassword(user);
+    }
+
+    @Override
+    public void resetPasswordWithOtp(ForgotVerifyRequest req) {
+        final String username = req.username().trim();
+        final String email = req.email().trim();
+
+        User user = userRepo.findByUsernameAndEmail(username, email)
+                .orElseThrow(() -> new IllegalStateException("OTP không hợp lệ hoặc đã hết hạn"));
+
+        // chặn tài khoản Google
+        if (user.getAuthProvider() == AuthProvider.GOOGLE) {
+            throw new IllegalStateException("Tài khoản này đăng nhập bằng Google. Vui lòng đăng nhập bằng Google.");
+        }
+        // verify + consume OTP (one-time) (đảm bảo @Transactional để tránh race)
+        otpService.verifyAndConsumeOtpOrThrow(user, OtpPurpose.PASSWORD_RESET, req.otp());
+
+        // đổi mật khẩu
+        user.setPassword(encoder.encode(req.newPassword()));
+        userRepo.save(user);
+
+        // revoke toàn bộ phiên/refresh tokens
+        sessionAllowlistService.revokeAllForUser(user.getUserId());
     }
 }

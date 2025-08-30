@@ -10,12 +10,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.UserDto;
-import fit.kltn_cookinote_backend.dtos.request.ForgotResetRequest;
-import fit.kltn_cookinote_backend.dtos.request.ForgotStartRequest;
-import fit.kltn_cookinote_backend.dtos.request.ForgotVerifyRequest;
 import fit.kltn_cookinote_backend.dtos.request.UpdateDisplayNameRequest;
-import fit.kltn_cookinote_backend.dtos.response.OtpRateInfo;
-import fit.kltn_cookinote_backend.dtos.response.ResetTokenResponse;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.AuthProvider;
 import fit.kltn_cookinote_backend.mappers.UserMapper;
@@ -31,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -41,7 +35,6 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder encoder;
     private final RefreshTokenService refreshService;
     private final SessionAllowlistService sessionService;
-    private final OtpService otpService;
 
     @Override
     @Transactional

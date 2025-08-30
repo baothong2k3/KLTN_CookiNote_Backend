@@ -9,11 +9,8 @@ package fit.kltn_cookinote_backend.services;/*
  * @version: 1.0
  */
 
-import fit.kltn_cookinote_backend.dtos.request.ForgotStartRequest;
+import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.OtpRateInfo;
-import fit.kltn_cookinote_backend.dtos.request.RegisterRequest;
-import fit.kltn_cookinote_backend.dtos.request.ResendOtpRequest;
-import fit.kltn_cookinote_backend.dtos.request.VerifyOtpRequest;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -25,4 +22,6 @@ public interface AuthService {
     OtpRateInfo resendOtp(ResendOtpRequest req);
 
     OtpRateInfo startForgotPassword(ForgotStartRequest req);
+
+    void resetPasswordWithOtp(ForgotVerifyRequest req);
 }

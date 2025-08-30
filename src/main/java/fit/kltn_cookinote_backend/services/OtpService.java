@@ -136,4 +136,31 @@ public class OtpService {
         // Thành công -> xóa OTP (đổi email sẽ được làm tại EmailChangeService)
         otpRepo.delete(otp);
     }
+
+    public void verifyAndConsumeOtpOrThrow(User user, OtpPurpose purpose, String rawOtp) {
+        EmailOtp otp = otpRepo.findByUserAndPurpose(user, purpose)
+                .orElseThrow(() -> new IllegalStateException("OTP không hợp lệ hoặc đã hết hạn"));
+
+        // hết hạn?
+        if (otp.getExpiresAt().isBefore(LocalDateTime.now(ZoneOffset.UTC))) {
+            otpRepo.delete(otp);
+            throw new IllegalStateException("OTP không hợp lệ hoặc đã hết hạn");
+        }
+
+        // quá số lần?
+        if (otp.getAttempts() >= otp.getMaxAttempts()) {
+            otpRepo.delete(otp);
+            throw new IllegalStateException("Bạn đã nhập sai quá số lần cho phép");
+        }
+
+        // sai → tăng attempts
+        if (!encoder.matches(rawOtp, otp.getCodeHash())) {
+            otp.setAttempts(otp.getAttempts() + 1);
+            otpRepo.save(otp);
+            throw new IllegalStateException("OTP không hợp lệ hoặc đã hết hạn");
+        }
+
+        // đúng → consume one-time
+        otpRepo.delete(otp);
+    }
 }
