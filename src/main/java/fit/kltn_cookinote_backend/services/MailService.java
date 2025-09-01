@@ -33,4 +33,18 @@ public class MailService {
                 """.formatted(username, otp));
         mailSender.send(message);
     }
+
+    public void sendWelcome(String to, String username) {
+        var message = new SimpleMailMessage();
+        message.setTo(to);
+        message.setSubject("[CookiNote] Chào mừng bạn đến với CookiNote");
+        message.setText("""
+                Xin chào, %s!
+                
+                Chào mừng bạn đến với CookiNote! Chúng tôi rất vui khi có bạn tham gia cùng chúng tôi.
+                
+                Hãy bắt đầu hành trình ẩm thực của bạn với CookiNote ngay hôm nay!
+                """.formatted(username));
+        mailSender.send(message);
+    }
 }

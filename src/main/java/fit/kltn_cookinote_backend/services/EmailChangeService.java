@@ -13,72 +13,14 @@ import fit.kltn_cookinote_backend.dtos.request.ChangeEmailRequest;
 import fit.kltn_cookinote_backend.dtos.request.VerifyEmailChangeRequest;
 import fit.kltn_cookinote_backend.dtos.response.OtpRateInfo;
 import fit.kltn_cookinote_backend.entities.User;
-import fit.kltn_cookinote_backend.repositories.UserRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Duration;
 
 @Service
-@RequiredArgsConstructor
-@Transactional
-public class EmailChangeService {
+public interface EmailChangeService {
 
-    private final UserRepository userRepo;
-    private final PendingEmailChangeStore store;
-    private final OtpService otpService;
+    OtpRateInfo requestChange(User user, ChangeEmailRequest req);
 
-    private static final Duration PENDING_TTL = Duration.ofMinutes(5);
+    OtpRateInfo resendOtp(User user, ChangeEmailRequest req);
 
-    @Transactional
-    public OtpRateInfo requestChange(User user, ChangeEmailRequest req) {
-        String newEmail = req.newEmail().trim().toLowerCase();
-
-        if (newEmail.equalsIgnoreCase(user.getEmail())) {
-            throw new IllegalArgumentException("Email mới phải khác email hiện tại.");
-        }
-        if (userRepo.existsByEmail(newEmail)) {
-            throw new IllegalArgumentException("Email này đã được sử dụng.");
-        }
-
-        // Lưu pending vào Redis để ràng buộc OTP với email MỚI
-        store.put(user.getUserId(), newEmail, PENDING_TTL);
-
-        // Gửi OTP tới email mới
-        return otpService.createAndSendEmailChangeOtp(user, newEmail);
-    }
-
-    @Transactional
-    public OtpRateInfo resendOtp(User user, ChangeEmailRequest req) {
-        String pending = store.get(user.getUserId());
-        if (pending == null) {
-            throw new IllegalStateException("Không có yêu cầu đổi email nào đang chờ xác thực.");
-        }
-        if (!pending.equalsIgnoreCase(req.newEmail().trim())) {
-            throw new IllegalStateException("Email mới không khớp với yêu cầu đang chờ xác thực.");
-        }
-        return otpService.createAndSendEmailChangeOtp(user, pending);
-    }
-
-    public void verifyAndCommit(User user, VerifyEmailChangeRequest req) {
-        String pending = store.get(user.getUserId());
-        if (pending == null) {
-            throw new IllegalStateException("Không có yêu cầu đổi email nào đang chờ xác thực.");
-        }
-        if (!pending.equalsIgnoreCase(req.newEmail().trim())) {
-            throw new IllegalStateException("Email mới không khớp với yêu cầu đang chờ xác thực.");
-        }
-
-        // Verify OTP (purpose EMAIL_CHANGE)
-        otpService.verifyEmailChangeOtp(user, req.otp());
-
-        // Commit: cập nhật email trong DB
-        user.setEmail(pending);
-        user.setEmailVerified(true); // xác thực email mới
-        userRepo.save(user);
-
-        // Dọn dẹp pending
-        store.delete(user.getUserId());
-    }
+    void verifyAndCommit(User user, VerifyEmailChangeRequest req);
 }
