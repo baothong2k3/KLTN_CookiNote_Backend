@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -63,6 +64,17 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     public List<CategoryResponse> listAll() {
         List<Category> categories = categoryRepository.findAll(Sort.by("name").ascending());
+        return categories.stream().map(this::toResponse).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CategoryResponse> listAllByCategoryName(String categoryName) {
+        String keyword = (categoryName == null) ? "" : categoryName.trim();
+        if (!StringUtils.hasText(keyword)) {
+            throw new IllegalArgumentException("Từ khoá tìm kiếm không được để trống");
+        }
+        List<Category> categories = categoryRepository.findByNameContainingIgnoreCase(keyword, Sort.by("name").ascending());
         return categories.stream().map(this::toResponse).toList();
     }
 

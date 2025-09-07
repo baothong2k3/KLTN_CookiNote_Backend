@@ -48,4 +48,10 @@ public class CategoryController {
         List<CategoryResponse> data = categoryService.listAll();
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách danh mục thành công", data, httpReq.getRequestURI()));
     }
+
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> listAllCategoriesByName(@RequestParam("categoryName") String categoryName, HttpServletRequest httpReq) {
+        List<CategoryResponse> data = categoryService.listAllByCategoryName(categoryName);
+        return ResponseEntity.ok(ApiResponse.success("Tìm danh mục thành công", data, httpReq.getRequestURI()));
+    }
 }

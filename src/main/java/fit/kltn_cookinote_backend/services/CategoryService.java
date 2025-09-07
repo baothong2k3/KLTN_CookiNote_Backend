@@ -17,6 +17,10 @@ import java.util.List;
 
 public interface CategoryService {
     CategoryResponse create(CreateCategoryRequest req);
+
     CategoryResponse update(Long id, UpdateCategoryRequest req);
+
     List<CategoryResponse> listAll();
+
+    List<CategoryResponse> listAllByCategoryName(String categoryName);
 }
