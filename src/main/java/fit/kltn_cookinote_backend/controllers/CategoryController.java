@@ -10,6 +10,7 @@ package fit.kltn_cookinote_backend.controllers;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.request.CreateCategoryRequest;
+import fit.kltn_cookinote_backend.dtos.request.UpdateCategoryRequest;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
 import fit.kltn_cookinote_backend.dtos.response.CategoryResponse;
 import fit.kltn_cookinote_backend.services.CategoryService;
@@ -18,10 +19,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -34,5 +32,12 @@ public class CategoryController {
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(@Valid @RequestBody CreateCategoryRequest req, HttpServletRequest httpReq) {
         CategoryResponse data = categoryService.create(req);
         return ResponseEntity.ok(ApiResponse.success("Tạo danh mục thành công", data, httpReq.getRequestURI()));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(@PathVariable Long id, @Valid @RequestBody UpdateCategoryRequest req, HttpServletRequest httpReq) {
+        CategoryResponse data = categoryService.update(id, req);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật danh mục thành công", data, httpReq.getRequestURI()));
     }
 }

@@ -10,8 +10,10 @@ package fit.kltn_cookinote_backend.services;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.request.CreateCategoryRequest;
+import fit.kltn_cookinote_backend.dtos.request.UpdateCategoryRequest;
 import fit.kltn_cookinote_backend.dtos.response.CategoryResponse;
 
 public interface CategoryService {
     CategoryResponse create(CreateCategoryRequest req);
+    CategoryResponse update(Long id, UpdateCategoryRequest req);
 }

@@ -10,6 +10,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.request.CreateCategoryRequest;
+import fit.kltn_cookinote_backend.dtos.request.UpdateCategoryRequest;
 import fit.kltn_cookinote_backend.dtos.response.CategoryResponse;
 import fit.kltn_cookinote_backend.entities.Category;
 import fit.kltn_cookinote_backend.repositories.CategoryRepository;
@@ -38,10 +39,29 @@ public class CategoryServiceImpl implements CategoryService {
                         .build()
         );
 
+        return toResponse(saved);
+    }
+
+    @Override
+    public CategoryResponse update(Long id, UpdateCategoryRequest req) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Danh mục không tồn tại"));
+        String name = req.name().trim();
+        if (categoryRepository.existsByNameIgnoreCaseAndIdNot(name, id)) {
+            throw new IllegalArgumentException("Tên danh mục đã tồn tại");
+        }
+        category.setName(name);
+        category.setDescription(req.description());
+
+        Category saved = categoryRepository.save(category);
+        return toResponse(saved);
+    }
+
+    private CategoryResponse toResponse(Category c) {
         return CategoryResponse.builder()
-                .id(saved.getId())
-                .name(saved.getName())
-                .description(saved.getDescription())
+                .id(c.getId())
+                .name(c.getName())
+                .description(c.getDescription())
                 .build();
     }
 }
