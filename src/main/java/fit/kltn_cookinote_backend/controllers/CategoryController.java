@@ -21,6 +21,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/categories")
@@ -39,5 +41,11 @@ public class CategoryController {
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(@PathVariable Long id, @Valid @RequestBody UpdateCategoryRequest req, HttpServletRequest httpReq) {
         CategoryResponse data = categoryService.update(id, req);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật danh mục thành công", data, httpReq.getRequestURI()));
+    }
+
+    @GetMapping({"", "/"})
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> listAllCategories(HttpServletRequest httpReq) {
+        List<CategoryResponse> data = categoryService.listAll();
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách danh mục thành công", data, httpReq.getRequestURI()));
     }
 }

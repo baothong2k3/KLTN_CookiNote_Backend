@@ -13,7 +13,10 @@ import fit.kltn_cookinote_backend.dtos.request.CreateCategoryRequest;
 import fit.kltn_cookinote_backend.dtos.request.UpdateCategoryRequest;
 import fit.kltn_cookinote_backend.dtos.response.CategoryResponse;
 
+import java.util.List;
+
 public interface CategoryService {
     CategoryResponse create(CreateCategoryRequest req);
     CategoryResponse update(Long id, UpdateCategoryRequest req);
+    List<CategoryResponse> listAll();
 }

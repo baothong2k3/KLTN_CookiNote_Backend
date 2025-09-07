@@ -16,8 +16,11 @@ import fit.kltn_cookinote_backend.entities.Category;
 import fit.kltn_cookinote_backend.repositories.CategoryRepository;
 import fit.kltn_cookinote_backend.services.CategoryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -55,6 +58,12 @@ public class CategoryServiceImpl implements CategoryService {
 
         Category saved = categoryRepository.save(category);
         return toResponse(saved);
+    }
+
+    @Override
+    public List<CategoryResponse> listAll() {
+        List<Category> categories = categoryRepository.findAll(Sort.by("name").ascending());
+        return categories.stream().map(this::toResponse).toList();
     }
 
     private CategoryResponse toResponse(Category c) {
