@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/categories", "/categories/").permitAll()
                         .requestMatchers(HttpMethod.GET, "/categories/search").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/recipes/categories/*").permitAll()
                         .anyRequest().authenticated()
                 ).exceptionHandling(ex -> ex
                         .authenticationEntryPoint(jsonEntryPoint)     // 401 JSON
