@@ -13,5 +13,5 @@ import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
 import fit.kltn_cookinote_backend.dtos.response.IdResponse;
 
 public interface RecipeService {
-    IdResponse createByAdmin(Long adminUserId, RecipeCreateRequest req);
+    IdResponse createByRecipe(Long id, RecipeCreateRequest req);
 }
