@@ -12,6 +12,8 @@ package fit.kltn_cookinote_backend.services.impl;/*
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeIngredientCreate;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepCreate;
+import fit.kltn_cookinote_backend.dtos.response.PageResult;
+import fit.kltn_cookinote_backend.dtos.response.RecipeCardResponse;
 import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
 import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Privacy;
@@ -22,6 +24,10 @@ import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.RecipeService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +44,10 @@ public class RecipeServiceImpl implements RecipeService {
     private final RecipeRepository recipeRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
+
+    private static final int DEFAULT_PAGE = 0;
+    private static final int DEFAULT_SIZE = 12; // mobile-friendly
+    private static final int MAX_SIZE = 20;
 
     @Override
     @Transactional
@@ -118,6 +128,22 @@ public class RecipeServiceImpl implements RecipeService {
         }
 
         return RecipeResponse.from(recipe);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<RecipeCardResponse> listPublicByCategory(Long categoryId, int page, int size) {
+        if (categoryId == null) throw new EntityNotFoundException("Category không hợp lệ.");
+
+        // Chuẩn hóa phân trang cho mobile
+        int p = Math.max(0, page);
+        int s = Math.min((size > 0 ? size : DEFAULT_SIZE), MAX_SIZE);
+        Pageable pageable = PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        Page<Recipe> pageData = recipeRepository.findByCategory_IdAndPrivacy(categoryId, Privacy.PUBLIC, pageable);
+
+        Page<RecipeCardResponse> mapped = pageData.map(RecipeCardResponse::from);
+        return PageResult.of(mapped);
     }
 
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {

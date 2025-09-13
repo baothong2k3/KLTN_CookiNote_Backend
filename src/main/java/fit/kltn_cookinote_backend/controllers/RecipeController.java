@@ -11,6 +11,8 @@ package fit.kltn_cookinote_backend.controllers;/*
 
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
+import fit.kltn_cookinote_backend.dtos.response.PageResult;
+import fit.kltn_cookinote_backend.dtos.response.RecipeCardResponse;
 import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
@@ -78,5 +80,16 @@ public class RecipeController {
         Long viewerId = (authUser != null) ? authUser.getUserId() : null;
         RecipeResponse data = recipeService.getDetail(viewerId, id);
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết công thức thành công", data, httpReq.getRequestURI()));
+    }
+
+    @GetMapping("/categories/{categoryId}")
+    public ResponseEntity<ApiResponse<PageResult<RecipeCardResponse>>> listByCategory(
+            @PathVariable Long categoryId,
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "size", required = false, defaultValue = "12") int size,
+            HttpServletRequest httpReq
+    ) {
+        PageResult<RecipeCardResponse> data = recipeService.listPublicByCategory(categoryId, page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức theo danh mục thành công", data, httpReq.getRequestURI()));
     }
 }
