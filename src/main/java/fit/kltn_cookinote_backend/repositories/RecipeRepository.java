@@ -46,4 +46,6 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
     void incrementViewById(@Param("id") Long id);
 
     Page<Recipe> findByCategory_IdAndPrivacy(Long categoryId, Privacy privacy, Pageable pageable);
+
+    Page<Recipe> findByPrivacy(Privacy privacy, Pageable pageable);
 }

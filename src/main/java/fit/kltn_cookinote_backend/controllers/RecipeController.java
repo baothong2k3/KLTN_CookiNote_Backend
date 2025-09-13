@@ -91,4 +91,14 @@ public class RecipeController {
         PageResult<RecipeCardResponse> data = recipeService.listPublicByCategory(categoryId, page, size);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức theo danh mục thành công", data, httpReq.getRequestURI()));
     }
+
+    @GetMapping("/public")
+    public ResponseEntity<ApiResponse<PageResult<RecipeCardResponse>>> listPublic(
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "size", required = false, defaultValue = "12") int size,
+            HttpServletRequest httpReq
+    ) {
+        PageResult<RecipeCardResponse> data = recipeService.listPublic(page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức công khai thành công", data, httpReq.getRequestURI()));
+    }
 }
