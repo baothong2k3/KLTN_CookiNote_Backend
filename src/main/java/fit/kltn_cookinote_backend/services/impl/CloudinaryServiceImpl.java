@@ -14,6 +14,7 @@ import com.cloudinary.utils.ObjectUtils;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.CloudinaryService;
+import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,11 +54,7 @@ public class CloudinaryServiceImpl implements CloudinaryService {
     @Override
     @Transactional
     public String updateAvatar(Long userId, MultipartFile file) throws IOException {
-        if (file == null || file.isEmpty()) throw new IllegalArgumentException("File ảnh trống.");
-        String ct = file.getContentType();
-        if (ct == null || !ALLOWED_TYPES.contains(ct))
-            throw new IllegalArgumentException("Định dạng ảnh không hợp lệ (chỉ JPG, PNG, WEBP).");
-        if (file.getSize() > 5 * 1024 * 1024) throw new IllegalArgumentException("Kích thước ảnh vượt quá 5MB.");
+        ImageValidationUtils.validateImage(file);
 
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User không tồn tại."));

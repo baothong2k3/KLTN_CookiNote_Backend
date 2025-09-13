@@ -15,7 +15,6 @@ import fit.kltn_cookinote_backend.entities.Category;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.CategoryRepository;
-import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.RecipeService;
 import jakarta.persistence.EntityNotFoundException;
@@ -27,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class RecipeServiceImpl implements RecipeService {
-    private final RecipeRepository recipeRepository;
+    //private final RecipeRepository recipeRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
 
