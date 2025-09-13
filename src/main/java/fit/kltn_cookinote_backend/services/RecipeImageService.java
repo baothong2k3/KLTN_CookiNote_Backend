@@ -15,7 +15,7 @@ import java.io.IOException;
 import java.util.List;
 
 public interface RecipeImageService {
-    String uploadCover(Long recipeId, MultipartFile file) throws IOException;
+    String uploadCover(Long actorUserId, Long recipeId, MultipartFile file) throws IOException;
 
     List<String> uploadStepImages(Long recipeId, Long stepId, List<MultipartFile> files) throws IOException;
 }

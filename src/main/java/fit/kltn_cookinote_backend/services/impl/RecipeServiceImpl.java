@@ -44,6 +44,9 @@ public class RecipeServiceImpl implements RecipeService {
     public IdResponse createByRecipe(Long id, RecipeCreateRequest req) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + id));
+
+        Privacy privacy = req.privacy() == null ? Privacy.PRIVATE : req.privacy();
+
         if (user.getRole() != Role.ADMIN && req.privacy() == Privacy.PUBLIC) {
             throw new AccessDeniedException("Chỉ ADMIN mới được tạo recipe công khai");
         }
@@ -52,7 +55,7 @@ public class RecipeServiceImpl implements RecipeService {
 
         Recipe recipe = Recipe.builder()
                 .user(user)
-                .privacy(req.privacy())
+                .privacy(privacy)
                 .category(category)
                 .title(req.title())
                 .description(req.description())

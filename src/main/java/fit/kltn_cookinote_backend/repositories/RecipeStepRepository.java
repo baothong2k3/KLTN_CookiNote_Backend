@@ -11,9 +11,14 @@ package fit.kltn_cookinote_backend.repositories;/*
 
 import fit.kltn_cookinote_backend.entities.RecipeStep;
 import org.springframework.data.jpa.repository.JpaRepository;
-
-import java.util.List;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface RecipeStepRepository extends JpaRepository<RecipeStep, Long> {
-    List<RecipeStep> findByRecipe_IdOrderByStepNoAsc(Long recipeId);
+    @Query("""
+            select r.user.userId
+            from RecipeStep s join s.recipe r
+            where s.id = :stepId
+            """)
+    Long findOwnerIdByStepId(@Param("stepId") Long stepId);
 }
