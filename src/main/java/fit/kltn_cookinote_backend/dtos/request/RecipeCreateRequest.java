@@ -1,6 +1,7 @@
 package fit.kltn_cookinote_backend.dtos.request;
 
 import fit.kltn_cookinote_backend.enums.Difficulty;
+import fit.kltn_cookinote_backend.enums.Privacy;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
@@ -23,6 +24,8 @@ public record RecipeCreateRequest(
         Integer cookTime,
 
         Difficulty difficulty,
+
+        Privacy privacy,
 
         @Size(max = 2048)
         String imageUrl,

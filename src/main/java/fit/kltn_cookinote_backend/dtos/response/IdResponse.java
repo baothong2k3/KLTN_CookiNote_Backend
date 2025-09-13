@@ -9,5 +9,8 @@ package fit.kltn_cookinote_backend.dtos.response;/*
  * @version: 1.0
  */
 
+import lombok.Builder;
+
+@Builder
 public record IdResponse(Long id) {
 }

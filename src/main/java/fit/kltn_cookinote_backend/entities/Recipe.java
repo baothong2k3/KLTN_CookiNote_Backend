@@ -10,6 +10,7 @@ package fit.kltn_cookinote_backend.entities;/*
  */
 
 import fit.kltn_cookinote_backend.enums.Difficulty;
+import fit.kltn_cookinote_backend.enums.Privacy;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -54,6 +55,9 @@ public class Recipe {
 
     @Enumerated(EnumType.STRING)
     private Difficulty difficulty;
+
+    @Enumerated(EnumType.STRING)
+    private Privacy privacy;
 
     @Column(name = "image_url", length = 2048)
     private String imageUrl;
