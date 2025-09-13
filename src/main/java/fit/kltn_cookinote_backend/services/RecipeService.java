@@ -10,8 +10,8 @@ package fit.kltn_cookinote_backend.services;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
-import fit.kltn_cookinote_backend.dtos.response.IdResponse;
+import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
 
 public interface RecipeService {
-    IdResponse createByRecipe(Long id, RecipeCreateRequest req);
+    RecipeResponse createByRecipe(Long id, RecipeCreateRequest req);
 }

@@ -11,7 +11,7 @@ package fit.kltn_cookinote_backend.controllers;/*
 
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
-import fit.kltn_cookinote_backend.dtos.response.IdResponse;
+import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.services.RecipeImageService;
@@ -42,10 +42,10 @@ public class RecipeController {
     // PHA 1: Tạo recipe (USER/ADMIN; nếu PUBLIC chỉ ADMIN)
     @PostMapping
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
-    public ResponseEntity<ApiResponse<IdResponse>> createRecipe(@AuthenticationPrincipal User authUser,
-                                                                @Valid @RequestBody RecipeCreateRequest req,
-                                                                HttpServletRequest httpReq) {
-        IdResponse data = recipeService.createByRecipe(authUser.getUserId(), req);
+    public ResponseEntity<ApiResponse<RecipeResponse>> createRecipe(@AuthenticationPrincipal User authUser,
+                                                                    @Valid @RequestBody RecipeCreateRequest req,
+                                                                    HttpServletRequest httpReq) {
+        RecipeResponse data = recipeService.createByRecipe(authUser.getUserId(), req);
         return ResponseEntity.ok(ApiResponse.success("Tạo công thức thành công", data, httpReq.getRequestURI()));
     }
 

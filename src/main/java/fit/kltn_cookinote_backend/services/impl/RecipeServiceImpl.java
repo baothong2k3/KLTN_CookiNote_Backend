@@ -12,7 +12,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeIngredientCreate;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepCreate;
-import fit.kltn_cookinote_backend.dtos.response.IdResponse;
+import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
 import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.enums.Role;
@@ -41,7 +41,7 @@ public class RecipeServiceImpl implements RecipeService {
 
     @Override
     @Transactional
-    public IdResponse createByRecipe(Long id, RecipeCreateRequest req) {
+    public RecipeResponse createByRecipe(Long id, RecipeCreateRequest req) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + id));
 
@@ -95,7 +95,7 @@ public class RecipeServiceImpl implements RecipeService {
         }
         recipe.setSteps(steps);
 
-        Recipe saved = recipeRepository.save(recipe);
-        return IdResponse.builder().id(saved.getId()).build();
+        Recipe saved = recipeRepository.saveAndFlush(recipe);
+        return RecipeResponse.from(saved);
     }
 }
