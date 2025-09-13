@@ -11,6 +11,8 @@ package fit.kltn_cookinote_backend.repositories;/*
 
 import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.enums.Privacy;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -42,4 +44,6 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
     @Modifying
     @Query("update Recipe r set r.view = coalesce(r.view,0) + 1 where r.id = :id")
     void incrementViewById(@Param("id") Long id);
+
+    Page<Recipe> findByCategory_IdAndPrivacy(Long categoryId, Privacy privacy, Pageable pageable);
 }
