@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 
 public record RecipeStepCreate(
         @Positive Integer stepNo,
-        @NotBlank @Size(max = 4096) String content,
-        @Size(max = 2048) String imageUrl
+        @NotBlank @Size(max = 4096) String content
 ) {
 }

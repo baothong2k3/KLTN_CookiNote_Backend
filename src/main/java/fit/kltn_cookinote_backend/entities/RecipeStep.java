@@ -12,6 +12,8 @@ package fit.kltn_cookinote_backend.entities;/*
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.List;
+
 @Entity
 @Table(name = "recipe_step")
 @Getter
@@ -34,7 +36,8 @@ public class RecipeStep {
     @Column(length = 4096)
     private String content;
 
-    @Column(name = "image_url")
-    private String imageUrl;
+    @OneToMany(mappedBy = "step", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id ASC")
+    private List<RecipeStepImage> images;
 }
 
