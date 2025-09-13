@@ -14,4 +14,5 @@ import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
 
 public interface RecipeService {
     RecipeResponse createByRecipe(Long id, RecipeCreateRequest req);
+    RecipeResponse getDetail(Long viewerUserIdOrNull, Long recipeId);
 }

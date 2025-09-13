@@ -37,7 +37,6 @@ public class RecipeController {
     private final RecipeService recipeService;
     private final RecipeImageService recipeImageService;
     private final RecipeStepImageService stepImageService;
-    private final RecipeRepository recipeRepository;
 
     // PHA 1: Tạo recipe (USER/ADMIN; nếu PUBLIC chỉ ADMIN)
     @PostMapping
@@ -72,4 +71,12 @@ public class RecipeController {
         return ResponseEntity.ok(ApiResponse.success("Thêm ảnh bước thành công", urls, httpReq.getRequestURI()));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<RecipeResponse>> getDetail(@AuthenticationPrincipal User authUser,
+                                                                 @PathVariable Long id,
+                                                                 HttpServletRequest httpReq) {
+        Long viewerId = (authUser != null) ? authUser.getUserId() : null;
+        RecipeResponse data = recipeService.getDetail(viewerId, id);
+        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết công thức thành công", data, httpReq.getRequestURI()));
+    }
 }

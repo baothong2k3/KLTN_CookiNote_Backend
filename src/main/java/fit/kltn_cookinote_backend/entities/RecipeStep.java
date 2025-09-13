@@ -11,6 +11,8 @@ package fit.kltn_cookinote_backend.entities;/*
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
 
 import java.util.List;
 
@@ -38,6 +40,7 @@ public class RecipeStep {
 
     @OneToMany(mappedBy = "step", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id ASC")
+    @Fetch(FetchMode.SUBSELECT)
     private List<RecipeStepImage> images;
 }
 

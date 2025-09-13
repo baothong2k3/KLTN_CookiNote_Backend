@@ -98,4 +98,32 @@ public class RecipeServiceImpl implements RecipeService {
         Recipe saved = recipeRepository.saveAndFlush(recipe);
         return RecipeResponse.from(saved);
     }
+
+    @Override
+    @Transactional
+    public RecipeResponse getDetail(Long viewerUserIdOrNull, Long recipeId) {
+        Recipe recipe = recipeRepository.findDetailById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        Long ownerId = (recipe.getUser() != null) ? recipe.getUser().getUserId() : null;
+        boolean isOwner = (viewerUserIdOrNull != null) && viewerUserIdOrNull.equals(ownerId);
+
+        if (!canView(recipe.getPrivacy(), ownerId, viewerUserIdOrNull)) {
+            throw new AccessDeniedException("Bạn không có quyền xem công thức này.");
+        }
+
+        if (!isOwner) {
+            recipeRepository.incrementViewById(recipeId);
+            recipe.setView((recipe.getView() == null ? 0 : recipe.getView()) + 1);
+        }
+
+        return RecipeResponse.from(recipe);
+    }
+
+    private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {
+        return switch (privacy) {
+            case PUBLIC, SHARED -> true;
+            case PRIVATE -> viewerId != null && viewerId.equals(ownerId);
+        };
+    }
 }
