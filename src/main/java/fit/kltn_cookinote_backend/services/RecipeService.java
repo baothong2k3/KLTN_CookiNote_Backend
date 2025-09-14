@@ -19,4 +19,5 @@ public interface RecipeService {
     RecipeResponse getDetail(Long viewerUserIdOrNull, Long recipeId);
     PageResult<RecipeCardResponse> listPublicByCategory(Long categoryId, int page, int size);
     PageResult<RecipeCardResponse> listPublic(int page, int size);
+    PageResult<RecipeCardResponse> listByOwner(Long ownerUserId, Long viewerUserIdOrNull, int page, int size);
 }

@@ -36,6 +36,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 
 @Service
@@ -156,6 +157,26 @@ public class RecipeServiceImpl implements RecipeService {
         Page<Recipe> pageData = recipeRepository.findByPrivacy(Privacy.PUBLIC, pageable);
         Page<RecipeCardResponse> mapped = pageData.map(RecipeCardResponse::from);
         return PageResult.of(mapped);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<RecipeCardResponse> listByOwner(Long ownerUserId, Long viewerUserIdOrNull, int page, int size) {
+        int p = Math.max(0, page);
+        int s = Math.min((size > 0 ? size : DEFAULT_SIZE), MAX_SIZE);
+        Pageable pageable = PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        boolean selfView = viewerUserIdOrNull != null && viewerUserIdOrNull.equals(ownerUserId);
+
+        Page<Recipe> pageData = selfView
+                ? recipeRepository.findByUser_UserId(ownerUserId, pageable)
+                : recipeRepository.findByUser_UserIdAndPrivacyIn(
+                ownerUserId,
+                EnumSet.of(Privacy.SHARED, Privacy.PUBLIC),
+                pageable
+        );
+
+        return PageResult.of(pageData.map(RecipeCardResponse::from));
     }
 
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {

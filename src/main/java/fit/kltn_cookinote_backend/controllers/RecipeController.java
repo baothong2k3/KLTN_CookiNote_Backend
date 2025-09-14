@@ -101,4 +101,23 @@ public class RecipeController {
         PageResult<RecipeCardResponse> data = recipeService.listPublic(page, size);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức công khai thành công", data, httpReq.getRequestURI()));
     }
+
+    /**
+     * Danh sách recipe của một user bất kỳ:
+     * - Nếu viewer == owner ⇒ trả PRIVATE + SHARED + PUBLIC
+     * - Nếu viewer != owner hoặc ẩn danh ⇒ trả SHARED + PUBLIC
+     * GET /recipes/users/{ownerId}?page=0&size=12
+     */
+    @GetMapping("/users/{ownerId}")
+    public ResponseEntity<ApiResponse<PageResult<RecipeCardResponse>>> listByOwner(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long ownerId,
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "size", required = false, defaultValue = "12") int size,
+            HttpServletRequest httpReq
+    ) {
+        Long viewerId = (authUser != null) ? authUser.getUserId() : null;
+        PageResult<RecipeCardResponse> data = recipeService.listByOwner(ownerId, viewerId, page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức theo chủ sở hữu thành công", data, httpReq.getRequestURI()));
+    }
 }

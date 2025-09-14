@@ -18,6 +18,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,4 +49,8 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
     Page<Recipe> findByCategory_IdAndPrivacy(Long categoryId, Privacy privacy, Pageable pageable);
 
     Page<Recipe> findByPrivacy(Privacy privacy, Pageable pageable);
+
+    Page<Recipe> findByUser_UserId(Long ownerId, Pageable pageable);
+
+    Page<Recipe> findByUser_UserIdAndPrivacyIn(Long ownerId, Collection<Privacy> privacies, Pageable pageable);
 }
