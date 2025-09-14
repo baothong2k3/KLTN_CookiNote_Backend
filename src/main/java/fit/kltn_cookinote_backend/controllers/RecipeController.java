@@ -120,4 +120,19 @@ public class RecipeController {
         PageResult<RecipeCardResponse> data = recipeService.listByOwner(ownerId, viewerId, page, size);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức theo chủ sở hữu thành công", data, httpReq.getRequestURI()));
     }
+
+    /**
+     * Tiện ích: danh sách của chính tôi (bao gồm PRIVATE/SHARED/ PUBLIC của bản thân).
+     * GET /recipes/me?page=0&size=12
+     */
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<PageResult<RecipeCardResponse>>> listMine(
+            @AuthenticationPrincipal User authUser,
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "size", required = false, defaultValue = "12") int size,
+            HttpServletRequest httpReq
+    ) {
+        PageResult<RecipeCardResponse> data = recipeService.listByOwner(authUser.getUserId(), authUser.getUserId(), page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức của tôi thành công", data, httpReq.getRequestURI()));
+    }
 }
