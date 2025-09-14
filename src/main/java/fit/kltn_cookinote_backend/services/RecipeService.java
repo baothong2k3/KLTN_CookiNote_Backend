@@ -10,10 +10,7 @@ package fit.kltn_cookinote_backend.services;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
-import fit.kltn_cookinote_backend.dtos.response.PageResult;
-import fit.kltn_cookinote_backend.dtos.response.RecipeCardResponse;
-import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
-import fit.kltn_cookinote_backend.dtos.response.RecipeStepItem;
+import fit.kltn_cookinote_backend.dtos.response.*;
 
 import java.util.List;
 
@@ -29,4 +26,6 @@ public interface RecipeService {
     PageResult<RecipeCardResponse> listByOwner(Long ownerUserId, Long viewerUserIdOrNull, int page, int size);
 
     List<RecipeStepItem> getSteps(Long viewerUserIdOrNull, Long recipeId);
+
+    List<RecipeIngredientItem> getIngredients(Long viewerUserIdOrNull, Long recipeId);
 }

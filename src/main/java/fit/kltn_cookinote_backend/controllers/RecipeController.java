@@ -147,4 +147,19 @@ public class RecipeController {
         List<RecipeStepItem> data = recipeService.getSteps(viewerId, recipeId);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách bước thành công", data, httpReq.getRequestURI()));
     }
+
+    /**
+     * Lấy danh sách nguyên liệu của 1 recipe (tôn trọng privacy).
+     * GET /recipes/{recipeId}/ingredients
+     */
+    @GetMapping("/{recipeId}/ingredients")
+    public ResponseEntity<ApiResponse<List<RecipeIngredientItem>>> getIngredients(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        Long viewerId = (authUser != null) ? authUser.getUserId() : null;
+        List<RecipeIngredientItem> data = recipeService.getIngredients(viewerId, recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách nguyên liệu thành công", data, httpReq.getRequestURI()));
+    }
 }
