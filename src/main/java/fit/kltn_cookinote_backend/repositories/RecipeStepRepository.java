@@ -14,6 +14,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface RecipeStepRepository extends JpaRepository<RecipeStep, Long> {
     @Query("""
             select r.user.userId
@@ -21,4 +23,6 @@ public interface RecipeStepRepository extends JpaRepository<RecipeStep, Long> {
             where s.id = :stepId
             """)
     Long findOwnerIdByStepId(@Param("stepId") Long stepId);
+
+    List<RecipeStep> findByRecipe_IdOrderByStepNoAsc(Long recipeId);
 }

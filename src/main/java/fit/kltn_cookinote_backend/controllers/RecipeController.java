@@ -10,10 +10,7 @@ package fit.kltn_cookinote_backend.controllers;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
-import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
-import fit.kltn_cookinote_backend.dtos.response.PageResult;
-import fit.kltn_cookinote_backend.dtos.response.RecipeCardResponse;
-import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
+import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.services.RecipeImageService;
 import fit.kltn_cookinote_backend.services.RecipeService;
@@ -134,5 +131,20 @@ public class RecipeController {
     ) {
         PageResult<RecipeCardResponse> data = recipeService.listByOwner(authUser.getUserId(), authUser.getUserId(), page, size);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức của tôi thành công", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Lấy danh sách bước của 1 recipe (tôn trọng privacy).
+     * GET /recipes/{recipeId}/steps
+     */
+    @GetMapping("/{recipeId}/steps")
+    public ResponseEntity<ApiResponse<List<RecipeStepItem>>> getSteps(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        Long viewerId = (authUser != null) ? authUser.getUserId() : null;
+        List<RecipeStepItem> data = recipeService.getSteps(viewerId, recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách bước thành công", data, httpReq.getRequestURI()));
     }
 }

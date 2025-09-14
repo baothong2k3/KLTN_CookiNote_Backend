@@ -13,11 +13,20 @@ import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
 import fit.kltn_cookinote_backend.dtos.response.PageResult;
 import fit.kltn_cookinote_backend.dtos.response.RecipeCardResponse;
 import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
+import fit.kltn_cookinote_backend.dtos.response.RecipeStepItem;
+
+import java.util.List;
 
 public interface RecipeService {
     RecipeResponse createByRecipe(Long id, RecipeCreateRequest req);
+
     RecipeResponse getDetail(Long viewerUserIdOrNull, Long recipeId);
+
     PageResult<RecipeCardResponse> listPublicByCategory(Long categoryId, int page, int size);
+
     PageResult<RecipeCardResponse> listPublic(int page, int size);
+
     PageResult<RecipeCardResponse> listByOwner(Long ownerUserId, Long viewerUserIdOrNull, int page, int size);
+
+    List<RecipeStepItem> getSteps(Long viewerUserIdOrNull, Long recipeId);
 }

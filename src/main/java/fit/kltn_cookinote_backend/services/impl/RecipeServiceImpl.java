@@ -15,15 +15,18 @@ import fit.kltn_cookinote_backend.dtos.request.RecipeStepCreate;
 import fit.kltn_cookinote_backend.dtos.response.PageResult;
 import fit.kltn_cookinote_backend.dtos.response.RecipeCardResponse;
 import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
+import fit.kltn_cookinote_backend.dtos.response.RecipeStepItem;
 import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.CategoryRepository;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
+import fit.kltn_cookinote_backend.repositories.RecipeStepRepository;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.RecipeService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -45,6 +48,7 @@ public class RecipeServiceImpl implements RecipeService {
     private final RecipeRepository recipeRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
+    private final RecipeStepRepository recipeStepRepository;
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 12; // mobile-friendly
@@ -177,6 +181,27 @@ public class RecipeServiceImpl implements RecipeService {
         );
 
         return PageResult.of(pageData.map(RecipeCardResponse::from));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RecipeStepItem> getSteps(Long viewerUserIdOrNull, Long recipeId) {
+        Recipe r = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        Long ownerId = (r.getUser() != null) ? r.getUser().getUserId() : null;
+        if (!canView(r.getPrivacy(), ownerId, viewerUserIdOrNull)) {
+            throw new AccessDeniedException("Bạn không có quyền xem bước của công thức này.");
+        }
+
+        List<RecipeStep> steps = recipeStepRepository.findByRecipe_IdOrderByStepNoAsc(recipeId);
+        steps.forEach(s -> {
+            if (s.getImages() != null) {
+                Hibernate.initialize(s.getImages());
+            }
+        });
+
+        return steps.stream().map(RecipeStepItem::from).toList();
     }
 
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {
