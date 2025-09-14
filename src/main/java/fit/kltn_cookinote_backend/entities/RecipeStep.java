@@ -11,6 +11,10 @@ package fit.kltn_cookinote_backend.entities;/*
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
+
+import java.util.List;
 
 @Entity
 @Table(name = "recipe_step")
@@ -34,7 +38,9 @@ public class RecipeStep {
     @Column(length = 4096)
     private String content;
 
-    @Column(name = "image_url")
-    private String imageUrl;
+    @OneToMany(mappedBy = "step", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id ASC")
+    @Fetch(FetchMode.SUBSELECT)
+    private List<RecipeStepImage> images;
 }
 

@@ -14,10 +14,11 @@ import com.cloudinary.utils.ObjectUtils;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.CloudinaryService;
+import fit.kltn_cookinote_backend.utils.CloudinaryUtils;
+import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.util.StringUtils;
@@ -28,8 +29,6 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.time.Instant;
-import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,22 +41,12 @@ public class CloudinaryServiceImpl implements CloudinaryService {
     @Value("${app.cloudinary.folder}")
     private String avatarFolder;
 
-    private static final Set<String> ALLOWED_TYPES = Set.of(
-            MediaType.IMAGE_JPEG_VALUE,
-            MediaType.IMAGE_PNG_VALUE,
-            "image/webp"
-    );
-
     private static final Pattern VERSION_SEGMENT = Pattern.compile("v\\d+/");
 
     @Override
     @Transactional
     public String updateAvatar(Long userId, MultipartFile file) throws IOException {
-        if (file == null || file.isEmpty()) throw new IllegalArgumentException("File ảnh trống.");
-        String ct = file.getContentType();
-        if (ct == null || !ALLOWED_TYPES.contains(ct))
-            throw new IllegalArgumentException("Định dạng ảnh không hợp lệ (chỉ JPG, PNG, WEBP).");
-        if (file.getSize() > 5 * 1024 * 1024) throw new IllegalArgumentException("Kích thước ảnh vượt quá 5MB.");
+        ImageValidationUtils.validateImage(file);
 
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User không tồn tại."));
@@ -67,19 +56,7 @@ public class CloudinaryServiceImpl implements CloudinaryService {
 
         // (2) Upload ảnh mới với public_id mới → an toàn để xóa ảnh cũ theo URL
         String newPublicId = "u_" + userId + "_" + Instant.now().getEpochSecond(); // hoặc kèm random nếu muốn
-        Map<?, ?> uploadResult = cloudinary.uploader().upload(
-                file.getBytes(),
-                ObjectUtils.asMap(
-                        "folder", avatarFolder,
-                        "public_id", newPublicId,
-                        "overwrite", false,           // mỗi lần là một asset mới
-                        "unique_filename", false,
-                        "resource_type", "image"
-                )
-        );
-
-        String newUrl = (String) uploadResult.get("secure_url");
-        if (!StringUtils.hasText(newUrl)) throw new IllegalStateException("Upload Cloudinary thất bại.");
+        String newUrl = CloudinaryUtils.uploadImage(cloudinary, file, avatarFolder, newPublicId);
 
         // (3) Cập nhật DB với URL mới
         user.setAvatarUrl(newUrl);

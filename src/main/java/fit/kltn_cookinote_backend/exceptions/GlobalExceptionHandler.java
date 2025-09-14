@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.TransactionSystemException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.io.IOException;
 import java.util.Set;
@@ -177,5 +178,11 @@ public class GlobalExceptionHandler {
         HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR; // 500
         return ResponseEntity.status(status)
                 .body(ApiResponse.error(status.value(), "Không thể xử lý file ảnh.", req.getRequestURI()));
+    }
+
+    @ExceptionHandler({NoResourceFoundException.class})
+    public ResponseEntity<ApiResponse<Void>> handleNoResource(NoResourceFoundException ex, HttpServletRequest req) {
+        return ResponseEntity.status(404)
+                .body(ApiResponse.error(404, "Not found: " + req.getRequestURI(), req.getRequestURI()));
     }
 }

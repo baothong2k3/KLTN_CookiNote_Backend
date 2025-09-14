@@ -10,8 +10,11 @@ package fit.kltn_cookinote_backend.entities;/*
  */
 
 import fit.kltn_cookinote_backend.enums.Difficulty;
+import fit.kltn_cookinote_backend.enums.Privacy;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -55,6 +58,9 @@ public class Recipe {
     @Enumerated(EnumType.STRING)
     private Difficulty difficulty;
 
+    @Enumerated(EnumType.STRING)
+    private Privacy privacy;
+
     @Column(name = "image_url", length = 2048)
     private String imageUrl;
 
@@ -68,10 +74,12 @@ public class Recipe {
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("stepNo ASC")
     @Builder.Default
+    @Fetch(FetchMode.SUBSELECT)
     private List<RecipeStep> steps = new ArrayList<>();
 
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
+    @Fetch(FetchMode.SUBSELECT)
     private List<RecipeIngredient> ingredients = new ArrayList<>();
 
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
