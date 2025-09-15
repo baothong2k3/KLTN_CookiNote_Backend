@@ -17,4 +17,6 @@ import java.io.IOException;
 @Service
 public interface CloudinaryService {
     String updateAvatar(Long userId, MultipartFile file) throws IOException;
+    void safeDeleteByPublicId(String publicId);
+    String extractPublicIdFromUrl(String url);
 }
