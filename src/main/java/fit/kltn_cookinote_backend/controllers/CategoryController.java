@@ -9,7 +9,6 @@ package fit.kltn_cookinote_backend.controllers;/*
  * @version: 1.0
  */
 
-import fit.kltn_cookinote_backend.dtos.request.CreateCategoryRequest;
 import fit.kltn_cookinote_backend.dtos.request.UpdateCategoryRequest;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
 import fit.kltn_cookinote_backend.dtos.response.CategoryResponse;
@@ -17,10 +16,13 @@ import fit.kltn_cookinote_backend.services.CategoryService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -29,11 +31,17 @@ import java.util.List;
 public class CategoryController {
     private final CategoryService categoryService;
 
-    @PostMapping("/create")
+    // CREATE: name, [description], [image]
+    @PostMapping(value = {"/create"}, consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(@Valid @RequestBody CreateCategoryRequest req, HttpServletRequest httpReq) {
-        CategoryResponse data = categoryService.create(req);
-        return ResponseEntity.ok(ApiResponse.success("Tạo danh mục thành công", data, httpReq.getRequestURI()));
+    public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
+            @RequestPart("name") String name,
+            @RequestPart(value = "description", required = false) String description,
+            @RequestPart(value = "image", required = false) MultipartFile image,
+            HttpServletRequest req) throws IOException {
+
+        var res = categoryService.createWithOptionalImage(name, description, image);
+        return ResponseEntity.ok(ApiResponse.success("Tạo danh mục thành công", res, req.getRequestURI()));
     }
 
     @PutMapping("/{id}")

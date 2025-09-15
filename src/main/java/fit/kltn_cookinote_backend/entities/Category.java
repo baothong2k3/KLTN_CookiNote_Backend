@@ -12,8 +12,6 @@ package fit.kltn_cookinote_backend.entities;/*
 import jakarta.persistence.*;
 import lombok.*;
 
-import jakarta.persistence.*;
-import lombok.*;
 
 import java.util.*;
 
@@ -34,6 +32,9 @@ public class Category {
 
     @Column(length = 2048)
     private String description;
+
+    @Column(name = "image_url", length = 512)
+    private String imageUrl;
 
     @OneToMany(mappedBy = "category")
     @Builder.Default

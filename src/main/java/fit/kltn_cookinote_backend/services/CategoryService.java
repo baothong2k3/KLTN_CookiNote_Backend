@@ -12,7 +12,10 @@ package fit.kltn_cookinote_backend.services;/*
 import fit.kltn_cookinote_backend.dtos.request.CreateCategoryRequest;
 import fit.kltn_cookinote_backend.dtos.request.UpdateCategoryRequest;
 import fit.kltn_cookinote_backend.dtos.response.CategoryResponse;
+import jakarta.annotation.Nullable;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 public interface CategoryService {
@@ -23,4 +26,6 @@ public interface CategoryService {
     List<CategoryResponse> listAll();
 
     List<CategoryResponse> listAllByCategoryName(String categoryName);
+
+    CategoryResponse createWithOptionalImage(String name, @Nullable String description, @Nullable MultipartFile image) throws IOException;
 }
