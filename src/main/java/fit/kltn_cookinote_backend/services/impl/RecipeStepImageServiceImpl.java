@@ -57,23 +57,25 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         if (!actorId.equals(ownerId)) throw new AccessDeniedException("Chỉ chủ sở hữu hoặc ADMIN mới được chỉnh sửa.");
     }
 
-    @Override
-    @Transactional
-    public List<String> addImagesToStep(Long actorUserId, Long recipeId, Long stepId, List<MultipartFile> files) throws IOException {
+    private RecipeStep loadAndCheckStep(Long actorUserId, Long recipeId, Long stepId) {
         RecipeStep step = stepRepository.findById(stepId)
                 .orElseThrow(() -> new EntityNotFoundException("Step không tồn tại: " + stepId));
-
         if (!Objects.equals(step.getRecipe().getId(), recipeId)) {
             throw new IllegalArgumentException("Step không thuộc về Recipe này.");
         }
-
         User actor = userRepository.findById(actorUserId)
                 .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
-
         Long ownerId = stepRepository.findOwnerIdByStepId(stepId);
         if (ownerId == null) throw new EntityNotFoundException("Step không tồn tại: " + stepId);
-
         ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+        return step;
+    }
+
+
+    @Override
+    @Transactional
+    public List<String> addImagesToStep(Long actorUserId, Long recipeId, Long stepId, List<MultipartFile> files) throws IOException {
+        RecipeStep step = loadAndCheckStep(actorUserId, recipeId, stepId);
 
         long current = stepImageRepository.countByStep_Id(stepId);
         int incoming = (files == null) ? 0 : files.size();
@@ -108,16 +110,7 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
     @Transactional
     public RecipeResponse updateStep(Long actorUserId, Long recipeId, Long stepId, RecipeStepUpdateRequest req) throws IOException {
         // 0) Load & kiểm quyền
-        RecipeStep step = stepRepository.findById(stepId)
-                .orElseThrow(() -> new EntityNotFoundException("Step không tồn tại: " + stepId));
-        if (!Objects.equals(step.getRecipe().getId(), recipeId)) {
-            throw new IllegalArgumentException("Step không thuộc về Recipe này.");
-        }
-
-        User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
-        Long ownerId = stepRepository.findOwnerIdByStepId(stepId);
-        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+        RecipeStep step = loadAndCheckStep(actorUserId, recipeId, stepId);
 
         // 1) Cập nhật nội dung
         if (req.content() != null) {
