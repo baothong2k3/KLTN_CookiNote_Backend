@@ -91,21 +91,37 @@ public class RecipeServiceImpl implements RecipeService {
         recipe.setIngredients(ingredients);
 
         // steps (chưa có ảnh)
-        List<RecipeStep> steps = new ArrayList<>();
-        // auto sắp theo stepNo nếu người dùng gửi lộn xộn / null
-        int autoIdx = 1;
-        List<RecipeStepCreate> sorted = new ArrayList<>(req.steps());
-        sorted.sort(Comparator.comparing(s -> s.stepNo() == null ? Integer.MAX_VALUE : s.stepNo()));
-        for (RecipeStepCreate s : sorted) {
-            Integer stepNo = s.stepNo() != null ? s.stepNo() : autoIdx++;
-            RecipeStep step = RecipeStep.builder()
-                    .recipe(recipe)
-                    .stepNo(stepNo)
-                    .content(s.content())
-                    .build();
-            steps.add(step);
+        if (req.steps() != null && !req.steps().isEmpty()) {
+            // sort input theo stepNo (null xuống cuối) để giữ ý người dùng tối đa
+            List<RecipeStepCreate> sorted = new ArrayList<>(req.steps());
+            sorted.sort(Comparator.comparing(s -> s.stepNo() == null ? Integer.MAX_VALUE : s.stepNo()));
+
+            List<RecipeStep> steps = new ArrayList<>(sorted.size());
+            Set<Integer> used = new HashSet<>();
+            int autoIdx = 1;
+
+            for (RecipeStepCreate s : sorted) {
+                Integer desired = s.stepNo();
+
+                // chuẩn hoá: nếu null/<=0/trùng thì gán số tự động tiếp theo chưa dùng
+                if (desired == null || desired <= 0 || used.contains(desired)) {
+                    while (used.contains(autoIdx)) autoIdx++;
+                    desired = autoIdx++;
+                }
+
+                used.add(desired);
+
+                steps.add(RecipeStep.builder()
+                        .recipe(recipe)
+                        .stepNo(desired)
+                        .content(s.content())
+                        .build());
+            }
+            recipe.setSteps(steps);
+        } else {
+            // không có bước nào: để list trống
+            recipe.setSteps(new ArrayList<>());
         }
-        recipe.setSteps(steps);
 
         Recipe saved = recipeRepository.saveAndFlush(recipe);
         return RecipeResponse.from(saved);
