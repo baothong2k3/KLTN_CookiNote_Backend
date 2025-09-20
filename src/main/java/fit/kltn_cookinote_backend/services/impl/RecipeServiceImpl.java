@@ -246,19 +246,21 @@ public class RecipeServiceImpl implements RecipeService {
         recipe.setPrepareTime(req.prepareTime());
         recipe.setCookTime(req.cookTime());
         recipe.setDifficulty(req.difficulty());
+        recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
 
         // Thay thế toàn bộ ingredients (không ảnh hưởng steps/images)
         if (req.ingredients() != null) {
-            recipeIngredientRepository.deleteAll(recipe.getIngredients());
-            List<RecipeIngredient> newIngs = new ArrayList<>();
+            List<RecipeIngredient> managed = recipe.getIngredients(); // collection managed
+            managed.clear(); // orphanRemoval sẽ xoá các bản ghi cũ an toàn khi flush
+
             for (RecipeIngredientCreate i : req.ingredients()) {
-                newIngs.add(RecipeIngredient.builder()
-                        .recipe(recipe)
+                RecipeIngredient ing = RecipeIngredient.builder()
+                        .recipe(recipe)        // rất quan trọng: set owner!
                         .name(i.name())
                         .quantity(i.quantity())
-                        .build());
+                        .build();
+                managed.add(ing);              // add vào collection đã quản lý
             }
-            recipe.setIngredients(newIngs);
         }
 
         Recipe saved = recipeRepository.saveAndFlush(recipe);

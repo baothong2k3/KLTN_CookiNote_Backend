@@ -10,6 +10,7 @@ package fit.kltn_cookinote_backend.controllers;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
+import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.services.RecipeImageService;
@@ -161,5 +162,17 @@ public class RecipeController {
         Long viewerId = (authUser != null) ? authUser.getUserId() : null;
         List<RecipeIngredientItem> data = recipeService.getIngredients(viewerId, recipeId);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách nguyên liệu thành công", data, httpReq.getRequestURI()));
+    }
+
+    @PutMapping("/{recipeId}")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<RecipeResponse>> updateContent(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @Valid @RequestBody RecipeUpdateRequest req,
+            HttpServletRequest httpReq
+    ) {
+        RecipeResponse data = recipeService.updateContent(authUser.getUserId(), recipeId, req);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật nội dung công thức thành công", data, httpReq.getRequestURI()));
     }
 }
