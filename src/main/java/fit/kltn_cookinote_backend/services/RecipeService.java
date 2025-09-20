@@ -10,6 +10,7 @@ package fit.kltn_cookinote_backend.services;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
+import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.*;
 
 import java.util.List;
@@ -28,4 +29,6 @@ public interface RecipeService {
     List<RecipeStepItem> getSteps(Long viewerUserIdOrNull, Long recipeId);
 
     List<RecipeIngredientItem> getIngredients(Long viewerUserIdOrNull, Long recipeId);
+
+    RecipeResponse updateContent(Long actorUserId, Long recipeId, RecipeUpdateRequest req);
 }

@@ -10,6 +10,8 @@ package fit.kltn_cookinote_backend.controllers;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
+import fit.kltn_cookinote_backend.dtos.request.RecipeStepUpdateRequest;
+import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.services.RecipeImageService;
@@ -161,5 +163,46 @@ public class RecipeController {
         Long viewerId = (authUser != null) ? authUser.getUserId() : null;
         List<RecipeIngredientItem> data = recipeService.getIngredients(viewerId, recipeId);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách nguyên liệu thành công", data, httpReq.getRequestURI()));
+    }
+
+    @PutMapping("/{recipeId}")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<RecipeResponse>> updateContent(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @Valid @RequestBody RecipeUpdateRequest req,
+            HttpServletRequest httpReq
+    ) {
+        RecipeResponse data = recipeService.updateContent(authUser.getUserId(), recipeId, req);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật nội dung công thức thành công", data, httpReq.getRequestURI()));
+    }
+
+    @PutMapping(value = "/{recipeId}/cover", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<RecipeResponse>> updateCover(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @RequestPart("file") MultipartFile file,
+            HttpServletRequest httpReq
+    ) throws IOException {
+        RecipeResponse data = recipeImageService.updateCover(authUser.getUserId(), recipeId, file);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật ảnh bìa thành công", data, httpReq.getRequestURI()));
+    }
+
+    @PutMapping(value = "/{recipeId}/steps/{stepId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<RecipeResponse>> updateStep(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @PathVariable Long stepId,
+            @RequestParam(value = "content", required = false) String content,
+            @RequestParam(value = "stepNo", required = false) Integer stepNo,
+            @RequestParam(value = "keepUrls", required = false) List<String> keepUrls, // có thể gửi nhiều keepUrls
+            @RequestPart(value = "addFiles", required = false) List<MultipartFile> addFiles,
+            HttpServletRequest httpReq
+    ) throws IOException {
+        RecipeStepUpdateRequest req = new RecipeStepUpdateRequest(content, stepNo, keepUrls, addFiles);
+        RecipeResponse data = stepImageService.updateStep(authUser.getUserId(), recipeId, stepId, req);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật bước công thức thành công", data, httpReq.getRequestURI()));
     }
 }

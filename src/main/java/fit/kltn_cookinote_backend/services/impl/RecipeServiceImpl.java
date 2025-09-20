@@ -12,6 +12,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeIngredientCreate;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepCreate;
+import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Privacy;
@@ -35,10 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.EnumSet;
-import java.util.List;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -93,21 +91,37 @@ public class RecipeServiceImpl implements RecipeService {
         recipe.setIngredients(ingredients);
 
         // steps (chưa có ảnh)
-        List<RecipeStep> steps = new ArrayList<>();
-        // auto sắp theo stepNo nếu người dùng gửi lộn xộn / null
-        int autoIdx = 1;
-        List<RecipeStepCreate> sorted = new ArrayList<>(req.steps());
-        sorted.sort(Comparator.comparing(s -> s.stepNo() == null ? Integer.MAX_VALUE : s.stepNo()));
-        for (RecipeStepCreate s : sorted) {
-            Integer stepNo = s.stepNo() != null ? s.stepNo() : autoIdx++;
-            RecipeStep step = RecipeStep.builder()
-                    .recipe(recipe)
-                    .stepNo(stepNo)
-                    .content(s.content())
-                    .build();
-            steps.add(step);
+        if (req.steps() != null && !req.steps().isEmpty()) {
+            // sort input theo stepNo (null xuống cuối) để giữ ý người dùng tối đa
+            List<RecipeStepCreate> sorted = new ArrayList<>(req.steps());
+            sorted.sort(Comparator.comparing(s -> s.stepNo() == null ? Integer.MAX_VALUE : s.stepNo()));
+
+            List<RecipeStep> steps = new ArrayList<>(sorted.size());
+            Set<Integer> used = new HashSet<>();
+            int autoIdx = 1;
+
+            for (RecipeStepCreate s : sorted) {
+                Integer desired = s.stepNo();
+
+                // chuẩn hoá: nếu null/<=0/trùng thì gán số tự động tiếp theo chưa dùng
+                if (desired == null || desired <= 0 || used.contains(desired)) {
+                    while (used.contains(autoIdx)) autoIdx++;
+                    desired = autoIdx++;
+                }
+
+                used.add(desired);
+
+                steps.add(RecipeStep.builder()
+                        .recipe(recipe)
+                        .stepNo(desired)
+                        .content(s.content())
+                        .build());
+            }
+            recipe.setSteps(steps);
+        } else {
+            // không có bước nào: để list trống
+            recipe.setSteps(new ArrayList<>());
         }
-        recipe.setSteps(steps);
 
         Recipe saved = recipeRepository.saveAndFlush(recipe);
         return RecipeResponse.from(saved);
@@ -218,10 +232,68 @@ public class RecipeServiceImpl implements RecipeService {
         return ings.stream().map(RecipeIngredientItem::from).toList();
     }
 
+    @Override
+    @Transactional
+    public RecipeResponse updateContent(Long actorUserId, Long recipeId, RecipeUpdateRequest req) {
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        Long ownerId = recipe.getUser().getUserId();
+        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        // Chỉ ADMIN mới set PUBLIC
+        Privacy incomingPrivacy = req.privacy();
+        if (incomingPrivacy != null) {
+            if (actor.getRole() != Role.ADMIN && incomingPrivacy == Privacy.PUBLIC) {
+                throw new AccessDeniedException("Chỉ ADMIN mới được đặt công khai (PUBLIC).");
+            }
+            recipe.setPrivacy(incomingPrivacy);
+        }
+
+        // Update trường cơ bản
+        Category category = categoryRepository.findById(req.categoryId())
+                .orElseThrow(() -> new EntityNotFoundException("Category không tồn tại: " + req.categoryId()));
+        recipe.setCategory(category);
+        recipe.setTitle(req.title());
+        recipe.setDescription(req.description());
+        recipe.setPrepareTime(req.prepareTime());
+        recipe.setCookTime(req.cookTime());
+        recipe.setDifficulty(req.difficulty());
+        recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+
+        // Thay thế toàn bộ ingredients (không ảnh hưởng steps/images)
+        if (req.ingredients() != null) {
+            List<RecipeIngredient> managed = recipe.getIngredients(); // collection managed
+            managed.clear(); // orphanRemoval sẽ xoá các bản ghi cũ an toàn khi flush
+
+            for (RecipeIngredientCreate i : req.ingredients()) {
+                RecipeIngredient ing = RecipeIngredient.builder()
+                        .recipe(recipe)        // rất quan trọng: set owner!
+                        .name(i.name())
+                        .quantity(i.quantity())
+                        .build();
+                managed.add(ing);              // add vào collection đã quản lý
+            }
+        }
+
+        Recipe saved = recipeRepository.saveAndFlush(recipe);
+        return RecipeResponse.from(saved);
+    }
+
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {
         return switch (privacy) {
             case PUBLIC, SHARED -> true;
             case PRIVATE -> viewerId != null && viewerId.equals(ownerId);
         };
+    }
+
+    private void ensureOwnerOrAdmin(Long actorId, Long ownerId, Role actorRole) {
+        if (actorRole == Role.ADMIN) return;
+        if (!Objects.equals(actorId, ownerId)) {
+            throw new AccessDeniedException("Chỉ chủ sở hữu hoặc ADMIN mới được chỉnh sửa.");
+        }
     }
 }

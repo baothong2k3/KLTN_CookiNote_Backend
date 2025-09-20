@@ -19,19 +19,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
 
 
 public interface RecipeRepository extends JpaRepository<Recipe, Long> {
     @Query("select r.user.userId from Recipe r where r.id = :recipeId")
     Long findOwnerId(@Param("recipeId") Long recipeId);
-
-    boolean existsByIdAndUser_UserId(Long recipeId, Long userId);
-
-    List<Recipe> findByPrivacyOrderByCreatedAtDesc(Privacy privacy);
-
-    List<Recipe> findByUser_UserIdOrderByCreatedAtDesc(Long userId);
 
     @Query("""
                select r

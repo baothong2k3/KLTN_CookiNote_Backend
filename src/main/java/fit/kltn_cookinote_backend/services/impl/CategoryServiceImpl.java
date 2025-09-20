@@ -9,55 +9,102 @@ package fit.kltn_cookinote_backend.services.impl;/*
  * @version: 1.0
  */
 
-import fit.kltn_cookinote_backend.dtos.request.CreateCategoryRequest;
-import fit.kltn_cookinote_backend.dtos.request.UpdateCategoryRequest;
+import com.cloudinary.Cloudinary;
 import fit.kltn_cookinote_backend.dtos.response.CategoryResponse;
 import fit.kltn_cookinote_backend.entities.Category;
 import fit.kltn_cookinote_backend.repositories.CategoryRepository;
 import fit.kltn_cookinote_backend.services.CategoryService;
+import fit.kltn_cookinote_backend.services.CloudinaryService;
+import fit.kltn_cookinote_backend.utils.CloudinaryUtils;
+import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
+import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class CategoryServiceImpl implements CategoryService {
     private final CategoryRepository categoryRepository;
+    private final CloudinaryService cloudinaryService;
+    private final Cloudinary cloudinary;
+
+    @Value("${app.cloudinary.category-folder}")
+    private String categoryFolder;
 
     @Override
     @Transactional
-    public CategoryResponse create(CreateCategoryRequest req) {
-        String name = req.name().trim();
+    public CategoryResponse createWithOptionalImage(String nameRaw, String description, @Nullable MultipartFile image) throws IOException {
+        String name = validateAndNormalizeName(nameRaw);
         if (categoryRepository.existsByNameIgnoreCase(name)) {
             throw new IllegalArgumentException("Tên danh mục đã tồn tại");
         }
 
-        Category saved = categoryRepository.save(
-                Category.builder()
-                        .name(name)
-                        .description(req.description())
-                        .build()
-        );
+        // 1) tạo trước để có id
+        Category cat = Category.builder()
+                .name(name)
+                .description(description)
+                .build();
+        cat = categoryRepository.saveAndFlush(cat);
 
-        return toResponse(saved);
+        // 2) nếu có ảnh → upload và lưu URL
+        if (image != null && !image.isEmpty()) {
+            ImageValidationUtils.validateImage(image);
+            String publicId = "c_" + cat.getId() + "_" + Instant.now().getEpochSecond();
+            String imageUrl = CloudinaryUtils.uploadImage(cloudinary, image, categoryFolder, publicId);
+            cat.setImageUrl(imageUrl);
+            categoryRepository.save(cat);
+        }
+        return toResponse(cat);
     }
 
     @Override
-    public CategoryResponse update(Long id, UpdateCategoryRequest req) {
-        Category category = categoryRepository.findById(id)
+    @Transactional
+    public CategoryResponse updateWithOptionalImage(Long id, String nameRaw, String description, MultipartFile image) throws IOException {
+        Category cat = categoryRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Danh mục không tồn tại"));
-        String name = req.name().trim();
+
+        String name = validateAndNormalizeName(nameRaw);
         if (categoryRepository.existsByNameIgnoreCaseAndIdNot(name, id)) {
             throw new IllegalArgumentException("Tên danh mục đã tồn tại");
         }
-        category.setName(name);
-        category.setDescription(req.description());
 
-        Category saved = categoryRepository.save(category);
+        cat.setName(name);
+        cat.setDescription(description);
+
+        final String oldUrl = cat.getImageUrl();
+
+        if (image != null && !image.isEmpty()) {
+            ImageValidationUtils.validateImage(image);
+            String publicId = "c_" + id + "_" + Instant.now().getEpochSecond();
+            String imageUrl = CloudinaryUtils.uploadImage(cloudinary, image, categoryFolder, publicId);
+            cat.setImageUrl(imageUrl);
+
+            // xóa ảnh cũ SAU COMMIT
+            if (StringUtils.hasText(oldUrl)) {
+                String oldPublicId = cloudinaryService.extractPublicIdFromUrl(oldUrl);
+                if (StringUtils.hasText(oldPublicId)) {
+                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            cloudinaryService.safeDeleteByPublicId(oldPublicId);
+                        }
+                    });
+                }
+            }
+        }
+
+        Category saved = categoryRepository.save(cat);
         return toResponse(saved);
     }
 
@@ -83,6 +130,16 @@ public class CategoryServiceImpl implements CategoryService {
                 .id(c.getId())
                 .name(c.getName())
                 .description(c.getDescription())
+                .imageUrl(c.getImageUrl())
                 .build();
+    }
+
+    // ---- helpers ----
+
+    private String validateAndNormalizeName(String raw) {
+        if (!StringUtils.hasText(raw)) throw new IllegalArgumentException("Tên danh mục không được để trống");
+        String name = raw.trim();
+        if (name.length() > 100) throw new IllegalArgumentException("Tên danh mục tối đa 100 ký tự");
+        return name;
     }
 }

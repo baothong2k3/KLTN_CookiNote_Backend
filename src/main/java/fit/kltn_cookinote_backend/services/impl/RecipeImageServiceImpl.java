@@ -10,6 +10,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
  */
 
 import com.cloudinary.Cloudinary;
+import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
 import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.entities.RecipeStep;
 import fit.kltn_cookinote_backend.entities.User;
@@ -17,6 +18,7 @@ import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.repositories.RecipeStepRepository;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
+import fit.kltn_cookinote_backend.services.CloudinaryService;
 import fit.kltn_cookinote_backend.services.RecipeImageService;
 import fit.kltn_cookinote_backend.utils.CloudinaryUtils;
 import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
@@ -26,6 +28,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -36,6 +41,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class RecipeImageServiceImpl implements RecipeImageService {
     private final Cloudinary cloudinary;
+    private final CloudinaryService cloudinaryService;
     private final RecipeRepository recipeRepository;
     private final RecipeStepRepository stepRepository;
     private final UserRepository userRepository;
@@ -70,6 +76,45 @@ public class RecipeImageServiceImpl implements RecipeImageService {
         recipeRepository.save(recipe);
 
         return url;
+    }
+
+    @Override
+    @Transactional
+    public RecipeResponse updateCover(Long actorUserId, Long recipeId, MultipartFile file) throws IOException {
+        ImageValidationUtils.validateImage(file);
+
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        Long ownerId = recipe.getUser().getUserId();
+        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        final String oldUrl = recipe.getImageUrl();
+
+        String publicId = recipeFolder + "/r_" + recipeId + "/cover_" + Instant.now().getEpochSecond();
+        String newUrl = CloudinaryUtils.uploadImage(cloudinary, file, recipeFolder, publicId);
+
+        recipe.setImageUrl(newUrl);
+        recipeRepository.saveAndFlush(recipe);
+
+        // Xoá ảnh cũ sau khi commit
+        if (StringUtils.hasText(oldUrl)) {
+            final String oldPid = cloudinaryService.extractPublicIdFromUrl(oldUrl);
+            if (StringUtils.hasText(oldPid)) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        cloudinaryService.safeDeleteByPublicId(oldPid);
+                    }
+                });
+            }
+        }
+
+        // Trả lại RecipeResponse đầy đủ (cover mới)
+        return RecipeResponse.from(recipe);
     }
 
     @Override

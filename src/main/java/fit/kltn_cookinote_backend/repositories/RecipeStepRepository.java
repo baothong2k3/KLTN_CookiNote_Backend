@@ -15,6 +15,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface RecipeStepRepository extends JpaRepository<RecipeStep, Long> {
     @Query("""
@@ -25,4 +26,8 @@ public interface RecipeStepRepository extends JpaRepository<RecipeStep, Long> {
     Long findOwnerIdByStepId(@Param("stepId") Long stepId);
 
     List<RecipeStep> findByRecipe_IdOrderByStepNoAsc(Long recipeId);
+
+    Optional<RecipeStep> findByRecipe_IdAndStepNo(Long recipeId, Integer stepNo);
+
+    boolean existsByRecipe_IdAndStepNoAndIdNot(Long recipeId, Integer stepNo, Long excludeStepId);
 }

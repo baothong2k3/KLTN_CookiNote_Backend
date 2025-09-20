@@ -78,7 +78,8 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         return newUrl;
     }
 
-    private void safeDeleteByPublicId(String publicId) {
+    @Override
+    public void safeDeleteByPublicId(String publicId) {
         try {
             cloudinary.uploader().destroy(publicId, ObjectUtils.asMap(
                     "invalidate", true,
@@ -95,7 +96,8 @@ public class CloudinaryServiceImpl implements CloudinaryService {
      * .../image/upload/c_scale,w_200/v1724550000/cookinote/avatars/u_1_1724550123.png
      * -> trả về: cookinote/avatars/u_1_1724550123
      */
-    private String extractPublicIdFromUrl(String url) {
+    @Override
+    public String extractPublicIdFromUrl(String url) {
         try {
             URL u = new URL(url);
             String path = u.getPath(); // /<cloud>/image/upload/[transform/...]v1234567890/<folder>/<name>.<ext>
