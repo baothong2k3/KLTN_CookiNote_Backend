@@ -175,4 +175,16 @@ public class RecipeController {
         RecipeResponse data = recipeService.updateContent(authUser.getUserId(), recipeId, req);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật nội dung công thức thành công", data, httpReq.getRequestURI()));
     }
+
+    @PutMapping(value = "/{recipeId}/cover", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<RecipeResponse>> updateCover(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @RequestPart("file") MultipartFile file,
+            HttpServletRequest httpReq
+    ) throws IOException {
+        RecipeResponse data = recipeImageService.updateCover(authUser.getUserId(), recipeId, file);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật ảnh bìa thành công", data, httpReq.getRequestURI()));
+    }
 }
