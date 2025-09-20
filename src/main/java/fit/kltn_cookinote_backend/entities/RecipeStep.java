@@ -17,7 +17,11 @@ import org.hibernate.annotations.FetchMode;
 import java.util.List;
 
 @Entity
-@Table(name = "recipe_step")
+@Table(name = "recipe_step",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_recipe_step_recipe_stepno",
+                columnNames = {"recipe_id", "step_no"})
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -32,7 +36,7 @@ public class RecipeStep {
     @JoinColumn(name = "recipe_id", nullable = false)
     private Recipe recipe;
 
-    @Column(name = "step_no")
+    @Column(name = "step_no", nullable = false)
     private Integer stepNo;
 
     @Column(length = 4096)
