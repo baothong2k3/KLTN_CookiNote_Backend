@@ -12,6 +12,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeIngredientCreate;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepCreate;
+import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Privacy;
@@ -35,10 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.EnumSet;
-import java.util.List;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -218,10 +216,66 @@ public class RecipeServiceImpl implements RecipeService {
         return ings.stream().map(RecipeIngredientItem::from).toList();
     }
 
+    @Override
+    @Transactional
+    public RecipeResponse updateContent(Long actorUserId, Long recipeId, RecipeUpdateRequest req) {
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        Long ownerId = recipe.getUser().getUserId();
+        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        // Chỉ ADMIN mới set PUBLIC
+        Privacy incomingPrivacy = req.privacy();
+        if (incomingPrivacy != null) {
+            if (actor.getRole() != Role.ADMIN && incomingPrivacy == Privacy.PUBLIC) {
+                throw new AccessDeniedException("Chỉ ADMIN mới được đặt công khai (PUBLIC).");
+            }
+            recipe.setPrivacy(incomingPrivacy);
+        }
+
+        // Update trường cơ bản
+        Category category = categoryRepository.findById(req.categoryId())
+                .orElseThrow(() -> new EntityNotFoundException("Category không tồn tại: " + req.categoryId()));
+        recipe.setCategory(category);
+        recipe.setTitle(req.title());
+        recipe.setDescription(req.description());
+        recipe.setPrepareTime(req.prepareTime());
+        recipe.setCookTime(req.cookTime());
+        recipe.setDifficulty(req.difficulty());
+
+        // Thay thế toàn bộ ingredients (không ảnh hưởng steps/images)
+        if (req.ingredients() != null) {
+            recipeIngredientRepository.deleteAll(recipe.getIngredients());
+            List<RecipeIngredient> newIngs = new ArrayList<>();
+            for (RecipeIngredientCreate i : req.ingredients()) {
+                newIngs.add(RecipeIngredient.builder()
+                        .recipe(recipe)
+                        .name(i.name())
+                        .quantity(i.quantity())
+                        .build());
+            }
+            recipe.setIngredients(newIngs);
+        }
+
+        Recipe saved = recipeRepository.saveAndFlush(recipe);
+        return RecipeResponse.from(saved);
+    }
+
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {
         return switch (privacy) {
             case PUBLIC, SHARED -> true;
             case PRIVATE -> viewerId != null && viewerId.equals(ownerId);
         };
+    }
+
+    private void ensureOwnerOrAdmin(Long actorId, Long ownerId, Role actorRole) {
+        if (actorRole == Role.ADMIN) return;
+        if (!Objects.equals(actorId, ownerId)) {
+            throw new AccessDeniedException("Chỉ chủ sở hữu hoặc ADMIN mới được chỉnh sửa.");
+        }
     }
 }

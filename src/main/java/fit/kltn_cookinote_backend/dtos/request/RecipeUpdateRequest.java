@@ -14,7 +14,6 @@ public record RecipeUpdateRequest(
         Integer cookTime,
         Difficulty difficulty,
         Privacy privacy, // nếu null sẽ giữ nguyên privacy cũ (không tự động chuyển)
-        List<RecipeIngredientCreate> ingredients, // thay thế toàn bộ
-        List<RecipeStepCreate> steps
+        List<RecipeIngredientCreate> ingredients // thay thế toàn bộ
 ) {
 }
