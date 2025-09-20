@@ -24,14 +24,15 @@ import fit.kltn_cookinote_backend.services.CloudinaryService;
 import fit.kltn_cookinote_backend.services.RecipeImageService;
 import fit.kltn_cookinote_backend.services.RecipeStepImageService;
 import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -47,6 +48,9 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
     private final UserRepository userRepository;
     private final CloudinaryService cloudinaryService;
     private final RecipeRepository recipeRepository;
+
+    @PersistenceContext
+    private EntityManager em;
 
     private void ensureOwnerOrAdmin(Long actorId, Long ownerId, Role actorRole) {
         if (actorRole == Role.ADMIN) return;
@@ -201,6 +205,9 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
                 stepImageRepository.saveAll(toSave);
             }
         }
+
+        em.flush();
+        em.clear();
 
         // 4) Reload & trả về RecipeResponse
         Recipe reloaded = recipeRepository.findDetailById(recipeId)

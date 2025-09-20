@@ -10,6 +10,7 @@ package fit.kltn_cookinote_backend.controllers;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
+import fit.kltn_cookinote_backend.dtos.request.RecipeStepUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.User;
@@ -186,5 +187,22 @@ public class RecipeController {
     ) throws IOException {
         RecipeResponse data = recipeImageService.updateCover(authUser.getUserId(), recipeId, file);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật ảnh bìa thành công", data, httpReq.getRequestURI()));
+    }
+
+    @PutMapping(value = "/{recipeId}/steps/{stepId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<RecipeResponse>> updateStep(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @PathVariable Long stepId,
+            @RequestParam(value = "content", required = false) String content,
+            @RequestParam(value = "stepNo", required = false) Integer stepNo,
+            @RequestParam(value = "keepUrls", required = false) List<String> keepUrls, // có thể gửi nhiều keepUrls
+            @RequestPart(value = "addFiles", required = false) List<MultipartFile> addFiles,
+            HttpServletRequest httpReq
+    ) throws IOException {
+        RecipeStepUpdateRequest req = new RecipeStepUpdateRequest(content, stepNo, keepUrls, addFiles);
+        RecipeResponse data = stepImageService.updateStep(authUser.getUserId(), recipeId, stepId, req);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật bước công thức thành công", data, httpReq.getRequestURI()));
     }
 }
