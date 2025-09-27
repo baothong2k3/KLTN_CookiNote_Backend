@@ -38,6 +38,7 @@ public class ShoppingList {
     @Column(length = 50)
     private String quantity;
 
+    @Builder.Default
     @Column
-    private Boolean checked;
+    private Boolean checked = false;
 }
