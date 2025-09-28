@@ -61,4 +61,24 @@ public class ShoppingListController {
         );
         return ResponseEntity.ok(ApiResponse.success("Thêm nguyên liệu lẻ loi thành công.", data, http.getRequestURI()));
     }
+
+    /**
+     * (2) Thêm 1 nguyên liệu vào list có recipe_id (áp dụng merge giữ checked)
+     */
+    @PostMapping("/recipes/{recipeId}/items")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ShoppingListResponse>> upsertOneInRecipe(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @Valid @RequestBody ShoppingListUpsertRequest req,
+            HttpServletRequest http
+    ) {
+        ShoppingListResponse data = shoppingListService.upsertOneInRecipe(
+                authUser.getUserId(), recipeId, req.ingredient(), req.quantity()
+        );
+        return ResponseEntity.ok(ApiResponse.success(
+                "Thêm nguyên liệu vào recipe #" + recipeId + " thành công.",
+                data, http.getRequestURI()
+        ));
+    }
 }

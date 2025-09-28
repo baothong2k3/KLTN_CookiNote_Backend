@@ -133,4 +133,44 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
         return toResponse(item, null);
     }
+
+    // ===== (2) Có recipe_id: áp dụng merge giữ checked =====
+    @Override
+    @Transactional
+    public ShoppingListResponse upsertOneInRecipe(Long userId, Long recipeId, String ingredient, String quantity) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User không tồn tại: " + userId));
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        // Quyền xem/merge với recipe PRIVATE
+        if (recipe.getPrivacy() == Privacy.PRIVATE && !Objects.equals(recipe.getUser().getUserId(), userId)) {
+            throw new AccessDeniedException("Bạn không có quyền thêm nguyên liệu vào recipe PRIVATE này.");
+        }
+
+        String name = canonicalize(ingredient);
+        if (name.isEmpty()) throw new IllegalArgumentException("Tên nguyên liệu trống.");
+
+        // Upsert theo (user, recipe_id, ingredient ignoreCase)
+        ShoppingList item = shoppingListRepository
+                .findByUser_UserIdAndRecipe_IdAndIngredientIgnoreCase(userId, recipeId, name)
+                .map(exist -> {
+                    // GIỮ checked cũ; chỉ cập nhật quantity nếu khác
+                    if (!Objects.equals(safe(quantity), safe(exist.getQuantity()))) {
+                        exist.setQuantity(quantity);
+                    }
+                    return exist;
+                })
+                .orElseGet(() -> shoppingListRepository.save(
+                        ShoppingList.builder()
+                                .user(user)
+                                .recipe(recipe)
+                                .ingredient(name)              // canonicalized
+                                .quantity(quantity)
+                                .checked(Boolean.FALSE)
+                                .build()
+                ));
+
+        return toResponse(item, recipeId);
+    }
 }

@@ -18,4 +18,7 @@ public interface ShoppingListService {
 
     // (1) Thêm 1 nguyên liệu lẻ loi (recipe = null)
     ShoppingListResponse upsertOneStandalone(Long userId, String ingredient, String quantity);
+
+    // (2) Thêm 1 nguyên liệu vào list có recipe_id (áp dụng quy tắc merge giữ checked)
+    ShoppingListResponse upsertOneInRecipe(Long userId, Long recipeId, String ingredient, String quantity);
 }
