@@ -9,19 +9,18 @@ package fit.kltn_cookinote_backend.controllers;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.request.ShoppingListUpsertRequest;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
 import fit.kltn_cookinote_backend.dtos.response.ShoppingListResponse;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.services.ShoppingListService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -45,5 +44,21 @@ public class ShoppingListController {
     ) {
         List<ShoppingListResponse> data = shoppingListService.createFromRecipe(authUser.getUserId(), recipeId);
         return ResponseEntity.ok(ApiResponse.success("Tạo shopping list từ recipe #" + recipeId + " thành công (" + data.size() + " mục).", data, req.getRequestURI()));
+    }
+
+    /**
+     * (1) Thêm 1 nguyên liệu lẻ loi (recipe=null)
+     */
+    @PostMapping("/items")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ShoppingListResponse>> upsertOneStandalone(
+            @AuthenticationPrincipal User authUser,
+            @Valid @RequestBody ShoppingListUpsertRequest req,
+            HttpServletRequest http
+    ) {
+        ShoppingListResponse data = shoppingListService.upsertOneStandalone(
+                authUser.getUserId(), req.ingredient(), req.quantity()
+        );
+        return ResponseEntity.ok(ApiResponse.success("Thêm nguyên liệu lẻ loi thành công.", data, http.getRequestURI()));
     }
 }

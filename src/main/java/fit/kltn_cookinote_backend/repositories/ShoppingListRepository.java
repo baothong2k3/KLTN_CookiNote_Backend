@@ -21,4 +21,10 @@ public interface ShoppingListRepository extends JpaRepository<ShoppingList, Long
     Optional<ShoppingList> findByUser_UserIdAndRecipe_IdAndIngredientIgnoreCase(
             Long userId, Long recipeId, String ingredient
     );
+
+    List<ShoppingList> findByUser_UserIdAndRecipeIsNull(Long userId);
+
+    Optional<ShoppingList> findByUser_UserIdAndRecipeIsNullAndIngredientIgnoreCase(
+            Long userId, String ingredient
+    );
 }

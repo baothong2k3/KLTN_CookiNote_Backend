@@ -15,4 +15,7 @@ import java.util.List;
 
 public interface ShoppingListService {
     List<ShoppingListResponse> createFromRecipe(Long userId, Long recipeId);
+
+    // (1) Thêm 1 nguyên liệu lẻ loi (recipe = null)
+    ShoppingListResponse upsertOneStandalone(Long userId, String ingredient, String quantity);
 }

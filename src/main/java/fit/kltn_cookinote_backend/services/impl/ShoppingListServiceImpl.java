@@ -101,4 +101,36 @@ public class ShoppingListServiceImpl implements ShoppingListService {
         return shoppingListRepository.findByUser_UserIdAndRecipe_Id(userId, recipeId).stream()
                 .map(s -> toResponse(s, recipeId)).toList();
     }
+
+    @Override
+    @Transactional
+    public ShoppingListResponse upsertOneStandalone(Long userId, String ingredient, String quantity) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User không tồn tại: " + userId));
+
+        String name = canonicalize(ingredient);
+        if (name.isEmpty()) throw new IllegalArgumentException("Tên nguyên liệu trống.");
+
+        // Upsert theo (user, recipe IS NULL, ingredient ignoreCase)
+        ShoppingList item = shoppingListRepository
+                .findByUser_UserIdAndRecipeIsNullAndIngredientIgnoreCase(userId, name)
+                .map(exist -> {
+                    // GIỮ checked cũ, chỉ cập nhật quantity nếu khác
+                    if (!Objects.equals(safe(quantity), safe(exist.getQuantity()))) {
+                        exist.setQuantity(quantity);
+                    }
+                    return exist;
+                })
+                .orElseGet(() -> shoppingListRepository.save(
+                        ShoppingList.builder()
+                                .user(user)
+                                .recipe(null)                  // lẻ loi
+                                .ingredient(name)              // canonicalized
+                                .quantity(quantity)
+                                .checked(Boolean.FALSE)        // mặc định chưa tick
+                                .build()
+                ));
+
+        return toResponse(item, null);
+    }
 }

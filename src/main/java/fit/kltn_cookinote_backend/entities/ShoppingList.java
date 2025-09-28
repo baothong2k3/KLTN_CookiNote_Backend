@@ -29,7 +29,7 @@ public class ShoppingList {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "recipe_id")
+    @JoinColumn(name = "recipe_id", nullable = true)
     private Recipe recipe;
 
     @Column(length = 100, nullable = false)
