@@ -27,4 +27,7 @@ public interface ShoppingListService {
                                            String newIngredientOrNull,
                                            String newQuantityOrNull,
                                            Boolean newCheckedOrNull);
+
+    // Chuyển 1 item (ingredient) từ list này sang list khác (có thể là null)
+    ShoppingListResponse moveItem(Long userId, Long itemId, Long targetRecipeIdOrNull);
 }

@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.controllers;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.request.ShoppingListMoveRequest;
 import fit.kltn_cookinote_backend.dtos.request.ShoppingListUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.request.ShoppingListUpsertRequest;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
@@ -102,5 +103,24 @@ public class ShoppingListController {
                 req.checked()
         );
         return ResponseEntity.ok(ApiResponse.success("Cập nhật nguyên liệu thành công.", data, http.getRequestURI()));
+    }
+
+    /**
+     * Chuyển 1 item (ingredient) từ list này sang list khác (có thể là null)
+     */
+    @PatchMapping("/items/{itemId}/move")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ShoppingListResponse>> moveItem(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long itemId,
+            @RequestBody ShoppingListMoveRequest req,
+            HttpServletRequest http
+    ) {
+        ShoppingListResponse data = shoppingListService.moveItem(
+                authUser.getUserId(),
+                itemId,
+                req == null ? null : req.recipeId()
+        );
+        return ResponseEntity.ok(ApiResponse.success("Di chuyển nguyên liệu thành công.", data, http.getRequestURI()));
     }
 }

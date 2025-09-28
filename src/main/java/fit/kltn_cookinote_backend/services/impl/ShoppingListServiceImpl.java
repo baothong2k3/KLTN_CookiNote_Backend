@@ -237,4 +237,65 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
         return toResponse(current, recipeId);
     }
+
+    @Override
+    @Transactional
+    public ShoppingListResponse moveItem(Long userId, Long itemId, Long targetRecipeIdOrNull) {
+        // ensure user
+        userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User không tồn tại: " + userId));
+
+        // item hiện tại (thuộc về user)
+        ShoppingList current = shoppingListRepository.findByIdAndUser_UserId(itemId, userId)
+                .orElseThrow(() -> new EntityNotFoundException("Item không tồn tại hoặc không thuộc về bạn: " + itemId));
+
+        // list nguồn/đích
+        Long sourceRecipeId = current.getRecipe() != null ? current.getRecipe().getId() : null;
+
+        // nếu không đổi list -> no-op
+        if (Objects.equals(sourceRecipeId, targetRecipeIdOrNull)) {
+            return toResponse(current, sourceRecipeId);
+        }
+
+        Recipe targetRecipe = null;
+        if (targetRecipeIdOrNull != null) {
+            targetRecipe = recipeRepository.findById(targetRecipeIdOrNull)
+                    .orElseThrow(() -> new EntityNotFoundException("Recipe đích không tồn tại: " + targetRecipeIdOrNull));
+
+            // chỉ owner mới được chuyển vào recipe PRIVATE
+            if (targetRecipe.getPrivacy() == Privacy.PRIVATE
+                    && !Objects.equals(targetRecipe.getUser().getUserId(), userId)) {
+                throw new AccessDeniedException("Bạn không có quyền chuyển vào recipe PRIVATE này.");
+            }
+        }
+
+        // tên đã lưu của current đã canonicalized từ trước
+        String name = current.getIngredient();
+
+        // tìm trùng trong list đích
+        Optional<ShoppingList> dup = (targetRecipe == null)
+                ? shoppingListRepository.findByUser_UserIdAndRecipeIsNullAndIngredientIgnoreCase(userId, name)
+                : shoppingListRepository.findByUser_UserIdAndRecipe_IdAndIngredientIgnoreCase(userId, targetRecipe.getId(), name);
+
+        if (dup.isPresent() && !dup.get().getId().equals(current.getId())) {
+            // MERGE vào item đích
+            ShoppingList target = dup.get();
+
+            boolean mergedChecked = Boolean.TRUE.equals(target.getChecked()) || Boolean.TRUE.equals(current.getChecked());
+            String mergedQty = (target.getQuantity() != null) ? target.getQuantity() : current.getQuantity();
+
+            target.setChecked(mergedChecked);
+            target.setQuantity(mergedQty);
+            // target giữ nguyên ingredient (đã canonical)
+
+            // xoá bản gốc
+            shoppingListRepository.delete(current);
+
+            return toResponse(target, targetRecipeIdOrNull);
+        } else {
+            // không trùng -> chỉ chuyển list
+            current.setRecipe(targetRecipe);
+            return toResponse(current, targetRecipeIdOrNull);
+        }
+    }
 }
