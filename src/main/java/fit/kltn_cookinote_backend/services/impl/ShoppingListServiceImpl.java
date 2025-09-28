@@ -173,4 +173,68 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
         return toResponse(item, recipeId);
     }
+
+    @Override
+    @Transactional
+    public ShoppingListResponse updateItemContent(Long userId, Long itemId,
+                                                  String newIngredientOrNull,
+                                                  String newQuantityOrNull,
+                                                  Boolean newCheckedOrNull) {
+        userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User không tồn tại: " + userId));
+
+        // Lấy item thuộc về user
+        ShoppingList current = shoppingListRepository.findByIdAndUser_UserId(itemId, userId)
+                .orElseThrow(() -> new EntityNotFoundException("Item không tồn tại hoặc không thuộc về bạn: " + itemId));
+
+        // Xác định list (recipe_id có thể null)
+        Long recipeId = current.getRecipe() != null ? current.getRecipe().getId() : null;
+
+        // Chuẩn hoá & re-validate dữ liệu mới (nếu có)
+        String nameNew = (newIngredientOrNull != null)
+                ? normalizeAndValidateName(newIngredientOrNull)
+                : current.getIngredient();
+
+        String qtyNew = (newQuantityOrNull != null)
+                ? normalizeAndValidateQuantity(newQuantityOrNull)
+                : null; // null = không đổi
+
+        // Nếu đổi tên, kiểm tra trùng trong cùng list để MERGE
+        boolean nameChanged = !Objects.equals(nameNew, current.getIngredient());
+
+        if (nameChanged) {
+            Optional<ShoppingList> dup = (recipeId == null)
+                    ? shoppingListRepository.findByUser_UserIdAndRecipeIsNullAndIngredientIgnoreCase(userId, nameNew)
+                    : shoppingListRepository.findByUser_UserIdAndRecipe_IdAndIngredientIgnoreCase(userId, recipeId, nameNew);
+
+            if (dup.isPresent() && !dup.get().getId().equals(current.getId())) {
+                // Merge vào item trùng
+                ShoppingList target = dup.get();
+
+                // checked = OR(current, target, newChecked nếu có)
+                boolean mergedChecked = Boolean.TRUE.equals(target.getChecked())
+                        || Boolean.TRUE.equals(current.getChecked())
+                        || Boolean.TRUE.equals(newCheckedOrNull);
+
+                // quantity: ưu tiên qtyNew nếu gửi; nếu không, giữ target.quantity
+                String mergedQty = (qtyNew != null) ? qtyNew : target.getQuantity();
+
+                target.setChecked(mergedChecked);
+                target.setQuantity(mergedQty);
+                target.setIngredient(nameNew); // canonicalized
+
+                // Xoá item hiện tại để tránh duplicate
+                shoppingListRepository.delete(current);
+
+                return toResponse(target, recipeId);
+            }
+        }
+
+        // Không cần merge -> cập nhật trực tiếp current
+        current.setIngredient(nameNew); // canonicalized
+        if (qtyNew != null) current.setQuantity(qtyNew);
+        if (newCheckedOrNull != null) current.setChecked(newCheckedOrNull);
+
+        return toResponse(current, recipeId);
+    }
 }

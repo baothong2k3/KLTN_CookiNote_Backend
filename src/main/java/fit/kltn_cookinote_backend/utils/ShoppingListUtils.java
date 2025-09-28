@@ -39,4 +39,18 @@ public class ShoppingListUtils {
                 .checked(Boolean.TRUE.equals(s.getChecked()))
                 .build();
     }
+
+    public static String normalizeAndValidateName(String raw) {
+        String name = canonicalize(raw);
+        if (name.isBlank()) throw new IllegalArgumentException("Tên nguyên liệu không được trống.");
+        if (name.length() > 100) throw new IllegalArgumentException("Tên nguyên liệu tối đa 100 ký tự.");
+        return name;
+    }
+
+    public static String normalizeAndValidateQuantity(String raw) {
+        if (raw == null) return null;
+        String q = canonicalize(raw);
+        if (q.length() > 50) throw new IllegalArgumentException("Số lượng tối đa 50 ký tự.");
+        return q;
+    }
 }

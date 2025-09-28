@@ -21,4 +21,10 @@ public interface ShoppingListService {
 
     // (2) Thêm 1 nguyên liệu vào list có recipe_id (áp dụng quy tắc merge giữ checked)
     ShoppingListResponse upsertOneInRecipe(Long userId, Long recipeId, String ingredient, String quantity);
+
+    // Cập nhật nội dung 1 item (ingredient, quantity, checked)
+    ShoppingListResponse updateItemContent(Long userId, Long itemId,
+                                           String newIngredientOrNull,
+                                           String newQuantityOrNull,
+                                           Boolean newCheckedOrNull);
 }
