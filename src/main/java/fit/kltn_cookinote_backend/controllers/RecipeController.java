@@ -14,6 +14,7 @@ import fit.kltn_cookinote_backend.dtos.request.RecipeStepUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.services.FavoriteService;
 import fit.kltn_cookinote_backend.services.RecipeImageService;
 import fit.kltn_cookinote_backend.services.RecipeService;
 import fit.kltn_cookinote_backend.services.RecipeStepImageService;
@@ -37,6 +38,7 @@ public class RecipeController {
     private final RecipeService recipeService;
     private final RecipeImageService recipeImageService;
     private final RecipeStepImageService stepImageService;
+    private final FavoriteService favoriteService;
 
     // PHA 1: Tạo recipe (USER/ADMIN; nếu PUBLIC chỉ ADMIN)
     @PostMapping
@@ -206,5 +208,20 @@ public class RecipeController {
         RecipeStepUpdateRequest req = new RecipeStepUpdateRequest(content, stepNo, suggestedTime, tips, keepUrls, addFiles);
         RecipeResponse data = stepImageService.updateStep(authUser.getUserId(), recipeId, stepId, req);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật bước công thức thành công", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Thêm một công thức vào danh sách yêu thích của người dùng hiện tại.
+     * POST /recipes/{recipeId}/favorite
+     */
+    @PostMapping("/{recipeId}/favorite")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> addFavorite(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        favoriteService.addRecipeToFavorites(authUser.getUserId(), recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Đã thêm công thức vào danh sách yêu thích", httpReq.getRequestURI()));
     }
 }

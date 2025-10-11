@@ -1,0 +1,21 @@
+/*
+ * @ (#) FavoriteService.java    1.0    12/10/2025
+ * Copyright (c) 2025 IUH. All rights reserved.
+ */
+package fit.kltn_cookinote_backend.services;/*
+ * @description:
+ * @author: Bao Thong
+ * @date: 12/10/2025
+ * @version: 1.0
+ */
+
+import org.springframework.stereotype.Service;
+
+
+@Service
+public interface FavoriteService {
+    /**
+     * Thêm một công thức vào danh sách yêu thích của người dùng.
+     */
+    void addRecipeToFavorites(Long userId, Long recipeId);
+}
