@@ -67,9 +67,10 @@ public record RecipeResponse(
                     .forEach(s -> {
                         List<String> imgs = new ArrayList<>();
                         if (s.getImages() != null) {
-                            for (RecipeStepImage si : s.getImages()) {
-                                imgs.add(si.getImageUrl());
-                            }
+                            // Lọc và chỉ lấy những ảnh có cờ active = true
+                            s.getImages().stream()
+                                    .filter(RecipeStepImage::isActive)
+                                    .forEach(si -> imgs.add(si.getImageUrl()));
                         }
                         stepDtos.add(StepDto.builder()
                                 .id(s.getId())
