@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.response.RecipeCardResponse;
 import fit.kltn_cookinote_backend.entities.Favorite;
 import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.entities.User;
@@ -22,6 +23,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -44,5 +48,14 @@ public class FavoriteServiceImpl implements FavoriteService {
 
         Favorite favorite = Favorite.of(user, recipe);
         favoriteRepository.save(favorite);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RecipeCardResponse> getFavoriteRecipes(Long userId) {
+        List<Recipe> favoriteRecipes = favoriteRepository.findFavoriteRecipesByUserId(userId);
+        return favoriteRecipes.stream()
+                .map(RecipeCardResponse::from)
+                .collect(Collectors.toList());
     }
 }

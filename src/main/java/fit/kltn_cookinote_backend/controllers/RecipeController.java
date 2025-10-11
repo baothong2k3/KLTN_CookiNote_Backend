@@ -224,4 +224,18 @@ public class RecipeController {
         favoriteService.addRecipeToFavorites(authUser.getUserId(), recipeId);
         return ResponseEntity.ok(ApiResponse.success("Đã thêm công thức vào danh sách yêu thích", httpReq.getRequestURI()));
     }
+
+    /**
+     * Lấy danh sách các công thức yêu thích của người dùng hiện tại.
+     * GET /recipes/me/favorites
+     */
+    @GetMapping("/me/favorites")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<RecipeCardResponse>>> getMyFavorites(
+            @AuthenticationPrincipal User authUser,
+            HttpServletRequest httpReq
+    ) {
+        List<RecipeCardResponse> data = favoriteService.getFavoriteRecipes(authUser.getUserId());
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức yêu thích thành công", data, httpReq.getRequestURI()));
+    }
 }
