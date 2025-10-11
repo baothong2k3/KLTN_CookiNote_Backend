@@ -42,7 +42,8 @@ public record RecipeResponse(
     }
 
     @Builder
-    public record StepDto(Long id, Integer stepNo, String content, List<String> images) {
+    public record StepDto(Long id, Integer stepNo, String content, Integer suggestedTime, String tips,
+                          List<String> images) {
     }
 
     public static RecipeResponse from(Recipe r) {
@@ -74,6 +75,8 @@ public record RecipeResponse(
                                 .id(s.getId())
                                 .stepNo(s.getStepNo())
                                 .content(s.getContent())
+                                .suggestedTime(s.getSuggestedTime())
+                                .tips(s.getTips())
                                 .images(imgs)
                                 .build());
                     });

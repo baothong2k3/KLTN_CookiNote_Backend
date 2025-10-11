@@ -21,6 +21,8 @@ public record RecipeStepItem(
         Long id,
         Integer stepNo,
         String content,
+        Integer suggestedTime,
+        String tips,
         List<String> images
 ) {
     public static RecipeStepItem from(RecipeStep s) {
@@ -34,6 +36,8 @@ public record RecipeStepItem(
                 .id(s.getId())
                 .stepNo(s.getStepNo())
                 .content(s.getContent())
+                .suggestedTime(s.getSuggestedTime())
+                .tips(s.getTips())
                 .images(urls)
                 .build();
     }

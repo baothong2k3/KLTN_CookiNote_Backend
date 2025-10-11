@@ -197,11 +197,13 @@ public class RecipeController {
             @PathVariable Long stepId,
             @RequestParam(value = "content", required = false) String content,
             @RequestParam(value = "stepNo", required = false) Integer stepNo,
-            @RequestParam(value = "keepUrls", required = false) List<String> keepUrls, // có thể gửi nhiều keepUrls
+            @RequestParam(value = "suggestTime", required = false) Integer suggestedTime,
+            @RequestParam(value = "tips", required = false) String tips,
+            @RequestParam(value = "keepUrls", required = false) List<String> keepUrls,
             @RequestPart(value = "addFiles", required = false) List<MultipartFile> addFiles,
             HttpServletRequest httpReq
     ) throws IOException {
-        RecipeStepUpdateRequest req = new RecipeStepUpdateRequest(content, stepNo, keepUrls, addFiles);
+        RecipeStepUpdateRequest req = new RecipeStepUpdateRequest(content, stepNo, suggestedTime, tips, keepUrls, addFiles);
         RecipeResponse data = stepImageService.updateStep(authUser.getUserId(), recipeId, stepId, req);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật bước công thức thành công", data, httpReq.getRequestURI()));
     }

@@ -114,6 +114,8 @@ public class RecipeServiceImpl implements RecipeService {
                 steps.add(RecipeStep.builder()
                         .recipe(recipe)
                         .stepNo(desired)
+                        .suggestedTime(s.suggestedTime())
+                        .tips(s.tips())
                         .content(s.content())
                         .build());
             }

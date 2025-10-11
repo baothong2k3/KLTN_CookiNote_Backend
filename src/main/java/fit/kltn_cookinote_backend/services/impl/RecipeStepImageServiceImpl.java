@@ -112,9 +112,15 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         // 0) Load & kiểm quyền
         RecipeStep step = loadAndCheckStep(actorUserId, recipeId, stepId);
 
-        // 1) Cập nhật nội dung
+        // 1) Cập nhật nội dung, thời gian và tips
         if (req.content() != null) {
             step.setContent(req.content());
+        }
+        if (req.suggestedTime() != null) {
+            step.setSuggestedTime(req.suggestedTime());
+        }
+        if (req.tips() != null) {
+            step.setTips(req.tips());
         }
 
         // 2) Đảm bảo không trùng stepNo (swap nếu cần)
