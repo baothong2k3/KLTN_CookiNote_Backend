@@ -26,4 +26,9 @@ public interface FavoriteService {
      * Lấy danh sách các công thức yêu thích của người dùng.
      */
     List<RecipeCardResponse> getFavoriteRecipes(Long userId);
+
+    /**
+     * Xóa một công thức khỏi danh sách yêu thích của người dùng.
+     */
+    void removeRecipeFromFavorites(Long userId, Long recipeId);
 }

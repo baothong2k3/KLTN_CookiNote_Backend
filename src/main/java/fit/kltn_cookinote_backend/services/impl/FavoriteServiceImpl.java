@@ -58,4 +58,16 @@ public class FavoriteServiceImpl implements FavoriteService {
                 .map(RecipeCardResponse::from)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    @Transactional
+    public void removeRecipeFromFavorites(Long userId, Long recipeId) {
+        userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người dùng với id: " + userId));
+        recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy công thức với id: " + recipeId));
+
+        Favorite.FavoriteId favoriteId = new Favorite.FavoriteId(userId, recipeId);
+        favoriteRepository.deleteById(favoriteId);
+    }
 }

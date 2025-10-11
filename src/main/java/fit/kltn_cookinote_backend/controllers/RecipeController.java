@@ -238,4 +238,19 @@ public class RecipeController {
         List<RecipeCardResponse> data = favoriteService.getFavoriteRecipes(authUser.getUserId());
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức yêu thích thành công", data, httpReq.getRequestURI()));
     }
+
+    /**
+     * Xóa một công thức khỏi danh sách yêu thích của người dùng hiện tại.
+     * DELETE /recipes/{recipeId}/favorite
+     */
+    @DeleteMapping("/{recipeId}/favorite")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> removeFavorite(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        favoriteService.removeRecipeFromFavorites(authUser.getUserId(), recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Đã xóa công thức khỏi danh sách yêu thích", httpReq.getRequestURI()));
+    }
 }
