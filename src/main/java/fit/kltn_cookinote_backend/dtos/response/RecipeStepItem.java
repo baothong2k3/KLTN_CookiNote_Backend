@@ -21,19 +21,24 @@ public record RecipeStepItem(
         Long id,
         Integer stepNo,
         String content,
+        Integer suggestedTime,
+        String tips,
         List<String> images
 ) {
     public static RecipeStepItem from(RecipeStep s) {
         List<String> urls = new ArrayList<>();
         if (s.getImages() != null) {
-            for (RecipeStepImage img : s.getImages()) {
-                urls.add(img.getImageUrl());
-            }
+            // Lọc và chỉ lấy những ảnh có cờ active = true
+            s.getImages().stream()
+                    .filter(RecipeStepImage::isActive)
+                    .forEach(img -> urls.add(img.getImageUrl()));
         }
         return RecipeStepItem.builder()
                 .id(s.getId())
                 .stepNo(s.getStepNo())
                 .content(s.getContent())
+                .suggestedTime(s.getSuggestedTime())
+                .tips(s.getTips())
                 .images(urls)
                 .build();
     }

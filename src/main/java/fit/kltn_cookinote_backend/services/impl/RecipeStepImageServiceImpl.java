@@ -112,9 +112,15 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         // 0) Load & kiểm quyền
         RecipeStep step = loadAndCheckStep(actorUserId, recipeId, stepId);
 
-        // 1) Cập nhật nội dung
+        // 1) Cập nhật nội dung, thời gian và tips
         if (req.content() != null) {
             step.setContent(req.content());
+        }
+        if (req.suggestedTime() != null) {
+            step.setSuggestedTime(req.suggestedTime());
+        }
+        if (req.tips() != null) {
+            step.setTips(req.tips());
         }
 
         // 2) Đảm bảo không trùng stepNo (swap nếu cần)
@@ -153,40 +159,30 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
             stepRepository.save(step);
         }
 
-        // 3) Ảnh: giữ/xoá/thêm (≤ 5 ảnh/step)
-        List<RecipeStepImage> existing = stepImageRepository.findByStep_Id(stepId);
-        Set<String> keepSet = new HashSet<>(Optional.ofNullable(req.keepUrls()).orElse(List.of()));
+        // 3) Xử lý ảnh
+        List<RecipeStepImage> existingImages = stepImageRepository.findByStep_Id(stepId);
+        Set<String> keepUrlsSet = new HashSet<>(Optional.ofNullable(req.keepUrls()).orElse(List.of()));
 
-        // 3.1 Ảnh cần xoá
-        List<RecipeStepImage> toDelete = existing.stream()
-                .filter(img -> !keepSet.contains(img.getImageUrl()))
+        // 3.1) Vô hiệu hóa (soft-delete) các ảnh không được giữ lại
+        List<RecipeStepImage> toDeactivate = existingImages.stream()
+                .filter(img -> img.isActive() && !keepUrlsSet.contains(img.getImageUrl()))
                 .toList();
 
-        int keepCount = existing.size() - toDelete.size();
-        int addCount = Optional.ofNullable(req.addFiles()).map(List::size).orElse(0);
-        if (keepCount + addCount > 5) {
-            throw new IllegalArgumentException("Mỗi step tối đa 5 ảnh (giữ " + keepCount + ", thêm " + addCount + ").");
-        }
-
-        // 3.2 Xoá DB ngay, Cloudinary sau commit
-        if (!toDelete.isEmpty()) {
-            List<Long> delIds = toDelete.stream().map(RecipeStepImage::getId).toList();
-            stepImageRepository.deleteByIdIn(delIds);
-
-            for (RecipeStepImage img : toDelete) {
-                String pid = cloudinaryService.extractPublicIdFromUrl(img.getImageUrl());
-                if (org.springframework.util.StringUtils.hasText(pid)) {
-                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                        @Override
-                        public void afterCommit() {
-                            cloudinaryService.safeDeleteByPublicId(pid);
-                        }
-                    });
-                }
+        if (!toDeactivate.isEmpty()) {
+            for (RecipeStepImage img : toDeactivate) {
+                img.setActive(false);
             }
+            stepImageRepository.saveAll(toDeactivate);
         }
 
-        // 3.3 Thêm ảnh mới
+        // 3.2) Kiểm tra giới hạn số lượng ảnh
+        long activeImageCount = existingImages.stream().filter(RecipeStepImage::isActive).count() - toDeactivate.size();
+        int addCount = Optional.ofNullable(req.addFiles()).map(List::size).orElse(0);
+        if (activeImageCount + addCount > 5) {
+            throw new IllegalArgumentException("Mỗi step tối đa 5 ảnh (hiện có " + activeImageCount + ", thêm " + addCount + ").");
+        }
+
+        // 3.3) Thêm ảnh mới (các ảnh này sẽ có active=true mặc định)
         if (req.addFiles() != null && !req.addFiles().isEmpty()) {
             for (MultipartFile f : req.addFiles()) ImageValidationUtils.validateImage(f);
             List<String> newUrls = recipeImageService.uploadStepImages(recipeId, stepId, req.addFiles());
@@ -202,7 +198,7 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         em.flush();
         em.clear();
 
-        // 4) Reload & trả về RecipeResponse
+        // 4) Tải lại và trả về
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
         return RecipeResponse.from(reloaded);

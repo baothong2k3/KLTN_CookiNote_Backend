@@ -14,6 +14,7 @@ import fit.kltn_cookinote_backend.dtos.request.RecipeStepUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.services.FavoriteService;
 import fit.kltn_cookinote_backend.services.RecipeImageService;
 import fit.kltn_cookinote_backend.services.RecipeService;
 import fit.kltn_cookinote_backend.services.RecipeStepImageService;
@@ -37,6 +38,7 @@ public class RecipeController {
     private final RecipeService recipeService;
     private final RecipeImageService recipeImageService;
     private final RecipeStepImageService stepImageService;
+    private final FavoriteService favoriteService;
 
     // PHA 1: Tạo recipe (USER/ADMIN; nếu PUBLIC chỉ ADMIN)
     @PostMapping
@@ -197,12 +199,58 @@ public class RecipeController {
             @PathVariable Long stepId,
             @RequestParam(value = "content", required = false) String content,
             @RequestParam(value = "stepNo", required = false) Integer stepNo,
-            @RequestParam(value = "keepUrls", required = false) List<String> keepUrls, // có thể gửi nhiều keepUrls
+            @RequestParam(value = "suggestTime", required = false) Integer suggestedTime,
+            @RequestParam(value = "tips", required = false) String tips,
+            @RequestParam(value = "keepUrls", required = false) List<String> keepUrls,
             @RequestPart(value = "addFiles", required = false) List<MultipartFile> addFiles,
             HttpServletRequest httpReq
     ) throws IOException {
-        RecipeStepUpdateRequest req = new RecipeStepUpdateRequest(content, stepNo, keepUrls, addFiles);
+        RecipeStepUpdateRequest req = new RecipeStepUpdateRequest(content, stepNo, suggestedTime, tips, keepUrls, addFiles);
         RecipeResponse data = stepImageService.updateStep(authUser.getUserId(), recipeId, stepId, req);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật bước công thức thành công", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Thêm một công thức vào danh sách yêu thích của người dùng hiện tại.
+     * POST /recipes/{recipeId}/favorite
+     */
+    @PostMapping("/{recipeId}/favorite")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> addFavorite(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        favoriteService.addRecipeToFavorites(authUser.getUserId(), recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Đã thêm công thức vào danh sách yêu thích", httpReq.getRequestURI()));
+    }
+
+    /**
+     * Lấy danh sách các công thức yêu thích của người dùng hiện tại.
+     * GET /recipes/me/favorites
+     */
+    @GetMapping("/me/favorites")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<RecipeCardResponse>>> getMyFavorites(
+            @AuthenticationPrincipal User authUser,
+            HttpServletRequest httpReq
+    ) {
+        List<RecipeCardResponse> data = favoriteService.getFavoriteRecipes(authUser.getUserId());
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức yêu thích thành công", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Xóa một công thức khỏi danh sách yêu thích của người dùng hiện tại.
+     * DELETE /recipes/{recipeId}/favorite
+     */
+    @DeleteMapping("/{recipeId}/favorite")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> removeFavorite(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        favoriteService.removeRecipeFromFavorites(authUser.getUserId(), recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Đã xóa công thức khỏi danh sách yêu thích", httpReq.getRequestURI()));
     }
 }

@@ -29,7 +29,7 @@ public class ShoppingList {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "recipe_id", nullable = false)
+    @JoinColumn(name = "recipe_id", nullable = true)
     private Recipe recipe;
 
     @Column(length = 100, nullable = false)
@@ -38,6 +38,7 @@ public class ShoppingList {
     @Column(length = 50)
     private String quantity;
 
+    @Builder.Default
     @Column
-    private Boolean checked;
+    private Boolean checked = false;
 }

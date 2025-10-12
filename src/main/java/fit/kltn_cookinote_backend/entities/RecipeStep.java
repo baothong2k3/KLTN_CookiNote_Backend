@@ -42,6 +42,12 @@ public class RecipeStep {
     @Column(length = 4096)
     private String content;
 
+    @Column(name = "suggested_time") // Thời gian gợi ý (phút)
+    private Integer suggestedTime;
+
+    @Column(length = 2048) // Mẹo/ghi chú cho bước này
+    private String tips;
+
     @OneToMany(mappedBy = "step", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id ASC")
     @Fetch(FetchMode.SUBSELECT)
