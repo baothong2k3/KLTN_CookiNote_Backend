@@ -29,4 +29,13 @@ public interface ShoppingListRepository extends JpaRepository<ShoppingList, Long
     Optional<ShoppingList> findByUser_UserIdAndRecipeIsNullAndIngredientIgnoreCase(
             Long userId, String ingredient
     );
+
+    /**
+     * Tìm tất cả các mục trong danh sách mua sắm của một người dùng,
+     * sắp xếp theo thứ tự được thêm vào (ID giảm dần - mới nhất trước).
+     *
+     * @param userId ID của người dùng.
+     * @return Danh sách các mục ShoppingList.
+     */
+    List<ShoppingList> findByUser_UserIdOrderByIdDesc(Long userId);
 }

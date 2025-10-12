@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.response.GroupedShoppingListResponse;
 import fit.kltn_cookinote_backend.dtos.response.ShoppingListResponse;
 import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.entities.RecipeIngredient;
@@ -297,5 +298,47 @@ public class ShoppingListServiceImpl implements ShoppingListService {
             current.setRecipe(targetRecipe);
             return toResponse(current, targetRecipeIdOrNull);
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<GroupedShoppingListResponse> getAllGroupedByRecipe(Long userId) {
+        // 1. Lấy tất cả các mục của người dùng, sắp xếp theo ID giảm dần (mới nhất trước)
+        List<ShoppingList> allItems = shoppingListRepository.findByUser_UserIdOrderByIdDesc(userId);
+
+        // 2. Gom nhóm theo Recipe ID, sử dụng LinkedHashMap để giữ nguyên thứ tự
+        Map<Long, List<ShoppingList>> groupedByRecipeId = new LinkedHashMap<>();
+        // Sử dụng một khóa đặc biệt (ví dụ: 0L) cho các mục không có recipe
+        final Long NO_RECIPE_KEY = 0L;
+
+        for (ShoppingList item : allItems) {
+            Long key = (item.getRecipe() != null) ? item.getRecipe().getId() : NO_RECIPE_KEY;
+            groupedByRecipeId.computeIfAbsent(key, k -> new ArrayList<>()).add(item);
+        }
+
+        // 3. Chuyển đổi sang DTO
+        List<GroupedShoppingListResponse> result = new ArrayList<>();
+        groupedByRecipeId.forEach((recipeId, items) -> {
+            List<GroupedShoppingListResponse.ShoppingListItem> itemDtos = items.stream()
+                    .map(item -> GroupedShoppingListResponse.ShoppingListItem.builder()
+                            .id(item.getId())
+                            .ingredient(item.getIngredient())
+                            .quantity(item.getQuantity())
+                            .checked(item.getChecked())
+                            .build())
+                    .collect(Collectors.toList());
+
+            // Lấy thông tin recipe từ item đầu tiên trong nhóm (nếu có)
+            Recipe recipe = items.get(0).getRecipe();
+
+            result.add(GroupedShoppingListResponse.builder()
+                    .recipeId(Objects.equals(recipeId, NO_RECIPE_KEY) ? null : recipeId)
+                    .recipeTitle(recipe != null ? recipe.getTitle() : "Khác")
+                    .recipeImageUrl(recipe != null ? recipe.getImageUrl() : null)
+                    .items(itemDtos)
+                    .build());
+        });
+
+        return result;
     }
 }
