@@ -31,8 +31,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -46,7 +44,6 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
     private final RecipeStepRepository stepRepository;
     private final RecipeStepImageRepository stepImageRepository;
     private final UserRepository userRepository;
-    private final CloudinaryService cloudinaryService;
     private final RecipeRepository recipeRepository;
 
     @PersistenceContext
@@ -63,6 +60,12 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         if (!Objects.equals(step.getRecipe().getId(), recipeId)) {
             throw new IllegalArgumentException("Step không thuộc về Recipe này.");
         }
+
+        // *** KIỂM TRA TRẠNG THÁI DELETED CỦA RECIPE CHA ***
+        if (step.getRecipe().isDeleted()) {
+            throw new EntityNotFoundException("Công thức của bước này đã bị xóa: " + recipeId);
+        }
+
         User actor = userRepository.findById(actorUserId)
                 .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
         Long ownerId = stepRepository.findOwnerIdByStepId(stepId);

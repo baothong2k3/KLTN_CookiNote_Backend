@@ -23,7 +23,7 @@ import java.util.Optional;
 
 
 public interface RecipeRepository extends JpaRepository<Recipe, Long> {
-    @Query("select r.user.userId from Recipe r where r.id = :recipeId")
+    @Query("select r.user.userId from Recipe r where r.id = :recipeId AND r.deleted = false")
     Long findOwnerId(@Param("recipeId") Long recipeId);
 
     @Query("""

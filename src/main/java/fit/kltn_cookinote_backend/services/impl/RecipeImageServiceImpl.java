@@ -61,8 +61,12 @@ public class RecipeImageServiceImpl implements RecipeImageService {
                 .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
 
         Recipe recipe = recipeRepository.findById(recipeId)
-                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+                .orElseThrow(() -> new EntityNotFoundException("Công thức không tồn tại: " + recipeId));
 
+        // ***KIỂM TRA TRẠNG THÁI DELETED * * *
+        if (recipe.isDeleted()) {
+            throw new EntityNotFoundException("Công thức không tồn tại hoặc đã bị xóa: " + recipeId);
+        }
         // Consolidated ownership check
         if (actor.getRole() != Role.ADMIN && !Objects.equals(actor.getUserId(), recipe.getUser().getUserId())) {
             throw new AccessDeniedException("Chỉ chủ sở hữu hoặc ADMIN mới được chỉnh sửa.");
@@ -103,6 +107,11 @@ public class RecipeImageServiceImpl implements RecipeImageService {
 
         RecipeStep step = stepRepository.findById(stepId)
                 .orElseThrow(() -> new EntityNotFoundException("Step không tồn tại: " + stepId));
+
+        // *** KIỂM TRA RECIPE CỦA STEP ***
+        if (step.getRecipe().isDeleted()) {
+            throw new EntityNotFoundException("Công thức của bước này đã bị xóa.");
+        }
 
         if (!Objects.equals(step.getRecipe().getId(), recipeId)) {
             throw new IllegalArgumentException("Step không thuộc về Recipe này.");

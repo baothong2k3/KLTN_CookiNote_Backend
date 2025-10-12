@@ -246,6 +246,11 @@ public class RecipeServiceImpl implements RecipeService {
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
+        // *** KIỂM TRA TRẠNG THÁI DELETED ***
+        if (recipe.isDeleted()) {
+            throw new EntityNotFoundException("Không thể cập nhật công thức đã bị xóa: " + recipeId);
+        }
+
         Long ownerId = recipe.getUser().getUserId();
         ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
 
@@ -296,6 +301,11 @@ public class RecipeServiceImpl implements RecipeService {
 
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        // *** KIỂM TRA TRẠNG THÁI DELETED ***
+        if (recipe.isDeleted()) {
+            throw new IllegalStateException("Công thức này đã được xóa trước đó.");
+        }
 
         Long ownerId = recipe.getUser().getUserId();
         ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
