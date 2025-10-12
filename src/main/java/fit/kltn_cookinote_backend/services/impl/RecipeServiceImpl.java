@@ -48,6 +48,7 @@ public class RecipeServiceImpl implements RecipeService {
     private final RecipeIngredientRepository recipeIngredientRepository;
     private final CloudinaryService cloudinaryService;
     private final ShoppingListRepository shoppingListRepository;
+    private final FavoriteRepository favoriteRepository;
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 12; // mobile-friendly
@@ -375,6 +376,18 @@ public class RecipeServiceImpl implements RecipeService {
                 item.setIsRecipeDeleted(true); // Đánh dấu đã xóa
             }
             shoppingListRepository.saveAllAndFlush(relatedItems);
+        }
+
+        // CẬP NHẬT: Xử lý các favorite item trước khi xóa recipe
+        List<Favorite> relatedFavorites = favoriteRepository.findByRecipe_Id(recipeId);
+        if (!relatedFavorites.isEmpty()) {
+            final String recipeTitle = recipe.getTitle();
+            for (Favorite favorite : relatedFavorites) {
+                favorite.setRecipe(null);
+                favorite.setOriginalRecipeTitle(recipeTitle);
+                favorite.setIsRecipeDeleted(true);
+            }
+            favoriteRepository.saveAllAndFlush(relatedFavorites);
         }
 
         // Thu thập tất cả public ID của ảnh để xóa sau khi commit DB

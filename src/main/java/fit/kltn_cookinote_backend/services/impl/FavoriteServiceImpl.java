@@ -41,7 +41,6 @@ public class FavoriteServiceImpl implements FavoriteService {
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người dùng với id: " + userId));
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy công thức với id: " + recipeId));
-
         if (recipe.isDeleted()) {
             throw new IllegalArgumentException("Không thể thêm công thức đã bị xóa vào danh sách yêu thích.");
         }
@@ -50,16 +49,26 @@ public class FavoriteServiceImpl implements FavoriteService {
             throw new AccessDeniedException("Bạn không có quyền xem công thức này.");
         }
 
-        Favorite favorite = Favorite.of(user, recipe);
+        Favorite favorite = Favorite.builder().user(user).recipe(recipe).build();
         favoriteRepository.save(favorite);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<RecipeCardResponse> getFavoriteRecipes(Long userId) {
-        List<Recipe> favoriteRecipes = favoriteRepository.findFavoriteRecipesByUserId(userId);
-        return favoriteRecipes.stream()
-                .map(RecipeCardResponse::from)
+        List<Favorite> favorites = favoriteRepository.findByUser_UserIdOrderByIdDesc(userId);
+        return favorites.stream()
+                .map(fav -> {
+                    if (fav.getRecipe() != null) {
+                        return RecipeCardResponse.from(fav.getRecipe());
+                    } else {
+                        return RecipeCardResponse.builder()
+                                .id(null)
+                                .title("[ĐÃ XÓA] " + fav.getOriginalRecipeTitle())
+                                .deleted(true)
+                                .build();
+                    }
+                })
                 .collect(Collectors.toList());
     }
 
@@ -71,7 +80,6 @@ public class FavoriteServiceImpl implements FavoriteService {
         recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy công thức với id: " + recipeId));
 
-        Favorite.FavoriteId favoriteId = new Favorite.FavoriteId(userId, recipeId);
-        favoriteRepository.deleteById(favoriteId);
+        favoriteRepository.findByUser_UserIdAndRecipe_Id(userId, recipeId).ifPresent(favoriteRepository::delete);
     }
 }

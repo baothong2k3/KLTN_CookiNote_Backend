@@ -93,7 +93,7 @@ public class Recipe {
     @Fetch(FetchMode.SUBSELECT)
     private List<RecipeIngredient> ingredients = new ArrayList<>();
 
-    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "recipe", cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH, CascadeType.DETACH})
     @Builder.Default
     private Set<Favorite> favorites = new HashSet<>();
 
