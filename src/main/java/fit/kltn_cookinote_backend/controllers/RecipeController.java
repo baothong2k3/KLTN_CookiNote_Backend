@@ -253,4 +253,23 @@ public class RecipeController {
         favoriteService.removeRecipeFromFavorites(authUser.getUserId(), recipeId);
         return ResponseEntity.ok(ApiResponse.success("Đã xóa công thức khỏi danh sách yêu thích", httpReq.getRequestURI()));
     }
+
+    /**
+     * Xóa một công thức (owner hoặc ADMIN).
+     *
+     * @param authUser
+     * @param recipeId
+     * @param httpReq
+     * @return
+     */
+    @DeleteMapping("/{recipeId}")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteRecipe(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        recipeService.deleteRecipe(authUser.getUserId(), recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Đã xóa công thức thành công", httpReq.getRequestURI()));
+    }
 }

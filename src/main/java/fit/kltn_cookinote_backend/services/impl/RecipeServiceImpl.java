@@ -285,6 +285,35 @@ public class RecipeServiceImpl implements RecipeService {
         return RecipeResponse.from(saved);
     }
 
+    @Override
+    @Transactional
+    public void deleteRecipe(Long actorUserId, Long recipeId) {
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        Long ownerId = recipe.getUser().getUserId();
+        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        // Soft delete the recipe
+        recipe.setDeleted(true);
+        recipe.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
+
+        // Deactivate all images associated with the recipe's steps
+        if (recipe.getSteps() != null) {
+            for (RecipeStep step : recipe.getSteps()) {
+                if (step.getImages() != null) {
+                    for (RecipeStepImage image : step.getImages()) {
+                        image.setActive(false);
+                    }
+                }
+            }
+        }
+        recipeRepository.save(recipe);
+    }
+
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {
         return switch (privacy) {
             case PUBLIC, SHARED -> true;

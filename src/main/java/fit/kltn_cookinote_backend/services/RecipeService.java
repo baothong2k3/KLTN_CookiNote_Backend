@@ -31,4 +31,6 @@ public interface RecipeService {
     List<RecipeIngredientItem> getIngredients(Long viewerUserIdOrNull, Long recipeId);
 
     RecipeResponse updateContent(Long actorUserId, Long recipeId, RecipeUpdateRequest req);
+
+    void deleteRecipe(Long actorUserId, Long recipeId);
 }

@@ -15,6 +15,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Fetch;
 import org.hibernate.annotations.FetchMode;
+import org.hibernate.annotations.Where;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -28,6 +29,7 @@ import java.util.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Where(clause = "deleted = false")
 public class Recipe {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -72,6 +74,13 @@ public class Recipe {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "deleted", nullable = false)
+    @Builder.Default
+    private boolean deleted = false;
 
     // children
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
