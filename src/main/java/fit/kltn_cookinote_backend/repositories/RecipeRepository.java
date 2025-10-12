@@ -31,19 +31,26 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
                from Recipe r
                left join fetch r.user
                left join fetch r.category
-               where r.id = :id
+               where r.id = :id AND r.deleted = false
             """)
     Optional<Recipe> findDetailById(@Param("id") Long id);
 
     @Modifying
-    @Query("update Recipe r set r.view = coalesce(r.view,0) + 1 where r.id = :id")
+    @Query("update Recipe r set r.view = coalesce(r.view,0) + 1 where r.id = :id AND r.deleted = false")
     void incrementViewById(@Param("id") Long id);
 
-    Page<Recipe> findByCategory_IdAndPrivacy(Long categoryId, Privacy privacy, Pageable pageable);
+    @Query("SELECT r FROM Recipe r WHERE r.category.id = :categoryId AND r.privacy = :privacy AND r.deleted = false")
+    Page<Recipe> findByCategory_IdAndPrivacy(@Param("categoryId") Long categoryId, @Param("privacy") Privacy privacy, Pageable pageable);
 
-    Page<Recipe> findByPrivacy(Privacy privacy, Pageable pageable);
+    @Query("SELECT r FROM Recipe r WHERE r.privacy = :privacy AND r.deleted = false")
+    Page<Recipe> findByPrivacy(@Param("privacy") Privacy privacy, Pageable pageable);
 
-    Page<Recipe> findByUser_UserId(Long ownerId, Pageable pageable);
+    @Query("SELECT r FROM Recipe r WHERE r.user.userId = :ownerId AND r.deleted = false")
+    Page<Recipe> findByUser_UserId(@Param("ownerId") Long ownerId, Pageable pageable);
 
-    Page<Recipe> findByUser_UserIdAndPrivacyIn(Long ownerId, Collection<Privacy> privacies, Pageable pageable);
+    @Query("SELECT r FROM Recipe r WHERE r.user.userId = :ownerId AND r.privacy IN :privacies AND r.deleted = false")
+    Page<Recipe> findByUser_UserIdAndPrivacyIn(@Param("ownerId") Long ownerId, @Param("privacies") Collection<Privacy> privacies, Pageable pageable);
+
+    @Query("SELECT r FROM Recipe r WHERE r.deleted = true AND (:userId IS NULL OR r.user.userId = :userId)")
+    Page<Recipe> findDeleted(@Param("userId") Long userId, Pageable pageable);
 }

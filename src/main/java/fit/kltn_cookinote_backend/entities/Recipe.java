@@ -29,7 +29,6 @@ import java.util.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Where(clause = "deleted = false")
 public class Recipe {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

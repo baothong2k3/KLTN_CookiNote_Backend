@@ -12,6 +12,7 @@ package fit.kltn_cookinote_backend.services;/*
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.*;
+import fit.kltn_cookinote_backend.entities.User;
 
 import java.util.List;
 
@@ -33,4 +34,6 @@ public interface RecipeService {
     RecipeResponse updateContent(Long actorUserId, Long recipeId, RecipeUpdateRequest req);
 
     void deleteRecipe(Long actorUserId, Long recipeId);
+
+    PageResult<RecipeCardResponse> listDeletedRecipes(User actor, Long filterUserId, int page, int size);
 }

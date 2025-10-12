@@ -272,4 +272,26 @@ public class RecipeController {
         recipeService.deleteRecipe(authUser.getUserId(), recipeId);
         return ResponseEntity.ok(ApiResponse.success("Đã xóa công thức thành công", httpReq.getRequestURI()));
     }
+
+    /**
+     * Danh sách công thức đã xóa (ADMIN: tất cả; USER: của mình).
+     *
+     * @param authUser
+     * @param page
+     * @param size
+     * @param httpReq
+     * @return
+     */
+    @GetMapping("/deleted")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<PageResult<RecipeCardResponse>>> listDeleted(
+            @AuthenticationPrincipal User authUser,
+            @RequestParam(value = "userId", required = false) Long userId,
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "size", required = false, defaultValue = "12") int size,
+            HttpServletRequest httpReq
+    ) {
+        PageResult<RecipeCardResponse> data = recipeService.listDeletedRecipes(authUser, userId, page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức đã xóa thành công", data, httpReq.getRequestURI()));
+    }
 }

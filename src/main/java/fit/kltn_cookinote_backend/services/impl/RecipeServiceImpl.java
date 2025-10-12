@@ -314,6 +314,33 @@ public class RecipeServiceImpl implements RecipeService {
         recipeRepository.save(recipe);
     }
 
+    /**
+     * Xem danh sách công thức đã xoá (chỉ ADMIN hoặc chủ sở hữu)
+     *
+     * @param actor
+     * @param filterUserId
+     * @param page
+     * @param size
+     * @return
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<RecipeCardResponse> listDeletedRecipes(User actor, Long filterUserId, int page, int size) {
+        int p = Math.max(0, page);
+        int s = Math.min((size > 0 ? size : DEFAULT_SIZE), MAX_SIZE);
+        Pageable pageable = PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "deletedAt"));
+
+        Page<Recipe> pageData;
+
+        if (actor.getRole() == Role.ADMIN) {
+            pageData = recipeRepository.findDeleted(filterUserId, pageable);
+        } else {
+            pageData = recipeRepository.findDeleted(actor.getUserId(), pageable);
+        }
+
+        return PageResult.of(pageData.map(RecipeCardResponse::from));
+    }
+
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {
         return switch (privacy) {
             case PUBLIC, SHARED -> true;
