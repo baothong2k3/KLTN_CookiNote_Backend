@@ -42,6 +42,10 @@ public class FavoriteServiceImpl implements FavoriteService {
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy công thức với id: " + recipeId));
 
+        if (recipe.isDeleted()) {
+            throw new IllegalArgumentException("Không thể thêm công thức đã bị xóa vào danh sách yêu thích.");
+        }
+
         if (recipe.getPrivacy() == Privacy.PRIVATE && !recipe.getUser().getUserId().equals(userId)) {
             throw new AccessDeniedException("Bạn không có quyền xem công thức này.");
         }
