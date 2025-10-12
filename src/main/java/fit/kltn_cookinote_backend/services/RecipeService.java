@@ -36,4 +36,11 @@ public interface RecipeService {
     void deleteRecipe(Long actorUserId, Long recipeId);
 
     PageResult<RecipeCardResponse> listDeletedRecipes(User actor, Long filterUserId, int page, int size);
+
+    /**
+     * Xóa vĩnh viễn một công thức đã bị soft-delete.
+     * @param actorUserId ID của người thực hiện.
+     * @param recipeId ID của công thức cần xóa.
+     */
+    void hardDeleteRecipe(Long actorUserId, Long recipeId);
 }

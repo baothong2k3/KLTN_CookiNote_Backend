@@ -294,4 +294,19 @@ public class RecipeController {
         PageResult<RecipeCardResponse> data = recipeService.listDeletedRecipes(authUser, userId, page, size);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức đã xóa thành công", data, httpReq.getRequestURI()));
     }
+
+    /**
+     * Xóa vĩnh viễn một công thức (chỉ dành cho owner hoặc ADMIN).
+     * Yêu cầu công thức phải đã được xóa mềm trước đó.
+     */
+    @DeleteMapping("/{recipeId}/permanent")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> hardDeleteRecipe(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        recipeService.hardDeleteRecipe(authUser.getUserId(), recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Đã xóa vĩnh viễn công thức", httpReq.getRequestURI()));
+    }
 }

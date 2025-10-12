@@ -41,4 +41,11 @@ public class ShoppingList {
     @Builder.Default
     @Column
     private Boolean checked = false;
+
+    @Column(length = 255)
+    private String originalRecipeTitle; // Lưu tên recipe khi bị hard-delete
+
+    @Builder.Default
+    @Column(name = "is_recipe_deleted")
+    private Boolean isRecipeDeleted = false; // Đánh dấu khi recipe bị soft-delete
 }

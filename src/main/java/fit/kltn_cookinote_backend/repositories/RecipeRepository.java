@@ -53,4 +53,7 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
 
     @Query("SELECT r FROM Recipe r WHERE r.deleted = true AND (:userId IS NULL OR r.user.userId = :userId)")
     Page<Recipe> findDeleted(@Param("userId") Long userId, Pageable pageable);
+
+    @Query("SELECT r FROM Recipe r WHERE r.id = :id AND r.deleted = true")
+    Optional<Recipe> findDeletedById(@Param("id") Long id);
 }

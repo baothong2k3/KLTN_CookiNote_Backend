@@ -38,4 +38,6 @@ public interface ShoppingListRepository extends JpaRepository<ShoppingList, Long
      * @return Danh sách các mục ShoppingList.
      */
     List<ShoppingList> findByUser_UserIdOrderByIdDesc(Long userId);
+
+    List<ShoppingList> findByRecipe_Id(Long recipeId);
 }

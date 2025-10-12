@@ -303,22 +303,45 @@ public class ShoppingListServiceImpl implements ShoppingListService {
     @Override
     @Transactional(readOnly = true)
     public List<GroupedShoppingListResponse> getAllGroupedByRecipe(Long userId) {
-        // 1. Lấy tất cả các mục của người dùng, sắp xếp theo ID giảm dần (mới nhất trước)
         List<ShoppingList> allItems = shoppingListRepository.findByUser_UserIdOrderByIdDesc(userId);
 
-        // 2. Gom nhóm theo Recipe ID, sử dụng LinkedHashMap để giữ nguyên thứ tự
-        Map<Long, List<ShoppingList>> groupedByRecipeId = new LinkedHashMap<>();
-        // Sử dụng một khóa đặc biệt (ví dụ: 0L) cho các mục không có recipe
-        final Long NO_RECIPE_KEY = 0L;
+        Map<String, List<ShoppingList>> grouped = new LinkedHashMap<>();
 
+        // Gom nhóm thông minh hơn
         for (ShoppingList item : allItems) {
-            Long key = (item.getRecipe() != null) ? item.getRecipe().getId() : NO_RECIPE_KEY;
-            groupedByRecipeId.computeIfAbsent(key, k -> new ArrayList<>()).add(item);
+            String key;
+            if (item.getRecipe() != null) {
+                key = "recipe-" + item.getRecipe().getId();
+            } else if (item.getOriginalRecipeTitle() != null) {
+                // Nhóm các item của cùng một recipe đã bị xóa dựa trên tên gốc
+                key = "deleted-" + item.getOriginalRecipeTitle();
+            } else {
+                key = "standalone"; // Các item không thuộc recipe nào
+            }
+            grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(item);
         }
 
-        // 3. Chuyển đổi sang DTO
         List<GroupedShoppingListResponse> result = new ArrayList<>();
-        groupedByRecipeId.forEach((recipeId, items) -> {
+        grouped.forEach((key, items) -> {
+            ShoppingList firstItem = items.get(0);
+            Recipe recipe = firstItem.getRecipe();
+
+            String title;
+            String imageUrl = null;
+            Long recipeId = null;
+
+            if (recipe != null) {
+                recipeId = recipe.getId();
+                title = Boolean.TRUE.equals(firstItem.getIsRecipeDeleted())
+                        ? "[ĐÃ XÓA] " + recipe.getTitle()
+                        : recipe.getTitle();
+                imageUrl = recipe.getImageUrl();
+            } else if (firstItem.getOriginalRecipeTitle() != null) {
+                title = "[ĐÃ XÓA] " + firstItem.getOriginalRecipeTitle();
+            } else {
+                title = "Khác";
+            }
+
             List<GroupedShoppingListResponse.ShoppingListItem> itemDtos = items.stream()
                     .map(item -> GroupedShoppingListResponse.ShoppingListItem.builder()
                             .id(item.getId())
@@ -328,13 +351,10 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                             .build())
                     .collect(Collectors.toList());
 
-            // Lấy thông tin recipe từ item đầu tiên trong nhóm (nếu có)
-            Recipe recipe = items.get(0).getRecipe();
-
             result.add(GroupedShoppingListResponse.builder()
-                    .recipeId(Objects.equals(recipeId, NO_RECIPE_KEY) ? null : recipeId)
-                    .recipeTitle(recipe != null ? recipe.getTitle() : "Khác")
-                    .recipeImageUrl(recipe != null ? recipe.getImageUrl() : null)
+                    .recipeId(recipeId)
+                    .recipeTitle(title)
+                    .recipeImageUrl(imageUrl)
                     .items(itemDtos)
                     .build());
         });

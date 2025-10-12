@@ -101,7 +101,7 @@ public class Recipe {
     @Builder.Default
     private List<Share> shares = new ArrayList<>();
 
-    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "recipe", cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH, CascadeType.DETACH})
     @Builder.Default
     private List<ShoppingList> shoppingLists = new ArrayList<>();
 

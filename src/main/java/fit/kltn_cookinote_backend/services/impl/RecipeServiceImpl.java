@@ -17,11 +17,8 @@ import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.enums.Role;
-import fit.kltn_cookinote_backend.repositories.CategoryRepository;
-import fit.kltn_cookinote_backend.repositories.RecipeRepository;
-import fit.kltn_cookinote_backend.repositories.RecipeStepRepository;
-import fit.kltn_cookinote_backend.repositories.RecipeIngredientRepository;
-import fit.kltn_cookinote_backend.repositories.UserRepository;
+import fit.kltn_cookinote_backend.repositories.*;
+import fit.kltn_cookinote_backend.services.CloudinaryService;
 import fit.kltn_cookinote_backend.services.RecipeService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +30,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -46,6 +46,8 @@ public class RecipeServiceImpl implements RecipeService {
     private final UserRepository userRepository;
     private final RecipeStepRepository recipeStepRepository;
     private final RecipeIngredientRepository recipeIngredientRepository;
+    private final CloudinaryService cloudinaryService;
+    private final ShoppingListRepository shoppingListRepository;
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 12; // mobile-friendly
@@ -287,7 +289,7 @@ public class RecipeServiceImpl implements RecipeService {
 
     @Override
     @Transactional
-    public void deleteRecipe(Long actorUserId, Long recipeId) {
+    public void deleteRecipe(Long actorUserId, Long recipeId) { // soft delete
         User actor = userRepository.findById(actorUserId)
                 .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
 
@@ -301,7 +303,7 @@ public class RecipeServiceImpl implements RecipeService {
         recipe.setDeleted(true);
         recipe.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
 
-        // Deactivate all images associated with the recipe's steps
+        // Deactivate all images
         if (recipe.getSteps() != null) {
             for (RecipeStep step : recipe.getSteps()) {
                 if (step.getImages() != null) {
@@ -312,6 +314,15 @@ public class RecipeServiceImpl implements RecipeService {
             }
         }
         recipeRepository.save(recipe);
+
+        // CẬP NHẬT: Đánh dấu các shopping list item liên quan
+        List<ShoppingList> relatedItems = shoppingListRepository.findByRecipe_Id(recipeId);
+        if (!relatedItems.isEmpty()) {
+            for (ShoppingList item : relatedItems) {
+                item.setIsRecipeDeleted(true);
+            }
+            shoppingListRepository.saveAll(relatedItems);
+        }
     }
 
     /**
@@ -339,6 +350,71 @@ public class RecipeServiceImpl implements RecipeService {
         }
 
         return PageResult.of(pageData.map(RecipeCardResponse::from));
+    }
+
+    @Override
+    @Transactional
+    public void hardDeleteRecipe(Long actorUserId, Long recipeId) {
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Recipe recipe = recipeRepository.findDeletedById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Công thức không tồn tại hoặc chưa được xóa mềm: " + recipeId));
+
+        Long ownerId = recipe.getUser().getUserId();
+        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        // CẬP NHẬT: Xử lý các shopping list item trước khi xóa recipe
+        List<ShoppingList> relatedItems = shoppingListRepository.findByRecipe_Id(recipeId);
+        if (!relatedItems.isEmpty()) {
+            final String recipeTitle = recipe.getTitle();
+            for (ShoppingList item : relatedItems) {
+                item.setRecipe(null); // Ngắt kết nối
+                item.setOriginalRecipeTitle(recipeTitle); // Lưu lại tên
+                item.setIsRecipeDeleted(true); // Đánh dấu đã xóa
+            }
+            shoppingListRepository.saveAllAndFlush(relatedItems);
+        }
+
+        // Thu thập tất cả public ID của ảnh để xóa sau khi commit DB
+        final List<String> publicIdsToDelete = new ArrayList<>();
+
+        // 1. Ảnh bìa từ lịch sử
+        if (recipe.getCoverImageHistory() != null) {
+            recipe.getCoverImageHistory().stream()
+                    .map(RecipeCoverImageHistory::getImageUrl)
+                    .filter(StringUtils::hasText)
+                    .map(cloudinaryService::extractPublicIdFromUrl)
+                    .filter(StringUtils::hasText)
+                    .forEach(publicIdsToDelete::add);
+        }
+
+        // 2. Ảnh của các bước
+        if (recipe.getSteps() != null) {
+            for (RecipeStep step : recipe.getSteps()) {
+                if (step.getImages() != null) {
+                    step.getImages().stream()
+                            .map(RecipeStepImage::getImageUrl)
+                            .filter(StringUtils::hasText)
+                            .map(cloudinaryService::extractPublicIdFromUrl)
+                            .filter(StringUtils::hasText)
+                            .forEach(publicIdsToDelete::add);
+                }
+            }
+        }
+
+        // Đăng ký một callback để xóa ảnh trên Cloudinary CHỈ KHI giao dịch DB thành công
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                for (String publicId : publicIdsToDelete) {
+                    cloudinaryService.safeDeleteByPublicId(publicId);
+                }
+            }
+        });
+
+        // Xóa recipe khỏi DB
+        recipeRepository.delete(recipe);
     }
 
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {
