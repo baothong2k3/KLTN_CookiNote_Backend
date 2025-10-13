@@ -12,4 +12,4 @@ package fit.kltn_cookinote_backend.dtos.response;/*
 import fit.kltn_cookinote_backend.dtos.request.TokenPair;
 
 @lombok.Builder
-public record LoginResponse(Long userId, String email, String displayName, TokenPair tokens) {}
+public record LoginResponse(Long userId, String email, String avatarUrl, String displayName, TokenPair tokens) {}
