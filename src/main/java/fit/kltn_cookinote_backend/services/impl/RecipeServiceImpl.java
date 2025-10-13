@@ -331,7 +331,7 @@ public class RecipeServiceImpl implements RecipeService {
         if (!relatedItems.isEmpty()) {
             for (ShoppingList item : relatedItems) {
                 item.setIsRecipeDeleted(true);
-                item.setOriginalRecipeTitle(recipe.getTitle());
+                //item.setOriginalRecipeTitle(recipe.getTitle());
             }
             shoppingListRepository.saveAll(relatedItems);
         }
