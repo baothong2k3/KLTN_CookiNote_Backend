@@ -19,6 +19,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 
@@ -56,4 +57,12 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
 
     @Query("SELECT r FROM Recipe r WHERE r.id = :id AND r.deleted = true")
     Optional<Recipe> findDeletedById(@Param("id") Long id);
+
+    @Modifying
+    @Query("UPDATE Recipe r SET r.category.id = :destCatId WHERE r.category.id = :sourceCatId AND r.id IN :recipeIds")
+    int moveRecipesByIds(@Param("sourceCatId") Long sourceCatId, @Param("destCatId") Long destCatId, @Param("recipeIds") List<Long> recipeIds);
+
+    @Modifying
+    @Query("UPDATE Recipe r SET r.category.id = :destCatId WHERE r.category.id = :sourceCatId")
+    int moveAllRecipesByCategory(@Param("sourceCatId") Long sourceCatId, @Param("destCatId") Long destCatId);
 }
