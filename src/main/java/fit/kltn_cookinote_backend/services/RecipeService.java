@@ -55,4 +55,6 @@ public interface RecipeService {
      * @return Công thức mới đã được tạo.
      */
     RecipeResponse forkRecipe(Long clonerUserId, Long originalRecipeId, ForkRecipeRequest req);
+
+    PageResult<RecipeCardResponse> searchPublicRecipes(String query, int page, int size);
 }

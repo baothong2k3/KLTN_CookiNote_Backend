@@ -509,6 +509,18 @@ public class RecipeServiceImpl implements RecipeService {
         return RecipeResponse.from(saved);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<RecipeCardResponse> searchPublicRecipes(String query, int page, int size) {
+        int p = Math.max(0, page);
+        int s = Math.min((size > 0 ? size : DEFAULT_SIZE), MAX_SIZE);
+        Pageable pageable = PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        Page<Recipe> pageData = recipeRepository.searchPublicRecipes(query, pageable);
+
+        return PageResult.of(pageData.map(RecipeCardResponse::from));
+    }
+
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {
         return switch (privacy) {
             case PUBLIC, SHARED -> true;

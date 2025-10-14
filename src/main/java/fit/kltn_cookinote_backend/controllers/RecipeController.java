@@ -326,4 +326,15 @@ public class RecipeController {
         RecipeResponse data = recipeService.forkRecipe(authUser.getUserId(), originalRecipeId, req);
         return ResponseEntity.ok(ApiResponse.success("Sao chép và tùy chỉnh công thức thành công.", data, httpReq.getRequestURI()));
     }
+
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<PageResult<RecipeCardResponse>>> searchRecipes(
+            @RequestParam("query") String query,
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "size", required = false, defaultValue = "12") int size,
+            HttpServletRequest httpReq
+    ) {
+        PageResult<RecipeCardResponse> data = recipeService.searchPublicRecipes(query, page, size);
+        return ResponseEntity.ok(ApiResponse.success("Tìm kiếm công thức thành công", data, httpReq.getRequestURI()));
+    }
 }

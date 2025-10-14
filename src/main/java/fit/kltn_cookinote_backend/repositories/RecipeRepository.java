@@ -65,4 +65,16 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
     @Modifying
     @Query("UPDATE Recipe r SET r.category.id = :destCatId WHERE r.category.id = :sourceCatId")
     int moveAllRecipesByCategory(@Param("sourceCatId") Long sourceCatId, @Param("destCatId") Long destCatId);
+
+    @Query("""
+            SELECT DISTINCT r FROM Recipe r
+            LEFT JOIN r.ingredients i
+            WHERE r.privacy = 'PUBLIC' AND r.deleted = false
+            AND (
+                r.title LIKE %:query% OR
+                r.description LIKE %:query% OR
+                i.name LIKE %:query%
+            )
+            """)
+    Page<Recipe> searchPublicRecipes(@Param("query") String query, Pageable pageable);
 }
