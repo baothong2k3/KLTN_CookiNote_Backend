@@ -9,10 +9,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
  * @version: 1.0
  */
 
-import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
-import fit.kltn_cookinote_backend.dtos.request.RecipeIngredientCreate;
-import fit.kltn_cookinote_backend.dtos.request.RecipeStepCreate;
-import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
+import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Privacy;
@@ -37,6 +34,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -439,6 +437,76 @@ public class RecipeServiceImpl implements RecipeService {
 
         // Xóa recipe khỏi DB
         recipeRepository.delete(recipe);
+    }
+
+    @Override
+    @Transactional
+    public RecipeResponse forkRecipe(Long clonerUserId, Long originalRecipeId, ForkRecipeRequest req) {
+        User cloner = userRepository.findById(clonerUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + clonerUserId));
+
+        Recipe originalRecipe = recipeRepository.findDetailById(originalRecipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Công thức gốc không tồn tại: " + originalRecipeId));
+
+        // 1. Kiểm tra quyền xem công thức gốc
+        Long ownerId = originalRecipe.getUser().getUserId();
+        if (!canView(originalRecipe.getPrivacy(), ownerId, clonerUserId)) {
+            throw new AccessDeniedException("Bạn không có quyền xem công thức này để sao chép.");
+        }
+
+        // 2. Không cho tự fork công thức của chính mình
+        if (Objects.equals(clonerUserId, ownerId)) {
+            throw new IllegalArgumentException("Bạn không thể sao chép công thức của chính mình.");
+        }
+
+        // 3. Người dùng không được set PUBLIC nếu không phải ADMIN
+        if (cloner.getRole() != Role.ADMIN && req.privacy() == Privacy.PUBLIC) {
+            throw new AccessDeniedException("Chỉ ADMIN mới được tạo công thức công khai.");
+        }
+
+        Category category = categoryRepository.findById(req.categoryId())
+                .orElseThrow(() -> new EntityNotFoundException("Category không tồn tại: " + req.categoryId()));
+
+        // 4. Tạo công thức mới dựa trên request
+        Recipe newRecipe = Recipe.builder()
+                .user(cloner) // Chủ sở hữu là người đang fork
+                .originalRecipe(originalRecipe) // Liên kết tới công thức gốc
+                .category(category)
+                .title(req.title())
+                .description(req.description())
+                .prepareTime(req.prepareTime())
+                .cookTime(req.cookTime())
+                .difficulty(req.difficulty())
+                .privacy(req.privacy()) // Theo lựa chọn của người dùng
+                .view(0L) // Bắt đầu từ 0
+                .createdAt(LocalDateTime.now(ZoneOffset.UTC))
+                .build();
+
+        // 5. Sao chép và thêm nguyên liệu, các bước từ request
+        List<RecipeIngredient> ingredients = req.ingredients().stream()
+                .map(i -> RecipeIngredient.builder()
+                        .recipe(newRecipe)
+                        .name(i.name())
+                        .quantity(i.quantity())
+                        .build())
+                .collect(Collectors.toList());
+        newRecipe.setIngredients(ingredients);
+
+        List<RecipeStep> steps = req.steps().stream()
+                .map(s -> RecipeStep.builder()
+                        .recipe(newRecipe)
+                        .stepNo(s.stepNo())
+                        .content(s.content())
+                        .suggestedTime(s.suggestedTime())
+                        .tips(s.tips())
+                        // Lưu ý: Ảnh không được sao chép trực tiếp, người dùng phải tự upload cho công thức mới của họ
+                        .images(new ArrayList<>())
+                        .build())
+                .collect(Collectors.toList());
+        newRecipe.setSteps(steps);
+
+        Recipe saved = recipeRepository.save(newRecipe);
+        return RecipeResponse.from(saved);
     }
 
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {

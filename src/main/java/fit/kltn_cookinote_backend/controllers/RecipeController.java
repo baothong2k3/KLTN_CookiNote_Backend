@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.controllers;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.request.ForkRecipeRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
@@ -308,5 +309,21 @@ public class RecipeController {
     ) {
         recipeService.hardDeleteRecipe(authUser.getUserId(), recipeId);
         return ResponseEntity.ok(ApiResponse.success("Đã xóa vĩnh viễn công thức", httpReq.getRequestURI()));
+    }
+
+    /**
+     * Tạo một bản sao tùy chỉnh (fork) của một công thức đã có.
+     * POST /recipes/{originalRecipeId}/fork
+     */
+    @PostMapping("/{originalRecipeId}/fork")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<RecipeResponse>> forkRecipe(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long originalRecipeId,
+            @Valid @RequestBody ForkRecipeRequest req,
+            HttpServletRequest httpReq
+    ) {
+        RecipeResponse data = recipeService.forkRecipe(authUser.getUserId(), originalRecipeId, req);
+        return ResponseEntity.ok(ApiResponse.success("Sao chép và tùy chỉnh công thức thành công.", data, httpReq.getRequestURI()));
     }
 }

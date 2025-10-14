@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.services;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.request.ForkRecipeRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.*;
@@ -39,8 +40,19 @@ public interface RecipeService {
 
     /**
      * Xóa vĩnh viễn một công thức đã bị soft-delete.
+     *
      * @param actorUserId ID của người thực hiện.
-     * @param recipeId ID của công thức cần xóa.
+     * @param recipeId    ID của công thức cần xóa.
      */
     void hardDeleteRecipe(Long actorUserId, Long recipeId);
+
+    /**
+     * Tạo một bản sao (fork) của công thức đã có để người dùng hiện tại tùy chỉnh và sở hữu.
+     *
+     * @param clonerUserId     ID của người dùng thực hiện sao chép.
+     * @param originalRecipeId ID của công thức gốc.
+     * @param req              Dữ liệu tùy chỉnh cho công thức mới.
+     * @return Công thức mới đã được tạo.
+     */
+    RecipeResponse forkRecipe(Long clonerUserId, Long originalRecipeId, ForkRecipeRequest req);
 }
