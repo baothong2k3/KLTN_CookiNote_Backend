@@ -10,12 +10,11 @@ package fit.kltn_cookinote_backend.services.impl;/*
  */
 
 import com.cloudinary.Cloudinary;
+import fit.kltn_cookinote_backend.dtos.response.AllRecipeImagesResponse;
 import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
-import fit.kltn_cookinote_backend.entities.Recipe;
-import fit.kltn_cookinote_backend.entities.RecipeCoverImageHistory;
-import fit.kltn_cookinote_backend.entities.RecipeStep;
-import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Role;
+import fit.kltn_cookinote_backend.repositories.RecipeCoverImageHistoryRepository;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.repositories.RecipeStepRepository;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
@@ -33,6 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +41,7 @@ public class RecipeImageServiceImpl implements RecipeImageService {
     private final RecipeRepository recipeRepository;
     private final RecipeStepRepository stepRepository;
     private final UserRepository userRepository;
+    private final RecipeCoverImageHistoryRepository recipeCoverImageHistoryRepository;
 
     @Value("${app.cloudinary.recipe-folder}")
     private String recipeFolder;
@@ -133,5 +134,27 @@ public class RecipeImageServiceImpl implements RecipeImageService {
         }
 
         return urls;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AllRecipeImagesResponse getAllRecipeImages(Long actorUserId, Long recipeId) {
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Công thức không tồn tại: " + recipeId));
+
+        if (actor.getRole() != Role.ADMIN && !Objects.equals(actor.getUserId(), recipe.getUser().getUserId())) {
+            throw new AccessDeniedException("Chỉ chủ sở hữu hoặc ADMIN mới có quyền xem lịch sử ảnh.");
+        }
+
+        List<RecipeCoverImageHistory> coverHistories = recipeCoverImageHistoryRepository.findByRecipe_Id(recipeId);
+
+        List<RecipeStepImage> stepImages = recipe.getSteps().stream()
+                .flatMap(step -> step.getImages().stream())
+                .collect(Collectors.toList());
+
+        return AllRecipeImagesResponse.from(coverHistories, stepImages);
     }
 }

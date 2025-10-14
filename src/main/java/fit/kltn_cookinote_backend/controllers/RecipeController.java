@@ -337,4 +337,15 @@ public class RecipeController {
         PageResult<RecipeCardResponse> data = recipeService.searchPublicRecipes(query, page, size);
         return ResponseEntity.ok(ApiResponse.success("Tìm kiếm công thức thành công", data, httpReq.getRequestURI()));
     }
+
+    @GetMapping("/{recipeId}/images/history")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<AllRecipeImagesResponse>> getAllRecipeImages(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        AllRecipeImagesResponse data = recipeImageService.getAllRecipeImages(authUser.getUserId(), recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử ảnh thành công", data, httpReq.getRequestURI()));
+    }
 }

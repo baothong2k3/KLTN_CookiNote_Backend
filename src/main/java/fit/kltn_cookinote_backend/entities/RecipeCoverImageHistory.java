@@ -30,4 +30,8 @@ public class RecipeCoverImageHistory {
 
     @Column(name = "image_url", length = 2048, nullable = false)
     private String imageUrl;
+
+    @Column(name = "is_active", nullable = false)
+    @Builder.Default
+    private boolean active = true;
 }
