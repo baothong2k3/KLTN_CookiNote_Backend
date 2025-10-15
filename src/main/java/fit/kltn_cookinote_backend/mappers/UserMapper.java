@@ -18,7 +18,9 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface UserMapper {
     @Mapping(target = "role", expression = "java(user.getRole().name())")
+    @Mapping(source = "username", target = "username")
     UserDto toDto(User user);
 
+    @Mapping(source = "username", target = "username")
     UserDetailDto toDetailDto(User user);
 }
