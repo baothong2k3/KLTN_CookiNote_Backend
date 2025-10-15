@@ -11,6 +11,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
 
 import fit.kltn_cookinote_backend.dtos.UserDto;
 import fit.kltn_cookinote_backend.dtos.request.UpdateDisplayNameRequest;
+import fit.kltn_cookinote_backend.dtos.request.UserDetailDto;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.AuthProvider;
 import fit.kltn_cookinote_backend.mappers.UserMapper;
@@ -18,6 +19,7 @@ import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.RefreshTokenService;
 import fit.kltn_cookinote_backend.services.SessionAllowlistService;
 import fit.kltn_cookinote_backend.services.UserService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -105,5 +107,12 @@ public class UserServiceImpl implements UserService {
     public Page<UserDto> getAllUsers(Pageable pageable) {
         Page<User> userPage = userRepo.findAll(pageable);
         return userPage.map(userMapper::toDto);
+    }
+
+    @Override
+    public UserDetailDto getUserDetails(Long userId) {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người dùng với id: " + userId));
+        return userMapper.toDetailDto(user);
     }
 }
