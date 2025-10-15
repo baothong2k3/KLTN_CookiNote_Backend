@@ -6,6 +6,8 @@ import lombok.Builder;
 public record UserDto(
         Long userId,
         String email,
+        String avatarUrl,
         String displayName,
-        String role) {
+        String role
+) {
 }
