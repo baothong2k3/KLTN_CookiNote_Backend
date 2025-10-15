@@ -58,6 +58,7 @@ public class LoginServiceImpl implements LoginService {
 
         return LoginResponse.builder()
                 .userId(user.getUserId())
+                .username(user.getUsername())
                 .email(user.getEmail())
                 .avatarUrl(user.getAvatarUrl())
                 .role(user.getRole().name())
