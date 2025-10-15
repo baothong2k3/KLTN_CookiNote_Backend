@@ -77,7 +77,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public OtpRateInfo startForgotPassword(ForgotStartRequest req) {
-        Optional<User> ou = userRepo.findByUsernameAndEmail(req.username(), req.email());
+        Optional<User> ou = userRepo.findByEmail(req.email());
 
         if (ou.isEmpty()) {
             // Trả OtpRateInfo “mask” (toàn số 0) — không tiết lộ user tồn tại hay không
