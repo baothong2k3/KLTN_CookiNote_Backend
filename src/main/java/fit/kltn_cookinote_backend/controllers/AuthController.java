@@ -108,6 +108,13 @@ public class AuthController {
                 "Nếu thông tin hợp lệ, chúng tôi đã gửi mã OTP đến email của bạn.", info, httpReq.getRequestURI()));
     }
 
+    @PostMapping("/forgot/check-otp")
+    public ResponseEntity<ApiResponse<Void>> checkOtp(@Valid @RequestBody ForgotCheckOtpRequest req, HttpServletRequest httpReq) {
+        authService.checkOtp(req);
+        return ResponseEntity.ok(ApiResponse.success(
+                "OTP hợp lệ.", httpReq.getRequestURI()));
+    }
+
     @PutMapping("/forgot/reset-with-otp")
     public ResponseEntity<ApiResponse<Void>> resetWithOtp(@Valid @RequestBody ForgotVerifyRequest req, HttpServletRequest httpReq) {
         authService.resetPasswordWithOtp(req);

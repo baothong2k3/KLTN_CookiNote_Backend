@@ -94,11 +94,20 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void resetPasswordWithOtp(ForgotVerifyRequest req) {
-        final String username = req.username().trim();
+    public void checkOtp(ForgotCheckOtpRequest req) {
         final String email = req.email().trim();
 
-        User user = userRepo.findByUsernameAndEmail(username, email)
+        User user = userRepo.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("OTP không hợp lệ hoặc đã hết hạn"));
+        otpService.checkOtp(user, OtpPurpose.PASSWORD_RESET, req.otp());
+
+    }
+
+    @Override
+    public void resetPasswordWithOtp(ForgotVerifyRequest req) {
+        final String email = req.email().trim();
+
+        User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("OTP không hợp lệ hoặc đã hết hạn"));
 
         // chặn tài khoản Google
