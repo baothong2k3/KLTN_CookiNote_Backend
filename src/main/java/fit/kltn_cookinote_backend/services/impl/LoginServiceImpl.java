@@ -60,6 +60,7 @@ public class LoginServiceImpl implements LoginService {
                 .userId(user.getUserId())
                 .email(user.getEmail())
                 .avatarUrl(user.getAvatarUrl())
+                .role(user.getRole().name())
                 .displayName(user.getDisplayName())
                 .tokens(TokenPair.builder()
                         .accessToken(issue.token())

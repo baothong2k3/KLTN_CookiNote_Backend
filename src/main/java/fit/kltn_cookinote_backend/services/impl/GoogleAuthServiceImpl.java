@@ -89,6 +89,8 @@ public class GoogleAuthServiceImpl implements GoogleAuthService {
                 .userId(user.getUserId())
                 .email(user.getEmail())
                 .displayName(user.getDisplayName())
+                .role(user.getRole().name())
+                .avatarUrl(user.getAvatarUrl())
                 .tokens(tokens)
                 .build();
     }
