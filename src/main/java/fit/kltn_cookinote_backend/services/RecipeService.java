@@ -59,4 +59,6 @@ public interface RecipeService {
     RecipeResponse forkRecipe(Long clonerUserId, Long originalRecipeId, ForkRecipeRequest req);
 
     PageResult<RecipeCardResponse> searchPublicRecipes(String query, int page, int size);
+
+    PageResult<RecipeCardResponse> listEasyToCook(int page, int size);
 }

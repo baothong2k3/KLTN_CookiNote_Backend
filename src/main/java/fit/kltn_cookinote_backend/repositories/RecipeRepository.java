@@ -79,4 +79,8 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
     Page<Recipe> searchPublicRecipes(@Param("query") String query, Pageable pageable);
 
     Page<Recipe> findByPrivacyAndDeletedFalseOrderByViewDesc(Privacy privacy, Pageable pageable);
+
+    @Query(value = "SELECT r FROM Recipe r LEFT JOIN r.ingredients i WHERE r.deleted = false AND r.privacy = 'PUBLIC' GROUP BY r.id ORDER BY r.difficulty ASC, COUNT(i.id) ASC, r.prepareTime ASC, r.cookTime ASC",
+            countQuery = "SELECT count(r) FROM Recipe r WHERE r.deleted = false and r.privacy = 'PUBLIC'")
+    Page<Recipe> findEasyToCook(Pageable pageable);
 }
