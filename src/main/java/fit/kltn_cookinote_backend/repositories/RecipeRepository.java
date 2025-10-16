@@ -77,4 +77,6 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
             )
             """)
     Page<Recipe> searchPublicRecipes(@Param("query") String query, Pageable pageable);
+
+    Page<Recipe> findByPrivacyAndDeletedFalseOrderByViewDesc(Privacy privacy, Pageable pageable);
 }

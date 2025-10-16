@@ -521,6 +521,17 @@ public class RecipeServiceImpl implements RecipeService {
         return PageResult.of(pageData.map(RecipeCardResponse::from));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<RecipeCardResponse> listPopular(int page, int size) {
+        int p = Math.max(0, page);
+        int s = Math.min((size > 0 ? size : DEFAULT_SIZE), MAX_SIZE);
+        Pageable pageable = PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "view"));
+
+        Page<Recipe> pageData = recipeRepository.findByPrivacyAndDeletedFalseOrderByViewDesc(Privacy.PUBLIC, pageable);
+        return PageResult.of(pageData.map(RecipeCardResponse::from));
+    }
+
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {
         return switch (privacy) {
             case PUBLIC, SHARED -> true;

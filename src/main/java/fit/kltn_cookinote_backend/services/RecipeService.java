@@ -26,6 +26,8 @@ public interface RecipeService {
 
     PageResult<RecipeCardResponse> listPublic(int page, int size);
 
+    PageResult<RecipeCardResponse> listPopular(int page, int size);
+
     PageResult<RecipeCardResponse> listByOwner(Long ownerUserId, Long viewerUserIdOrNull, int page, int size);
 
     List<RecipeStepItem> getSteps(Long viewerUserIdOrNull, Long recipeId);

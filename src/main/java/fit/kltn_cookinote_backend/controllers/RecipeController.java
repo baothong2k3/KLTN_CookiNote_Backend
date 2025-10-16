@@ -348,4 +348,14 @@ public class RecipeController {
         AllRecipeImagesResponse data = recipeImageService.getAllRecipeImages(authUser.getUserId(), recipeId);
         return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử ảnh thành công", data, httpReq.getRequestURI()));
     }
+
+    @GetMapping("/popular")
+    public ResponseEntity<ApiResponse<PageResult<RecipeCardResponse>>> listPopular(
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "size", required = false, defaultValue = "12") int size,
+            HttpServletRequest httpReq
+    ) {
+        PageResult<RecipeCardResponse> data = recipeService.listPopular(page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức phổ biến thành công", data, httpReq.getRequestURI()));
+    }
 }
