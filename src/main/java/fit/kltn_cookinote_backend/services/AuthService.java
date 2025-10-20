@@ -23,5 +23,7 @@ public interface AuthService {
 
     OtpRateInfo startForgotPassword(ForgotStartRequest req);
 
+    void checkOtp(ForgotCheckOtpRequest req);
+
     void resetPasswordWithOtp(ForgotVerifyRequest req);
 }

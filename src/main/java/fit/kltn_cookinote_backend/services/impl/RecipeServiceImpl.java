@@ -9,19 +9,13 @@ package fit.kltn_cookinote_backend.services.impl;/*
  * @version: 1.0
  */
 
-import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
-import fit.kltn_cookinote_backend.dtos.request.RecipeIngredientCreate;
-import fit.kltn_cookinote_backend.dtos.request.RecipeStepCreate;
-import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
+import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.enums.Role;
-import fit.kltn_cookinote_backend.repositories.CategoryRepository;
-import fit.kltn_cookinote_backend.repositories.RecipeRepository;
-import fit.kltn_cookinote_backend.repositories.RecipeStepRepository;
-import fit.kltn_cookinote_backend.repositories.RecipeIngredientRepository;
-import fit.kltn_cookinote_backend.repositories.UserRepository;
+import fit.kltn_cookinote_backend.repositories.*;
+import fit.kltn_cookinote_backend.services.CloudinaryService;
 import fit.kltn_cookinote_backend.services.RecipeService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -33,10 +27,14 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -46,6 +44,9 @@ public class RecipeServiceImpl implements RecipeService {
     private final UserRepository userRepository;
     private final RecipeStepRepository recipeStepRepository;
     private final RecipeIngredientRepository recipeIngredientRepository;
+    private final CloudinaryService cloudinaryService;
+    private final ShoppingListRepository shoppingListRepository;
+    private final FavoriteRepository favoriteRepository;
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 12; // mobile-friendly
@@ -243,6 +244,11 @@ public class RecipeServiceImpl implements RecipeService {
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
+        // *** KIỂM TRA TRẠNG THÁI DELETED ***
+        if (recipe.isDeleted()) {
+            throw new EntityNotFoundException("Không thể cập nhật công thức đã bị xóa: " + recipeId);
+        }
+
         Long ownerId = recipe.getUser().getUserId();
         ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
 
@@ -283,6 +289,258 @@ public class RecipeServiceImpl implements RecipeService {
 
         Recipe saved = recipeRepository.saveAndFlush(recipe);
         return RecipeResponse.from(saved);
+    }
+
+    @Override
+    @Transactional
+    public void deleteRecipe(Long actorUserId, Long recipeId) { // soft delete
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        // *** KIỂM TRA TRẠNG THÁI DELETED ***
+        if (recipe.isDeleted()) {
+            throw new IllegalStateException("Công thức này đã được xóa trước đó.");
+        }
+
+        Long ownerId = recipe.getUser().getUserId();
+        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        // Soft delete the recipe
+        recipe.setDeleted(true);
+        recipe.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
+
+        // Deactivate all images
+        if (recipe.getSteps() != null) {
+            for (RecipeStep step : recipe.getSteps()) {
+                if (step.getImages() != null) {
+                    for (RecipeStepImage image : step.getImages()) {
+                        image.setActive(false);
+                    }
+                }
+            }
+        }
+        recipeRepository.save(recipe);
+
+        // CẬP NHẬT: Đánh dấu các shopping list item liên quan
+        List<ShoppingList> relatedItems = shoppingListRepository.findByRecipe_Id(recipeId);
+        if (!relatedItems.isEmpty()) {
+            for (ShoppingList item : relatedItems) {
+                item.setIsRecipeDeleted(true);
+                //item.setOriginalRecipeTitle(recipe.getTitle());
+            }
+            shoppingListRepository.saveAll(relatedItems);
+        }
+    }
+
+    /**
+     * Xem danh sách công thức đã xoá (chỉ ADMIN hoặc chủ sở hữu)
+     *
+     * @param actor
+     * @param filterUserId
+     * @param page
+     * @param size
+     * @return
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<RecipeCardResponse> listDeletedRecipes(User actor, Long filterUserId, int page, int size) {
+        int p = Math.max(0, page);
+        int s = Math.min((size > 0 ? size : DEFAULT_SIZE), MAX_SIZE);
+        Pageable pageable = PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "deletedAt"));
+
+        Page<Recipe> pageData;
+
+        if (actor.getRole() == Role.ADMIN) {
+            pageData = recipeRepository.findDeleted(filterUserId, pageable);
+        } else {
+            pageData = recipeRepository.findDeleted(actor.getUserId(), pageable);
+        }
+
+        return PageResult.of(pageData.map(RecipeCardResponse::from));
+    }
+
+    @Override
+    @Transactional
+    public void hardDeleteRecipe(Long actorUserId, Long recipeId) {
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Recipe recipe = recipeRepository.findDeletedById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Công thức không tồn tại hoặc chưa được xóa mềm: " + recipeId));
+
+        Long ownerId = recipe.getUser().getUserId();
+        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        // CẬP NHẬT: Xử lý các shopping list item trước khi xóa recipe
+        List<ShoppingList> relatedItems = shoppingListRepository.findByRecipe_Id(recipeId);
+        if (!relatedItems.isEmpty()) {
+            final String recipeTitle = recipe.getTitle();
+            for (ShoppingList item : relatedItems) {
+                item.setRecipe(null); // Ngắt kết nối
+                item.setOriginalRecipeTitle(recipeTitle); // Lưu lại tên
+                item.setIsRecipeDeleted(true); // Đánh dấu đã xóa
+            }
+            shoppingListRepository.saveAllAndFlush(relatedItems);
+        }
+
+        // CẬP NHẬT: Xử lý các favorite item trước khi xóa recipe
+        List<Favorite> relatedFavorites = favoriteRepository.findByRecipe_Id(recipeId);
+        if (!relatedFavorites.isEmpty()) {
+            final String recipeTitle = recipe.getTitle();
+            for (Favorite favorite : relatedFavorites) {
+                favorite.setRecipe(null);
+                favorite.setOriginalRecipeTitle(recipeTitle);
+                favorite.setIsRecipeDeleted(true);
+            }
+            favoriteRepository.saveAllAndFlush(relatedFavorites);
+        }
+
+        // Thu thập tất cả public ID của ảnh để xóa sau khi commit DB
+        final List<String> publicIdsToDelete = new ArrayList<>();
+
+        // 1. Ảnh bìa từ lịch sử
+        if (recipe.getCoverImageHistory() != null) {
+            recipe.getCoverImageHistory().stream()
+                    .map(RecipeCoverImageHistory::getImageUrl)
+                    .filter(StringUtils::hasText)
+                    .map(cloudinaryService::extractPublicIdFromUrl)
+                    .filter(StringUtils::hasText)
+                    .forEach(publicIdsToDelete::add);
+        }
+
+        // 2. Ảnh của các bước
+        if (recipe.getSteps() != null) {
+            for (RecipeStep step : recipe.getSteps()) {
+                if (step.getImages() != null) {
+                    step.getImages().stream()
+                            .map(RecipeStepImage::getImageUrl)
+                            .filter(StringUtils::hasText)
+                            .map(cloudinaryService::extractPublicIdFromUrl)
+                            .filter(StringUtils::hasText)
+                            .forEach(publicIdsToDelete::add);
+                }
+            }
+        }
+
+        // Đăng ký một callback để xóa ảnh trên Cloudinary CHỈ KHI giao dịch DB thành công
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                for (String publicId : publicIdsToDelete) {
+                    cloudinaryService.safeDeleteByPublicId(publicId);
+                }
+            }
+        });
+
+        // Xóa recipe khỏi DB
+        recipeRepository.delete(recipe);
+    }
+
+    @Override
+    @Transactional
+    public RecipeResponse forkRecipe(Long clonerUserId, Long originalRecipeId, ForkRecipeRequest req) {
+        User cloner = userRepository.findById(clonerUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + clonerUserId));
+
+        Recipe originalRecipe = recipeRepository.findDetailById(originalRecipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Công thức gốc không tồn tại: " + originalRecipeId));
+
+        // 1. Kiểm tra quyền xem công thức gốc
+        Long ownerId = originalRecipe.getUser().getUserId();
+        if (!canView(originalRecipe.getPrivacy(), ownerId, clonerUserId)) {
+            throw new AccessDeniedException("Bạn không có quyền xem công thức này để sao chép.");
+        }
+
+        // 2. Không cho tự fork công thức của chính mình
+        if (Objects.equals(clonerUserId, ownerId)) {
+            throw new IllegalArgumentException("Bạn không thể sao chép công thức của chính mình.");
+        }
+
+        // 3. Người dùng không được set PUBLIC nếu không phải ADMIN
+        if (cloner.getRole() != Role.ADMIN && req.privacy() == Privacy.PUBLIC) {
+            throw new AccessDeniedException("Chỉ ADMIN mới được tạo công thức công khai.");
+        }
+
+        Category category = categoryRepository.findById(req.categoryId())
+                .orElseThrow(() -> new EntityNotFoundException("Category không tồn tại: " + req.categoryId()));
+
+        // 4. Tạo công thức mới dựa trên request
+        Recipe newRecipe = Recipe.builder()
+                .user(cloner) // Chủ sở hữu là người đang fork
+                .originalRecipe(originalRecipe) // Liên kết tới công thức gốc
+                .category(category)
+                .title(req.title())
+                .description(req.description())
+                .prepareTime(req.prepareTime())
+                .cookTime(req.cookTime())
+                .difficulty(req.difficulty())
+                .privacy(req.privacy()) // Theo lựa chọn của người dùng
+                .view(0L) // Bắt đầu từ 0
+                .createdAt(LocalDateTime.now(ZoneOffset.UTC))
+                .build();
+
+        // 5. Sao chép và thêm nguyên liệu, các bước từ request
+        List<RecipeIngredient> ingredients = req.ingredients().stream()
+                .map(i -> RecipeIngredient.builder()
+                        .recipe(newRecipe)
+                        .name(i.name())
+                        .quantity(i.quantity())
+                        .build())
+                .collect(Collectors.toList());
+        newRecipe.setIngredients(ingredients);
+
+        List<RecipeStep> steps = req.steps().stream()
+                .map(s -> RecipeStep.builder()
+                        .recipe(newRecipe)
+                        .stepNo(s.stepNo())
+                        .content(s.content())
+                        .suggestedTime(s.suggestedTime())
+                        .tips(s.tips())
+                        // Lưu ý: Ảnh không được sao chép trực tiếp, người dùng phải tự upload cho công thức mới của họ
+                        .images(new ArrayList<>())
+                        .build())
+                .collect(Collectors.toList());
+        newRecipe.setSteps(steps);
+
+        Recipe saved = recipeRepository.save(newRecipe);
+        return RecipeResponse.from(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<RecipeCardResponse> searchPublicRecipes(String query, int page, int size) {
+        int p = Math.max(0, page);
+        int s = Math.min((size > 0 ? size : DEFAULT_SIZE), MAX_SIZE);
+        Pageable pageable = PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        Page<Recipe> pageData = recipeRepository.searchPublicRecipes(query, pageable);
+
+        return PageResult.of(pageData.map(RecipeCardResponse::from));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<RecipeCardResponse> listPopular(int page, int size) {
+        int p = Math.max(0, page);
+        int s = Math.min((size > 0 ? size : DEFAULT_SIZE), MAX_SIZE);
+        Pageable pageable = PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "view"));
+
+        Page<Recipe> pageData = recipeRepository.findByPrivacyAndDeletedFalseOrderByViewDesc(Privacy.PUBLIC, pageable);
+        return PageResult.of(pageData.map(RecipeCardResponse::from));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<RecipeCardResponse> listEasyToCook(int page, int size) {
+        int p = Math.max(0, page);
+        int s = Math.min((size > 0 ? size : DEFAULT_SIZE), MAX_SIZE);
+        Pageable pageable = PageRequest.of(p, s);
+
+        Page<Recipe> pageData = recipeRepository.findEasyToCook(pageable);
+        return PageResult.of(pageData.map(RecipeCardResponse::from));
     }
 
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {

@@ -13,17 +13,20 @@ public record RecipeCardResponse(
         String ownerName,
         LocalDateTime createdAt,
         String difficulty,  // String để tránh buộc client cập nhật enum
-        Long view
+        Long view,
+        boolean deleted
 ) {
     public static RecipeCardResponse from(Recipe r) {
+        String title = r.isDeleted() ? "[ĐÃ XÓA] " + r.getTitle() : r.getTitle();
         return RecipeCardResponse.builder()
                 .id(r.getId())
-                .title(r.getTitle())
+                .title(title)
                 .imageUrl(r.getImageUrl())
                 .ownerName(r.getUser() != null ? r.getUser().getDisplayName() : null)
                 .createdAt(r.getCreatedAt())
                 .difficulty(r.getDifficulty() != null ? r.getDifficulty().name() : null)
                 .view(r.getView())
+                .deleted(r.isDeleted())
                 .build();
     }
 }

@@ -39,7 +39,9 @@ public class LoginServiceImpl implements LoginService {
     @Override
     public LoginResponse login(LoginRequest req) {
         User user = userRepo.findByUsername(req.username())
+                .or(() -> userRepo.findByEmail(req.username()))
                 .orElseThrow(() -> new IllegalArgumentException("Tài khoản hoặc mật khẩu không đúng."));
+
         if (!user.isEnabled() || !user.isEmailVerified()) {
             throw new IllegalStateException("Tài khoản chưa kích hoạt hoặc chưa xác thực email.");
         }
@@ -56,7 +58,10 @@ public class LoginServiceImpl implements LoginService {
 
         return LoginResponse.builder()
                 .userId(user.getUserId())
+                .username(user.getUsername())
                 .email(user.getEmail())
+                .avatarUrl(user.getAvatarUrl())
+                .role(user.getRole().name())
                 .displayName(user.getDisplayName())
                 .tokens(TokenPair.builder()
                         .accessToken(issue.token())

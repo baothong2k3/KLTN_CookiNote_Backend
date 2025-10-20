@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.controllers;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.request.ForkRecipeRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
@@ -252,5 +253,119 @@ public class RecipeController {
     ) {
         favoriteService.removeRecipeFromFavorites(authUser.getUserId(), recipeId);
         return ResponseEntity.ok(ApiResponse.success("Đã xóa công thức khỏi danh sách yêu thích", httpReq.getRequestURI()));
+    }
+
+    /**
+     * Xóa một công thức (owner hoặc ADMIN).
+     *
+     * @param authUser
+     * @param recipeId
+     * @param httpReq
+     * @return
+     */
+    @DeleteMapping("/{recipeId}")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteRecipe(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        recipeService.deleteRecipe(authUser.getUserId(), recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Đã xóa công thức thành công", httpReq.getRequestURI()));
+    }
+
+    /**
+     * Danh sách công thức đã xóa (ADMIN: tất cả; USER: của mình).
+     *
+     * @param authUser
+     * @param page
+     * @param size
+     * @param httpReq
+     * @return
+     */
+    @GetMapping("/deleted")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<PageResult<RecipeCardResponse>>> listDeleted(
+            @AuthenticationPrincipal User authUser,
+            @RequestParam(value = "userId", required = false) Long userId,
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "size", required = false, defaultValue = "12") int size,
+            HttpServletRequest httpReq
+    ) {
+        PageResult<RecipeCardResponse> data = recipeService.listDeletedRecipes(authUser, userId, page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức đã xóa thành công", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Xóa vĩnh viễn một công thức (chỉ dành cho owner hoặc ADMIN).
+     * Yêu cầu công thức phải đã được xóa mềm trước đó.
+     */
+    @DeleteMapping("/{recipeId}/permanent")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> hardDeleteRecipe(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        recipeService.hardDeleteRecipe(authUser.getUserId(), recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Đã xóa vĩnh viễn công thức", httpReq.getRequestURI()));
+    }
+
+    /**
+     * Tạo một bản sao tùy chỉnh (fork) của một công thức đã có.
+     * POST /recipes/{originalRecipeId}/fork
+     */
+    @PostMapping("/{originalRecipeId}/fork")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<RecipeResponse>> forkRecipe(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long originalRecipeId,
+            @Valid @RequestBody ForkRecipeRequest req,
+            HttpServletRequest httpReq
+    ) {
+        RecipeResponse data = recipeService.forkRecipe(authUser.getUserId(), originalRecipeId, req);
+        return ResponseEntity.ok(ApiResponse.success("Sao chép và tùy chỉnh công thức thành công.", data, httpReq.getRequestURI()));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<PageResult<RecipeCardResponse>>> searchRecipes(
+            @RequestParam("query") String query,
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "size", required = false, defaultValue = "12") int size,
+            HttpServletRequest httpReq
+    ) {
+        PageResult<RecipeCardResponse> data = recipeService.searchPublicRecipes(query, page, size);
+        return ResponseEntity.ok(ApiResponse.success("Tìm kiếm công thức thành công", data, httpReq.getRequestURI()));
+    }
+
+    @GetMapping("/{recipeId}/images/history")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<AllRecipeImagesResponse>> getAllRecipeImages(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        AllRecipeImagesResponse data = recipeImageService.getAllRecipeImages(authUser.getUserId(), recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử ảnh thành công", data, httpReq.getRequestURI()));
+    }
+
+    @GetMapping("/popular")
+    public ResponseEntity<ApiResponse<PageResult<RecipeCardResponse>>> listPopular(
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "size", required = false, defaultValue = "12") int size,
+            HttpServletRequest httpReq
+    ) {
+        PageResult<RecipeCardResponse> data = recipeService.listPopular(page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức phổ biến thành công", data, httpReq.getRequestURI()));
+    }
+
+    @GetMapping("/easy-to-cook")
+    public ResponseEntity<ApiResponse<PageResult<RecipeCardResponse>>> listEasyToCook(
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "size", required = false, defaultValue = "12") int size,
+            HttpServletRequest httpReq
+    ) {
+        PageResult<RecipeCardResponse> data = recipeService.listEasyToCook(page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức dễ nấu thành công", data, httpReq.getRequestURI()));
     }
 }

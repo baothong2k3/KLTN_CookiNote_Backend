@@ -10,13 +10,11 @@ package fit.kltn_cookinote_backend.controllers;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.UserDto;
-import fit.kltn_cookinote_backend.dtos.request.ChangeEmailRequest;
-import fit.kltn_cookinote_backend.dtos.request.ChangePasswordRequest;
-import fit.kltn_cookinote_backend.dtos.request.UpdateDisplayNameRequest;
-import fit.kltn_cookinote_backend.dtos.request.VerifyEmailChangeRequest;
+import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
 import fit.kltn_cookinote_backend.dtos.response.OtpRateInfo;
 import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.mappers.UserMapper;
 import fit.kltn_cookinote_backend.services.CloudinaryService;
 import fit.kltn_cookinote_backend.services.EmailChangeService;
 import fit.kltn_cookinote_backend.services.UserService;
@@ -24,11 +22,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/user")
@@ -37,18 +34,24 @@ public class UserController {
     private final UserService userService;
     private final EmailChangeService emailChangeService;
     private final CloudinaryService cloudinaryService;
+    private final UserMapper userMapper;
 
     // Kiểm tra access token
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> me(@AuthenticationPrincipal User user,
+    public ResponseEntity<ApiResponse<UserDto>> me(@AuthenticationPrincipal User user,
                                                                HttpServletRequest httpReq) {
-        Map<String, Object> data = Map.of(
-                "userId", user.getUserId(),
-                "email", user.getEmail(),
-                "displayName", user.getDisplayName(),
-                "role", user.getRole().name()
-        );
+        UserDto data = userMapper.toDto(user);
         return ResponseEntity.ok(ApiResponse.success("OK", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Lấy toàn bộ thông tin chi tiết của người dùng hiện tại.
+     */
+    @GetMapping("/me/details")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<UserDetailDto>> getMyDetails(@AuthenticationPrincipal User authUser, HttpServletRequest httpReq) {
+        UserDetailDto userDetails = userService.getUserDetails(authUser.getUserId());
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin chi tiết thành công", userDetails, httpReq.getRequestURI()));
     }
 
     @PatchMapping("/display-name")

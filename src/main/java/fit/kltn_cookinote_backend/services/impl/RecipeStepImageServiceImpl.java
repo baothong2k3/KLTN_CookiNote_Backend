@@ -15,12 +15,12 @@ import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.entities.RecipeStep;
 import fit.kltn_cookinote_backend.entities.RecipeStepImage;
 import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.repositories.RecipeStepImageRepository;
 import fit.kltn_cookinote_backend.repositories.RecipeStepRepository;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
-import fit.kltn_cookinote_backend.services.CloudinaryService;
 import fit.kltn_cookinote_backend.services.RecipeImageService;
 import fit.kltn_cookinote_backend.services.RecipeStepImageService;
 import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
@@ -31,8 +31,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -46,7 +44,6 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
     private final RecipeStepRepository stepRepository;
     private final RecipeStepImageRepository stepImageRepository;
     private final UserRepository userRepository;
-    private final CloudinaryService cloudinaryService;
     private final RecipeRepository recipeRepository;
 
     @PersistenceContext
@@ -60,14 +57,29 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
     private RecipeStep loadAndCheckStep(Long actorUserId, Long recipeId, Long stepId) {
         RecipeStep step = stepRepository.findById(stepId)
                 .orElseThrow(() -> new EntityNotFoundException("Step không tồn tại: " + stepId));
-        if (!Objects.equals(step.getRecipe().getId(), recipeId)) {
+        Recipe recipe = step.getRecipe();
+
+        if (!Objects.equals(recipe.getId(), recipeId)) {
             throw new IllegalArgumentException("Step không thuộc về Recipe này.");
         }
+
+        if (recipe.isDeleted()) {
+            throw new EntityNotFoundException("Công thức của bước này đã bị xóa: " + recipeId);
+        }
+
         User actor = userRepository.findById(actorUserId)
                 .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
-        Long ownerId = stepRepository.findOwnerIdByStepId(stepId);
-        if (ownerId == null) throw new EntityNotFoundException("Step không tồn tại: " + stepId);
-        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        Long ownerId = recipe.getUser().getUserId();
+
+        if (recipe.getPrivacy() == Privacy.PRIVATE) {
+            if (!actorUserId.equals(ownerId)) {
+                throw new AccessDeniedException("Chỉ chủ sở hữu mới có quyền chỉnh sửa công thức riêng tư.");
+            }
+        } else {
+            ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+        }
+
         return step;
     }
 

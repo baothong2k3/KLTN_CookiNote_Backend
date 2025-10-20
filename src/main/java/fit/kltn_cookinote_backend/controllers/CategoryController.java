@@ -9,10 +9,12 @@ package fit.kltn_cookinote_backend.controllers;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.request.MoveRecipesRequest;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
 import fit.kltn_cookinote_backend.dtos.response.CategoryResponse;
 import fit.kltn_cookinote_backend.services.CategoryService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -66,5 +69,15 @@ public class CategoryController {
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> listAllCategoriesByName(@RequestParam("categoryName") String categoryName, HttpServletRequest httpReq) {
         List<CategoryResponse> data = categoryService.listAllByCategoryName(categoryName);
         return ResponseEntity.ok(ApiResponse.success("Tìm danh mục thành công", data, httpReq.getRequestURI()));
+    }
+
+    @PostMapping("/move-recipes")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> moveRecipes(
+            @Valid @RequestBody MoveRecipesRequest req,
+            HttpServletRequest httpReq) {
+        Map<String, Integer> result = categoryService.moveRecipes(req);
+        String message = String.format("Đã chuyển %d công thức thành công.", result.get("movedCount"));
+        return ResponseEntity.ok(ApiResponse.success(message, result, httpReq.getRequestURI()));
     }
 }

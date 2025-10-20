@@ -10,6 +10,7 @@ package fit.kltn_cookinote_backend.mappers;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.UserDto;
+import fit.kltn_cookinote_backend.dtos.request.UserDetailDto;
 import fit.kltn_cookinote_backend.entities.User;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -17,5 +18,9 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface UserMapper {
     @Mapping(target = "role", expression = "java(user.getRole().name())")
+    @Mapping(source = "username", target = "username")
     UserDto toDto(User user);
+
+    @Mapping(source = "username", target = "username")
+    UserDetailDto toDetailDto(User user);
 }

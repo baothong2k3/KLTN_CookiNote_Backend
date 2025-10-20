@@ -15,6 +15,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Fetch;
 import org.hibernate.annotations.FetchMode;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -73,6 +75,18 @@ public class Recipe {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "deleted", nullable = false)
+    @Builder.Default
+    private boolean deleted = false;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "original_recipe_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL) // Nếu recipe gốc bị xóa, trường này sẽ thành null
+    private Recipe originalRecipe;
+
     // children
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("stepNo ASC")
@@ -85,7 +99,7 @@ public class Recipe {
     @Fetch(FetchMode.SUBSELECT)
     private List<RecipeIngredient> ingredients = new ArrayList<>();
 
-    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "recipe", cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH, CascadeType.DETACH})
     @Builder.Default
     private Set<Favorite> favorites = new HashSet<>();
 
@@ -93,7 +107,7 @@ public class Recipe {
     @Builder.Default
     private List<Share> shares = new ArrayList<>();
 
-    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "recipe", cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH, CascadeType.DETACH})
     @Builder.Default
     private List<ShoppingList> shoppingLists = new ArrayList<>();
 

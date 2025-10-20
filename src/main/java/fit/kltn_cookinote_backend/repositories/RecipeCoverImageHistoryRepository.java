@@ -11,6 +11,16 @@ package fit.kltn_cookinote_backend.repositories;/*
 
 import fit.kltn_cookinote_backend.entities.RecipeCoverImageHistory;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
 
 public interface RecipeCoverImageHistoryRepository extends JpaRepository<RecipeCoverImageHistory, Long> {
+    List<RecipeCoverImageHistory> findByRecipe_Id(Long recipeId);
+
+    @Modifying
+    @Query("UPDATE RecipeCoverImageHistory h SET h.active = false WHERE h.recipe.id = :recipeId")
+    void deactivateAllByRecipeId(@Param("recipeId") Long recipeId);
 }

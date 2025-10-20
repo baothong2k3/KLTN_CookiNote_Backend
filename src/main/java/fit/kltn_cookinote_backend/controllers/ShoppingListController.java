@@ -13,6 +13,7 @@ import fit.kltn_cookinote_backend.dtos.request.ShoppingListMoveRequest;
 import fit.kltn_cookinote_backend.dtos.request.ShoppingListUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.request.ShoppingListUpsertRequest;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
+import fit.kltn_cookinote_backend.dtos.response.GroupedShoppingListResponse;
 import fit.kltn_cookinote_backend.dtos.response.ShoppingListResponse;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.services.ShoppingListService;
@@ -122,5 +123,18 @@ public class ShoppingListController {
                 req == null ? null : req.recipeId()
         );
         return ResponseEntity.ok(ApiResponse.success("Di chuyển nguyên liệu thành công.", data, http.getRequestURI()));
+    }
+
+    /**
+     * Lấy toàn bộ danh sách mua sắm của người dùng, gom nhóm theo công thức.
+     */
+    @GetMapping
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<GroupedShoppingListResponse>>> getAllShoppingLists(
+            @AuthenticationPrincipal User authUser,
+            HttpServletRequest req
+    ) {
+        List<GroupedShoppingListResponse> data = shoppingListService.getAllGroupedByRecipe(authUser.getUserId());
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách mua sắm thành công", data, req.getRequestURI()));
     }
 }

@@ -11,8 +11,10 @@ package fit.kltn_cookinote_backend.entities;/*
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "favorite")
@@ -22,41 +24,26 @@ import java.io.Serializable;
 @AllArgsConstructor
 @Builder
 public class Favorite {
-
-    @EmbeddedId
-    private FavoriteId id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("userId")
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("recipeId")
-    @JoinColumn(name = "recipe_id", nullable = false)
+    @JoinColumn(name = "recipe_id", nullable = true)
     private Recipe recipe;
 
-    public static Favorite of(User user, Recipe recipe) {
-        return Favorite.builder()
-                .id(new FavoriteId(user.getUserId(), recipe.getId()))
-                .user(user)
-                .recipe(recipe)
-                .build();
-    }
+    @Column(length = 255)
+    private String originalRecipeTitle;
 
-    @Embeddable
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @EqualsAndHashCode
-    public static class FavoriteId implements Serializable {
-        private static final long serialVersionUID = 1L;
+    @Builder.Default
+    @Column(name = "is_recipe_deleted")
+    private Boolean isRecipeDeleted = false;
 
-        @Column(name = "user_id")
-        private Long userId;
-
-        @Column(name = "recipe_id")
-        private Long recipeId;
-    }
+    @Column(name = "created_at", nullable = false, updatable = false)
+    @CreationTimestamp
+    private LocalDateTime createdAt;
 }
