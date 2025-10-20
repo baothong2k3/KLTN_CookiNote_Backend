@@ -137,7 +137,7 @@ public class OtpService {
         otpRepo.delete(otp);
     }
 
-    public void verifyAndConsumeOtpOrThrow(User user, OtpPurpose purpose, String rawOtp) {
+    private EmailOtp findAndValidateOtp(User user, OtpPurpose purpose, String rawOtp) {
         EmailOtp otp = otpRepo.findByUserAndPurpose(user, purpose)
                 .orElseThrow(() -> new IllegalStateException("OTP không hợp lệ hoặc đã hết hạn"));
 
@@ -159,8 +159,16 @@ public class OtpService {
             otpRepo.save(otp);
             throw new IllegalStateException("OTP không hợp lệ hoặc đã hết hạn");
         }
+        return otp;
+    }
 
+    public void verifyAndConsumeOtpOrThrow(User user, OtpPurpose purpose, String rawOtp) {
+        EmailOtp otp = findAndValidateOtp(user, purpose, rawOtp);
         // đúng → consume one-time
         otpRepo.delete(otp);
+    }
+
+    public void checkOtp(User user, OtpPurpose purpose, String rawOtp) {
+        findAndValidateOtp(user, purpose, rawOtp);
     }
 }

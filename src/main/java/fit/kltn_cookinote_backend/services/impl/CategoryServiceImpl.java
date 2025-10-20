@@ -10,9 +10,11 @@ package fit.kltn_cookinote_backend.services.impl;/*
  */
 
 import com.cloudinary.Cloudinary;
+import fit.kltn_cookinote_backend.dtos.request.MoveRecipesRequest;
 import fit.kltn_cookinote_backend.dtos.response.CategoryResponse;
 import fit.kltn_cookinote_backend.entities.Category;
 import fit.kltn_cookinote_backend.repositories.CategoryRepository;
+import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.services.CategoryService;
 import fit.kltn_cookinote_backend.services.CloudinaryService;
 import fit.kltn_cookinote_backend.utils.CloudinaryUtils;
@@ -31,11 +33,14 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 public class CategoryServiceImpl implements CategoryService {
     private final CategoryRepository categoryRepository;
+    private final RecipeRepository recipeRepository;
     private final CloudinaryService cloudinaryService;
     private final Cloudinary cloudinary;
 
@@ -123,6 +128,35 @@ public class CategoryServiceImpl implements CategoryService {
         }
         List<Category> categories = categoryRepository.findByNameContainingIgnoreCase(keyword, Sort.by("name").ascending());
         return categories.stream().map(this::toResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Integer> moveRecipes(MoveRecipesRequest req) {
+        Long sourceId = req.sourceCategoryId();
+        Long destId = req.destinationCategoryId();
+
+        if (Objects.equals(sourceId, destId)) {
+            throw new IllegalArgumentException("Danh mục nguồn và đích không được trùng nhau.");
+        }
+
+        if (!categoryRepository.existsById(sourceId)) {
+            throw new IllegalArgumentException("Danh mục nguồn không tồn tại: " + sourceId);
+        }
+        if (!categoryRepository.existsById(destId)) {
+            throw new IllegalArgumentException("Danh mục đích không tồn tại: " + destId);
+        }
+
+        int movedCount;
+        if (req.recipeIds() == null || req.recipeIds().isEmpty()) {
+            // Chuyển tất cả
+            movedCount = recipeRepository.moveAllRecipesByCategory(sourceId, destId);
+        } else {
+            // Chuyển theo danh sách ID
+            movedCount = recipeRepository.moveRecipesByIds(sourceId, destId, req.recipeIds());
+        }
+
+        return Map.of("movedCount", movedCount);
     }
 
     private CategoryResponse toResponse(Category c) {

@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.services;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.response.GroupedShoppingListResponse;
 import fit.kltn_cookinote_backend.dtos.response.ShoppingListResponse;
 
 import java.util.List;
@@ -30,4 +31,13 @@ public interface ShoppingListService {
 
     // Chuyển 1 item (ingredient) từ list này sang list khác (có thể là null)
     ShoppingListResponse moveItem(Long userId, Long itemId, Long targetRecipeIdOrNull);
+
+    /**
+     * Lấy toàn bộ danh sách mua sắm của người dùng,
+     * gom nhóm theo công thức (recipe).
+     *
+     * @param userId ID của người dùng.
+     * @return Danh sách đã được gom nhóm.
+     */
+    List<GroupedShoppingListResponse> getAllGroupedByRecipe(Long userId);
 }

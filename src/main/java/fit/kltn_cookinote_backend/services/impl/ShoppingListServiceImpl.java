@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.response.GroupedShoppingListResponse;
 import fit.kltn_cookinote_backend.dtos.response.ShoppingListResponse;
 import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.entities.RecipeIngredient;
@@ -297,5 +298,67 @@ public class ShoppingListServiceImpl implements ShoppingListService {
             current.setRecipe(targetRecipe);
             return toResponse(current, targetRecipeIdOrNull);
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<GroupedShoppingListResponse> getAllGroupedByRecipe(Long userId) {
+        List<ShoppingList> allItems = shoppingListRepository.findByUser_UserIdOrderByIdDesc(userId);
+
+        Map<String, List<ShoppingList>> grouped = new LinkedHashMap<>();
+
+        // Gom nhóm thông minh hơn
+        for (ShoppingList item : allItems) {
+            String key;
+            if (item.getRecipe() != null) {
+                key = "recipe-" + item.getRecipe().getId();
+            } else if (item.getOriginalRecipeTitle() != null) {
+                // Nhóm các item của cùng một recipe đã bị xóa dựa trên tên gốc
+                key = "deleted-" + item.getOriginalRecipeTitle();
+            } else {
+                key = "standalone"; // Các item không thuộc recipe nào
+            }
+            grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(item);
+        }
+
+        List<GroupedShoppingListResponse> result = new ArrayList<>();
+        grouped.forEach((key, items) -> {
+            ShoppingList firstItem = items.get(0);
+            Recipe recipe = firstItem.getRecipe();
+
+            String title;
+            String imageUrl = null;
+            Long recipeId = null;
+
+            if (recipe != null) {
+                recipeId = recipe.getId();
+                title = Boolean.TRUE.equals(firstItem.getIsRecipeDeleted())
+                        ? "[ĐÃ XÓA] " + recipe.getTitle()
+                        : recipe.getTitle();
+                imageUrl = recipe.getImageUrl();
+            } else if (firstItem.getOriginalRecipeTitle() != null) {
+                title = "[ĐÃ XÓA] " + firstItem.getOriginalRecipeTitle();
+            } else {
+                title = "Khác";
+            }
+
+            List<GroupedShoppingListResponse.ShoppingListItem> itemDtos = items.stream()
+                    .map(item -> GroupedShoppingListResponse.ShoppingListItem.builder()
+                            .id(item.getId())
+                            .ingredient(item.getIngredient())
+                            .quantity(item.getQuantity())
+                            .checked(item.getChecked())
+                            .build())
+                    .collect(Collectors.toList());
+
+            result.add(GroupedShoppingListResponse.builder()
+                    .recipeId(recipeId)
+                    .recipeTitle(title)
+                    .recipeImageUrl(imageUrl)
+                    .items(itemDtos)
+                    .build());
+        });
+
+        return result;
     }
 }

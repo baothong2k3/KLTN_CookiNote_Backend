@@ -9,9 +9,11 @@ package fit.kltn_cookinote_backend.services;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.request.ForkRecipeRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.*;
+import fit.kltn_cookinote_backend.entities.User;
 
 import java.util.List;
 
@@ -24,6 +26,8 @@ public interface RecipeService {
 
     PageResult<RecipeCardResponse> listPublic(int page, int size);
 
+    PageResult<RecipeCardResponse> listPopular(int page, int size);
+
     PageResult<RecipeCardResponse> listByOwner(Long ownerUserId, Long viewerUserIdOrNull, int page, int size);
 
     List<RecipeStepItem> getSteps(Long viewerUserIdOrNull, Long recipeId);
@@ -31,4 +35,30 @@ public interface RecipeService {
     List<RecipeIngredientItem> getIngredients(Long viewerUserIdOrNull, Long recipeId);
 
     RecipeResponse updateContent(Long actorUserId, Long recipeId, RecipeUpdateRequest req);
+
+    void deleteRecipe(Long actorUserId, Long recipeId);
+
+    PageResult<RecipeCardResponse> listDeletedRecipes(User actor, Long filterUserId, int page, int size);
+
+    /**
+     * Xóa vĩnh viễn một công thức đã bị soft-delete.
+     *
+     * @param actorUserId ID của người thực hiện.
+     * @param recipeId    ID của công thức cần xóa.
+     */
+    void hardDeleteRecipe(Long actorUserId, Long recipeId);
+
+    /**
+     * Tạo một bản sao (fork) của công thức đã có để người dùng hiện tại tùy chỉnh và sở hữu.
+     *
+     * @param clonerUserId     ID của người dùng thực hiện sao chép.
+     * @param originalRecipeId ID của công thức gốc.
+     * @param req              Dữ liệu tùy chỉnh cho công thức mới.
+     * @return Công thức mới đã được tạo.
+     */
+    RecipeResponse forkRecipe(Long clonerUserId, Long originalRecipeId, ForkRecipeRequest req);
+
+    PageResult<RecipeCardResponse> searchPublicRecipes(String query, int page, int size);
+
+    PageResult<RecipeCardResponse> listEasyToCook(int page, int size);
 }

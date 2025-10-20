@@ -11,7 +11,12 @@ package fit.kltn_cookinote_backend.services;/*
 
 import fit.kltn_cookinote_backend.dtos.UserDto;
 import fit.kltn_cookinote_backend.dtos.request.UpdateDisplayNameRequest;
+import fit.kltn_cookinote_backend.dtos.request.UserDetailDto;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public interface UserService {
@@ -20,4 +25,8 @@ public interface UserService {
     void changePassword(Long userId, String currentPassword, String newPassword);
 
     boolean checkPassword(Long userId, String currentPassword);
+
+    Page<UserDto> getAllUsers(Pageable pageable);
+
+    UserDetailDto getUserDetails(Long userId);
 }

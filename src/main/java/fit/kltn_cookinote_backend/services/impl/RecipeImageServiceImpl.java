@@ -10,12 +10,11 @@ package fit.kltn_cookinote_backend.services.impl;/*
  */
 
 import com.cloudinary.Cloudinary;
+import fit.kltn_cookinote_backend.dtos.response.AllRecipeImagesResponse;
 import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
-import fit.kltn_cookinote_backend.entities.Recipe;
-import fit.kltn_cookinote_backend.entities.RecipeCoverImageHistory;
-import fit.kltn_cookinote_backend.entities.RecipeStep;
-import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Role;
+import fit.kltn_cookinote_backend.repositories.RecipeCoverImageHistoryRepository;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.repositories.RecipeStepRepository;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
@@ -33,6 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +41,7 @@ public class RecipeImageServiceImpl implements RecipeImageService {
     private final RecipeRepository recipeRepository;
     private final RecipeStepRepository stepRepository;
     private final UserRepository userRepository;
+    private final RecipeCoverImageHistoryRepository recipeCoverImageHistoryRepository;
 
     @Value("${app.cloudinary.recipe-folder}")
     private String recipeFolder;
@@ -61,8 +62,12 @@ public class RecipeImageServiceImpl implements RecipeImageService {
                 .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
 
         Recipe recipe = recipeRepository.findById(recipeId)
-                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+                .orElseThrow(() -> new EntityNotFoundException("Công thức không tồn tại: " + recipeId));
 
+        // ***KIỂM TRA TRẠNG THÁI DELETED * * *
+        if (recipe.isDeleted()) {
+            throw new EntityNotFoundException("Công thức không tồn tại hoặc đã bị xóa: " + recipeId);
+        }
         // Consolidated ownership check
         if (actor.getRole() != Role.ADMIN && !Objects.equals(actor.getUserId(), recipe.getUser().getUserId())) {
             throw new AccessDeniedException("Chỉ chủ sở hữu hoặc ADMIN mới được chỉnh sửa.");
@@ -104,6 +109,11 @@ public class RecipeImageServiceImpl implements RecipeImageService {
         RecipeStep step = stepRepository.findById(stepId)
                 .orElseThrow(() -> new EntityNotFoundException("Step không tồn tại: " + stepId));
 
+        // *** KIỂM TRA RECIPE CỦA STEP ***
+        if (step.getRecipe().isDeleted()) {
+            throw new EntityNotFoundException("Công thức của bước này đã bị xóa.");
+        }
+
         if (!Objects.equals(step.getRecipe().getId(), recipeId)) {
             throw new IllegalArgumentException("Step không thuộc về Recipe này.");
         }
@@ -124,5 +134,27 @@ public class RecipeImageServiceImpl implements RecipeImageService {
         }
 
         return urls;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AllRecipeImagesResponse getAllRecipeImages(Long actorUserId, Long recipeId) {
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Công thức không tồn tại: " + recipeId));
+
+        if (actor.getRole() != Role.ADMIN && !Objects.equals(actor.getUserId(), recipe.getUser().getUserId())) {
+            throw new AccessDeniedException("Chỉ chủ sở hữu hoặc ADMIN mới có quyền xem lịch sử ảnh.");
+        }
+
+        List<RecipeCoverImageHistory> coverHistories = recipeCoverImageHistoryRepository.findByRecipe_Id(recipeId);
+
+        List<RecipeStepImage> stepImages = recipe.getSteps().stream()
+                .flatMap(step -> step.getImages().stream())
+                .collect(Collectors.toList());
+
+        return AllRecipeImagesResponse.from(coverHistories, stepImages);
     }
 }
