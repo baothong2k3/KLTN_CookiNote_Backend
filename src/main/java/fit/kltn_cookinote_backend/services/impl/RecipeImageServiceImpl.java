@@ -64,7 +64,7 @@ public class RecipeImageServiceImpl implements RecipeImageService {
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Công thức không tồn tại: " + recipeId));
 
-        // ***KIỂM TRA TRẠNG THÁI DELETED * * *
+        // KIỂM TRA TRẠNG THÁI DELETED
         if (recipe.isDeleted()) {
             throw new EntityNotFoundException("Công thức không tồn tại hoặc đã bị xóa: " + recipeId);
         }
@@ -75,6 +75,8 @@ public class RecipeImageServiceImpl implements RecipeImageService {
 
         String publicId = recipeFolder + "/r_" + recipeId + "/cover_" + Instant.now().getEpochSecond();
         String newUrl = CloudinaryUtils.uploadImage(cloudinary, file, recipeFolder, publicId);
+
+        recipeCoverImageHistoryRepository.deactivateAllByRecipeId(recipe.getId());
 
         recipe.setImageUrl(newUrl);
 
