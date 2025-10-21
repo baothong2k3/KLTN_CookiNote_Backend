@@ -10,6 +10,7 @@ package fit.kltn_cookinote_backend.services;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.response.GroupedShoppingListResponse;
+import fit.kltn_cookinote_backend.dtos.response.RecipeSuggestionResponse;
 import fit.kltn_cookinote_backend.dtos.response.ShoppingListResponse;
 
 import java.util.List;
@@ -40,4 +41,6 @@ public interface ShoppingListService {
      * @return Danh sách đã được gom nhóm.
      */
     List<GroupedShoppingListResponse> getAllGroupedByRecipe(Long userId);
+
+    List<RecipeSuggestionResponse> suggestRecipes(Long userId, List<String> ingredientNames);
 }

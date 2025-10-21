@@ -12,8 +12,10 @@ package fit.kltn_cookinote_backend.controllers;/*
 import fit.kltn_cookinote_backend.dtos.request.ShoppingListMoveRequest;
 import fit.kltn_cookinote_backend.dtos.request.ShoppingListUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.request.ShoppingListUpsertRequest;
+import fit.kltn_cookinote_backend.dtos.request.SuggestRecipesRequest;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
 import fit.kltn_cookinote_backend.dtos.response.GroupedShoppingListResponse;
+import fit.kltn_cookinote_backend.dtos.response.RecipeSuggestionResponse;
 import fit.kltn_cookinote_backend.dtos.response.ShoppingListResponse;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.services.ShoppingListService;
@@ -136,5 +138,31 @@ public class ShoppingListController {
     ) {
         List<GroupedShoppingListResponse> data = shoppingListService.getAllGroupedByRecipe(authUser.getUserId());
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách mua sắm thành công", data, req.getRequestURI()));
+    }
+
+    /**
+     * Gợi ý công thức dựa trên danh sách nguyên liệu từ shopping list.
+     */
+    @PostMapping("/suggest-recipes")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<RecipeSuggestionResponse>>> suggestRecipes(
+            @AuthenticationPrincipal User authUser,
+            @Valid @RequestBody SuggestRecipesRequest req,
+            HttpServletRequest httpReq
+    ) {
+        if (req.ingredientNames() == null || req.ingredientNames().isEmpty()) {
+            throw new IllegalArgumentException("Danh sách nguyên liệu không được để trống.");
+        }
+
+        List<RecipeSuggestionResponse> suggestions = shoppingListService.suggestRecipes(
+                authUser.getUserId(),
+                req.ingredientNames()
+        );
+
+        return ResponseEntity.ok(ApiResponse.success(
+                "Gợi ý công thức thành công",
+                suggestions,
+                httpReq.getRequestURI()
+        ));
     }
 }

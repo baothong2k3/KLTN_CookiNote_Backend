@@ -83,4 +83,27 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
     @Query(value = "SELECT r FROM Recipe r LEFT JOIN r.ingredients i WHERE r.deleted = false AND r.privacy = 'PUBLIC' GROUP BY r.id ORDER BY r.difficulty ASC, COUNT(i.id) ASC, r.prepareTime ASC, r.cookTime ASC",
             countQuery = "SELECT count(r) FROM Recipe r WHERE r.deleted = false and r.privacy = 'PUBLIC'")
     Page<Recipe> findEasyToCook(Pageable pageable);
+
+    /**
+     * Tìm các công thức công khai (PUBLIC) chứa ít nhất một trong các nguyên liệu
+     * được cung cấp, sắp xếp theo số lượng nguyên liệu khớp nhiều nhất.
+     *
+     * @param ingredientNames Danh sách tên nguyên liệu (từ shopping list).
+     * @param pageable        Giới hạn số lượng trả về (ví dụ: PageRequest.of(0, 20)).
+     * @return Một trang các Recipe ứng viên.
+     */
+    @Query(value = """
+                SELECT r
+                FROM Recipe r
+                JOIN r.ingredients i
+                WHERE r.deleted = false
+                  AND r.privacy = 'PUBLIC'
+                  AND i.name IN :ingredientNames
+                GROUP BY r.id
+                ORDER BY COUNT(DISTINCT i.id) DESC
+            """)
+    Page<Recipe> findCandidateRecipesByIngredients(
+            @Param("ingredientNames") List<String> ingredientNames,
+            Pageable pageable
+    );
 }

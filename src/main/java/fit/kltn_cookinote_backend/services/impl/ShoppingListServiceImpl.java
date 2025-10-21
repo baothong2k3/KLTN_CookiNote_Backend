@@ -9,8 +9,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
  * @version: 1.0
  */
 
-import fit.kltn_cookinote_backend.dtos.response.GroupedShoppingListResponse;
-import fit.kltn_cookinote_backend.dtos.response.ShoppingListResponse;
+import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.entities.RecipeIngredient;
 import fit.kltn_cookinote_backend.entities.ShoppingList;
@@ -20,9 +19,13 @@ import fit.kltn_cookinote_backend.repositories.RecipeIngredientRepository;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.repositories.ShoppingListRepository;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
+import fit.kltn_cookinote_backend.services.GeminiApiClient;
 import fit.kltn_cookinote_backend.services.ShoppingListService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +43,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
     private final RecipeRepository recipeRepository;
     private final RecipeIngredientRepository ingredientRepository;
     private final ShoppingListRepository shoppingListRepository;
+    private final GeminiApiClient geminiApiClient;
 
     @Override
     @Transactional
@@ -360,5 +364,48 @@ public class ShoppingListServiceImpl implements ShoppingListService {
         });
 
         return result;
+    }
+
+    @Override
+    public List<RecipeSuggestionResponse> suggestRecipes(Long userId, List<String> ingredientNames) {
+
+        // ----- BƯỚC 1: LỌC ỨNG VIÊN -----
+        Pageable candidatesPageable = PageRequest.of(0, 20); // Lấy top 20 ứng viên
+        Page<Recipe> candidates = recipeRepository.findCandidateRecipesByIngredients(ingredientNames, candidatesPageable);
+
+        if (candidates.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // ----- BƯỚC 2: CHẤM ĐIỂM (Dùng parallel stream để tăng tốc) -----
+        List<RecipeSuggestionResponse> scoredSuggestions = candidates.getContent().parallelStream()
+                .map(recipe -> {
+                    // Gọi AI cho từng công thức
+                    AiScoreResponse score = geminiApiClient.getSuggestionScore(ingredientNames, recipe);
+
+                    // Chuyển Recipe thành RecipeCardResponse
+                    RecipeCardResponse card = RecipeCardResponse.from(recipe);
+
+                    return new RecipeSuggestionResponse(
+                            card,
+                            score.getMainIngredientMatchScore(),
+                            score.getOverallMatchScore(),
+                            score.getJustification()
+                    );
+                })
+                .toList();
+
+        // ----- BƯỚC 3: SẮP XẾP -----
+        List<RecipeSuggestionResponse> sortedList = new ArrayList<>(scoredSuggestions);
+
+        // Sắp xếp trên List mới
+        sortedList.sort(
+                Comparator.comparing(RecipeSuggestionResponse::mainIngredientMatchScore)
+                        .thenComparing(RecipeSuggestionResponse::overallMatchScore)
+                        .reversed() // Sắp xếp giảm dần
+        );
+
+        // Trả về List đã được sắp xếp
+        return sortedList;
     }
 }
