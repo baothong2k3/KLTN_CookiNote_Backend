@@ -27,9 +27,6 @@ public record RecipeCreateRequest(
 
         Privacy privacy,
 
-        @Size(max = 2048)
-        String imageUrl,
-
         @NotEmpty(message = "Danh sách nguyên liệu không được rỗng")
         @Valid
         List<RecipeIngredientCreate> ingredients,
