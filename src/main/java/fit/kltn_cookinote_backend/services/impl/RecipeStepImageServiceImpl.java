@@ -34,6 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 
 @Service
@@ -123,6 +125,10 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
     public RecipeResponse updateStep(Long actorUserId, Long recipeId, Long stepId, RecipeStepUpdateRequest req) throws IOException {
         // 0) Load & kiểm quyền
         RecipeStep step = loadAndCheckStep(actorUserId, recipeId, stepId);
+
+        Recipe recipe = step.getRecipe();
+        recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+        recipeRepository.save(recipe);
 
         // 1) Cập nhật nội dung, thời gian và tips
         if (req.content() != null) {
