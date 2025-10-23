@@ -455,4 +455,100 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                 paginatedList
         );
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ShoppingListSyncCheckResponse checkRecipeUpdates(Long userId, Long recipeId) {
+        // 1. Tải dữ liệu cần thiết
+        User user = userRepository.findById(userId) // Tải user để kiểm tra tồn tại (không cần thiết nếu đã xác thực)
+                .orElseThrow(() -> new EntityNotFoundException("User không tồn tại: " + userId));
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        // Quyền xem
+        if (recipe.getPrivacy() == Privacy.PRIVATE && !Objects.equals(recipe.getUser().getUserId(), userId)) {
+            throw new AccessDeniedException("Bạn không có quyền xem recipe PRIVATE này.");
+        }
+
+        // Danh sách mua sắm hiện tại của user cho recipe này
+        List<ShoppingList> currentShoppingList = shoppingListRepository.findByUser_UserIdAndRecipe_Id(userId, recipeId);
+        // Map theo key chuẩn hóa để tra cứu nhanh
+        Map<String, ShoppingList> shoppingMap = currentShoppingList.stream()
+                .filter(it -> it.getIngredient() != null)
+                .collect(Collectors.toMap(
+                        it -> normalize(it.getIngredient()),
+                        Function.identity(),
+                        (a, b) -> a // Giữ lại cái đầu tiên nếu có trùng key (hiếm khi xảy ra)
+                ));
+
+        // Nguyên liệu mới nhất từ công thức
+        List<RecipeIngredient> recipeIngredients = ingredientRepository.findByRecipe_IdOrderByIdAsc(recipeId);
+        // Map theo key chuẩn hóa
+        Map<String, RecipeIngredient> recipeMap = recipeIngredients.stream()
+                .filter(it -> it.getName() != null && !normalize(it.getName()).isEmpty())
+                .collect(Collectors.toMap(
+                        it -> normalize(it.getName()),
+                        Function.identity(),
+                        (a, b) -> a
+                ));
+
+        // 2. Thực hiện so sánh
+        List<ShoppingListSyncCheckResponse.SyncItem> addedItems = new ArrayList<>();
+        List<ShoppingListSyncCheckResponse.SyncItem> removedItems = new ArrayList<>();
+        List<ShoppingListSyncCheckResponse.UpdatedSyncItem> updatedItems = new ArrayList<>();
+        List<ShoppingListSyncCheckResponse.SyncItem> manualItemsNotInRecipe = new ArrayList<>();
+
+        // 2a. Duyệt qua nguyên liệu công thức -> Tìm mục mới (added) và mục cập nhật (updated)
+        for (RecipeIngredient ri : recipeIngredients) {
+            String key = normalize(ri.getName());
+            ShoppingList existingShoppingItem = shoppingMap.get(key);
+
+            if (existingShoppingItem == null) {
+                // Không có trong shopping list -> Thêm mới
+                addedItems.add(ShoppingListSyncCheckResponse.SyncItem.builder()
+                        .ingredient(canonicalize(ri.getName()))
+                        .quantity(ri.getQuantity())
+                        .build());
+            } else {
+                // Có trong shopping list -> Kiểm tra quantity
+                if (!Objects.equals(safe(ri.getQuantity()), safe(existingShoppingItem.getQuantity()))) {
+                    updatedItems.add(ShoppingListSyncCheckResponse.UpdatedSyncItem.builder()
+                            .shoppingListId(existingShoppingItem.getId())
+                            .ingredient(canonicalize(ri.getName()))
+                            .oldQuantity(existingShoppingItem.getQuantity())
+                            .newQuantity(ri.getQuantity())
+                            .build());
+                }
+                // Đánh dấu đã xử lý
+                shoppingMap.remove(key);
+            }
+        }
+
+        // 2b. Duyệt qua các mục còn lại trong shoppingMap -> Tìm mục bị xóa (removed) và mục tự thêm (manual)
+        for (ShoppingList remainingShoppingItem : shoppingMap.values()) {
+            if (Boolean.TRUE.equals(remainingShoppingItem.getIsFromRecipe())) {
+                // Mục này từ công thức nhưng không có trong recipeMap nữa -> Bị xóa (removed)
+                removedItems.add(ShoppingListSyncCheckResponse.SyncItem.builder()
+                        .shoppingListId(remainingShoppingItem.getId())
+                        .ingredient(remainingShoppingItem.getIngredient()) // Đã chuẩn hóa
+                        .quantity(remainingShoppingItem.getQuantity())
+                        .build());
+            } else {
+                // Mục này do người dùng tự thêm (isFromRecipe=false) và không có trong recipeMap
+                manualItemsNotInRecipe.add(ShoppingListSyncCheckResponse.SyncItem.builder()
+                        .shoppingListId(remainingShoppingItem.getId())
+                        .ingredient(remainingShoppingItem.getIngredient())
+                        .quantity(remainingShoppingItem.getQuantity())
+                        .build());
+            }
+        }
+
+        // 3. Xây dựng và trả về kết quả
+        return ShoppingListSyncCheckResponse.builder()
+                .addedItems(addedItems)
+                .removedItems(removedItems)
+                .updatedItems(updatedItems)
+                .manualItemsNotInRecipe(manualItemsNotInRecipe)
+                .build();
+    }
 }

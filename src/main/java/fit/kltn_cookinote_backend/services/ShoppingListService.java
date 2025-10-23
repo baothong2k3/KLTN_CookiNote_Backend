@@ -9,10 +9,7 @@ package fit.kltn_cookinote_backend.services;/*
  * @version: 1.0
  */
 
-import fit.kltn_cookinote_backend.dtos.response.GroupedShoppingListResponse;
-import fit.kltn_cookinote_backend.dtos.response.PageResult;
-import fit.kltn_cookinote_backend.dtos.response.RecipeSuggestionResponse;
-import fit.kltn_cookinote_backend.dtos.response.ShoppingListResponse;
+import fit.kltn_cookinote_backend.dtos.response.*;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
@@ -45,4 +42,14 @@ public interface ShoppingListService {
     List<GroupedShoppingListResponse> getAllGroupedByRecipe(Long userId);
 
     PageResult<RecipeSuggestionResponse> suggestRecipes(Long userId, List<String> ingredientNames, Pageable pageable);
+
+    /**
+     * So sánh ShoppingList hiện tại của user với Recipe gốc và trả về sự khác biệt.
+     * Không thực hiện thay đổi dữ liệu.
+     *
+     * @param userId   ID người dùng.
+     * @param recipeId ID công thức.
+     * @return Đối tượng chứa thông tin các mục thêm, xóa, cập nhật.
+     */
+    ShoppingListSyncCheckResponse checkRecipeUpdates(Long userId, Long recipeId);
 }

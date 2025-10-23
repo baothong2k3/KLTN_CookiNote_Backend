@@ -171,4 +171,20 @@ public class ShoppingListController {
                 httpReq.getRequestURI()
         ));
     }
+
+    /**
+     * Kiểm tra sự khác biệt giữa ShoppingList hiện tại và Recipe gốc.
+     * Không thay đổi dữ liệu.
+     */
+    @GetMapping("/recipes/{recipeId}/check-updates")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ShoppingListSyncCheckResponse>> checkRecipeUpdates(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest req
+    ) {
+        ShoppingListSyncCheckResponse data = shoppingListService.checkRecipeUpdates(authUser.getUserId(), recipeId);
+        String message = data.hasChanges() ? "Phát hiện thay đổi giữa danh sách mua sắm và công thức." : "Danh sách mua sắm đã khớp với công thức.";
+        return ResponseEntity.ok(ApiResponse.success(message, data, req.getRequestURI()));
+    }
 }
