@@ -18,9 +18,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration
 public class ApiClientConfig {
-
-    @Value("${gemini.api.url}")
-    private String geminiApiUrl;
+    @Value("${gemini.api.baseurl}")
+    private String geminiApiBaseUrl;
 
     /**
      * Tạo một Bean WebClient với tên "geminiWebClient".
@@ -28,11 +27,8 @@ public class ApiClientConfig {
      */
     @Bean("geminiWebClient")
     public WebClient geminiWebClient() {
-        // Lấy URL cơ sở (ví dụ: https://generativelanguage.googleapis.com)
-        String baseUrl = geminiApiUrl.substring(0, geminiApiUrl.indexOf("/v1beta"));
-
         return WebClient.builder()
-                .baseUrl(baseUrl)
+                .baseUrl(geminiApiBaseUrl)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
                 .build();

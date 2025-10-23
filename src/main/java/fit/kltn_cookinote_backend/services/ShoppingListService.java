@@ -10,8 +10,10 @@ package fit.kltn_cookinote_backend.services;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.response.GroupedShoppingListResponse;
+import fit.kltn_cookinote_backend.dtos.response.PageResult;
 import fit.kltn_cookinote_backend.dtos.response.RecipeSuggestionResponse;
 import fit.kltn_cookinote_backend.dtos.response.ShoppingListResponse;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -42,5 +44,5 @@ public interface ShoppingListService {
      */
     List<GroupedShoppingListResponse> getAllGroupedByRecipe(Long userId);
 
-    List<RecipeSuggestionResponse> suggestRecipes(Long userId, List<String> ingredientNames);
+    PageResult<RecipeSuggestionResponse> suggestRecipes(Long userId, List<String> ingredientNames, Pageable pageable);
 }

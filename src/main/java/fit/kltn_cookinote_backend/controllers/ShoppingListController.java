@@ -13,15 +13,14 @@ import fit.kltn_cookinote_backend.dtos.request.ShoppingListMoveRequest;
 import fit.kltn_cookinote_backend.dtos.request.ShoppingListUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.request.ShoppingListUpsertRequest;
 import fit.kltn_cookinote_backend.dtos.request.SuggestRecipesRequest;
-import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
-import fit.kltn_cookinote_backend.dtos.response.GroupedShoppingListResponse;
-import fit.kltn_cookinote_backend.dtos.response.RecipeSuggestionResponse;
-import fit.kltn_cookinote_backend.dtos.response.ShoppingListResponse;
+import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.services.ShoppingListService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -145,18 +144,25 @@ public class ShoppingListController {
      */
     @PostMapping("/suggest-recipes")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<List<RecipeSuggestionResponse>>> suggestRecipes(
+    public ResponseEntity<ApiResponse<PageResult<RecipeSuggestionResponse>>> suggestRecipes(
             @AuthenticationPrincipal User authUser,
             @Valid @RequestBody SuggestRecipesRequest req,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size,
             HttpServletRequest httpReq
     ) {
         if (req.ingredientNames() == null || req.ingredientNames().isEmpty()) {
             throw new IllegalArgumentException("Danh sách nguyên liệu không được để trống.");
         }
 
-        List<RecipeSuggestionResponse> suggestions = shoppingListService.suggestRecipes(
+        // Tạo đối tượng Pageable
+        Pageable pageable = PageRequest.of(page, size);
+
+        // Gọi service với Pageable
+        PageResult<RecipeSuggestionResponse> suggestions = shoppingListService.suggestRecipes(
                 authUser.getUserId(),
-                req.ingredientNames()
+                req.ingredientNames(),
+                pageable
         );
 
         return ResponseEntity.ok(ApiResponse.success(

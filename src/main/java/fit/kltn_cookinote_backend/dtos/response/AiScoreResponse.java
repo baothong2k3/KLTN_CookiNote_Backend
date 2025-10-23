@@ -17,6 +17,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class AiScoreResponse {
+    private Long id;
     private double mainIngredientMatchScore;
     private double overallMatchScore;
     private String justification;
