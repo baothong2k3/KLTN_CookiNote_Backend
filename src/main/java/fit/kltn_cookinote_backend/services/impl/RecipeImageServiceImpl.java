@@ -31,6 +31,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -79,6 +81,8 @@ public class RecipeImageServiceImpl implements RecipeImageService {
         recipeCoverImageHistoryRepository.deactivateAllByRecipeId(recipe.getId());
 
         recipe.setImageUrl(newUrl);
+
+        recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
 
         RecipeCoverImageHistory historyRecord = RecipeCoverImageHistory.builder()
                 .recipe(recipe)
