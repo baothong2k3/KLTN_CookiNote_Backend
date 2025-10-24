@@ -51,6 +51,25 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
     @PersistenceContext
     private EntityManager em;
 
+    // (Helper mới để kiểm tra quyền sở hữu Recipe)
+    private Recipe loadAndCheckRecipe(Long actorUserId, Long recipeId) {
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        if (recipe.isDeleted()) {
+            throw new EntityNotFoundException("Không thể chỉnh sửa công thức đã bị xóa: " + recipeId);
+        }
+
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Long ownerId = recipe.getUser().getUserId();
+        // Chỉ chủ sở hữu (hoặc admin) mới được thêm
+        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        return recipe;
+    }
+
     private void ensureOwnerOrAdmin(Long actorId, Long ownerId, Role actorRole) {
         if (actorRole == Role.ADMIN) return;
         if (!actorId.equals(ownerId)) throw new AccessDeniedException("Chỉ chủ sở hữu hoặc ADMIN mới được chỉnh sửa.");
@@ -217,6 +236,66 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         em.clear();
 
         // 4) Tải lại và trả về
+        Recipe reloaded = recipeRepository.findDetailById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+        return RecipeResponse.from(reloaded);
+    }
+
+    @Override
+    @Transactional
+    public RecipeResponse addStep(Long actorUserId, Long recipeId, String content, Integer suggestedTime, String tips, List<MultipartFile> addFiles) throws IOException {
+        // 1) Tải công thức và kiểm tra quyền
+        Recipe recipe = loadAndCheckRecipe(actorUserId, recipeId);
+
+        // 2) Cập nhật thời gian cho Recipe
+        recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+
+        // 3) Tính stepNo tiếp theo (thêm vào cuối)
+        int newStepNo = recipe.getSteps().stream()
+                .mapToInt(RecipeStep::getStepNo)
+                .max()
+                .orElse(0) + 1;
+
+        // 4) Tạo và lưu Step mới để lấy ID
+        RecipeStep newStep = RecipeStep.builder()
+                .recipe(recipe)
+                .stepNo(newStepNo)
+                .content(content)
+                .suggestedTime(suggestedTime)
+                .tips(tips)
+                .images(new ArrayList<>()) // Khởi tạo list
+                .build();
+        stepRepository.saveAndFlush(newStep); // Lưu ngay để lấy ID
+
+        // 5) Xử lý ảnh nếu có
+        if (addFiles != null && !addFiles.isEmpty()) {
+            // 5.1) Validate
+            for (MultipartFile f : addFiles) ImageValidationUtils.validateImage(f);
+            if (addFiles.size() > 5) {
+                throw new IllegalArgumentException("Mỗi step tối đa 5 ảnh (bạn đang thêm " + addFiles.size() + ").");
+            }
+
+            // 5.2) Upload
+            List<String> newUrls = recipeImageService.uploadStepImages(recipeId, newStep.getId(), addFiles);
+
+            // 5.3) Lưu ảnh vào DB và liên kết với Step
+            if (!newUrls.isEmpty()) {
+                List<RecipeStepImage> toSave = new ArrayList<>();
+                for (String url : newUrls) {
+                    toSave.add(RecipeStepImage.builder().step(newStep).imageUrl(url).build());
+                }
+                stepImageRepository.saveAll(toSave);
+                newStep.getImages().addAll(toSave);
+            }
+        }
+
+        // 6) Thêm bước mới vào danh sách của recipe (để response trả về)
+        recipe.getSteps().add(newStep);
+        recipeRepository.save(recipe); // Lưu recipe (để cập nhật updatedAt)
+
+        em.flush();
+
+        // 7) Tải lại toàn bộ và trả về
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
         return RecipeResponse.from(reloaded);

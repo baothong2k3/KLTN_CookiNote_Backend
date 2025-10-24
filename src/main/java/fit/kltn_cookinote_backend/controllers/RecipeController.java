@@ -368,4 +368,26 @@ public class RecipeController {
         PageResult<RecipeCardResponse> data = recipeService.listEasyToCook(page, size);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức dễ nấu thành công", data, httpReq.getRequestURI()));
     }
+
+    /**
+     * Thêm một bước mới vào cuối công thức (chỉ chủ sở hữu hoặc ADMIN).
+     * POST /recipes/{recipeId}/steps
+     */
+    @PostMapping(value = "/{recipeId}/steps", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<RecipeResponse>> addStep(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @RequestParam(value = "content") String content, // Nội dung là bắt buộc
+            @RequestParam(value = "suggestedTime", required = false) Integer suggestedTime,
+            @RequestParam(value = "tips", required = false) String tips,
+            @RequestPart(value = "addFiles", required = false) List<MultipartFile> addFiles,
+            HttpServletRequest httpReq
+    ) throws IOException {
+
+        RecipeResponse data = stepImageService.addStep(
+                authUser.getUserId(), recipeId, content, suggestedTime, tips, addFiles
+        );
+        return ResponseEntity.ok(ApiResponse.success("Thêm bước mới thành công", data, httpReq.getRequestURI()));
+    }
 }
