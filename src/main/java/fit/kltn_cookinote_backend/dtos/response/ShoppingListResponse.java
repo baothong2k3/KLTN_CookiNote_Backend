@@ -8,6 +8,7 @@ public record ShoppingListResponse(
         Long recipeId,
         String ingredient,
         String quantity,
-        Boolean checked
+        Boolean checked,
+        Boolean isFromRecipe
 ) {
 }

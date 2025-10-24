@@ -115,7 +115,7 @@ public class ShoppingListController {
     public ResponseEntity<ApiResponse<ShoppingListResponse>> moveItem(
             @AuthenticationPrincipal User authUser,
             @PathVariable Long itemId,
-            @RequestBody ShoppingListMoveRequest req,
+            @RequestBody(required = false) ShoppingListMoveRequest req,
             HttpServletRequest http
     ) {
         ShoppingListResponse data = shoppingListService.moveItem(

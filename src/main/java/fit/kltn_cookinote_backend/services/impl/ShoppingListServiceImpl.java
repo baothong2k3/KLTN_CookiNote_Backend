@@ -21,6 +21,7 @@ import fit.kltn_cookinote_backend.repositories.ShoppingListRepository;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.GeminiApiClient;
 import fit.kltn_cookinote_backend.services.ShoppingListService;
+import fit.kltn_cookinote_backend.utils.ShoppingListUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -49,6 +50,21 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
     private static final int CANDIDATE_POOL_SIZE = 5;
 
+    /**
+     * Helper method to get existing shopping list items for a user and recipe,
+     * mapped by normalized ingredient name.
+     */
+    private Map<String, ShoppingList> getExistingShoppingListMap(Long userId, Long recipeId) {
+        List<ShoppingList> existing = shoppingListRepository.findByUser_UserIdAndRecipe_Id(userId, recipeId);
+        return existing.stream()
+                .filter(it -> it.getIngredient() != null)
+                .collect(Collectors.toMap(
+                        it -> normalize(it.getIngredient()),
+                        Function.identity(),
+                        (a, b) -> a
+                ));
+    }
+
     @Override
     @Transactional
     public List<ShoppingListResponse> createFromRecipe(Long userId, Long recipeId) {
@@ -62,24 +78,15 @@ public class ShoppingListServiceImpl implements ShoppingListService {
         if (recipe.getPrivacy() == Privacy.PRIVATE && !Objects.equals(recipe.getUser().getUserId(), userId)) {
             throw new AccessDeniedException("Bạn không có quyền sử dụng recipe PRIVATE này.");
         }
-
-
-        // Lấy danh sách ShoppingList hiện có (KHÔNG xoá)
-        List<ShoppingList> existing = shoppingListRepository.findByUser_UserIdAndRecipe_Id(userId, recipeId);
-        Map<String, ShoppingList> existByKey = existing.stream()
-                .filter(it -> it.getIngredient() != null)
-                .collect(Collectors.toMap(
-                        it -> normalize(it.getIngredient()),
-                        it -> it,
-                        (a, b) -> a
-                ));
+        // Lấy các mục shopping list hiện có của user cho recipe này, map theo key chuẩn hóa
+        Map<String, ShoppingList> existByKey = getExistingShoppingListMap(userId, recipeId);
 
         // Lấy toàn bộ RecipeIngredient
         List<RecipeIngredient> ingredients = ingredientRepository.findByRecipe_IdOrderByIdAsc(recipeId);
 
         List<ShoppingList> toCreate = new ArrayList<>();
+
         for (RecipeIngredient ri : ingredients) {
-            // DÙNG TRỰC TIẾP getter
             String name = ri.getName();
             if (name == null || normalize(name).isEmpty()) continue;
 
@@ -88,25 +95,37 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
             ShoppingList exist = existByKey.get(key);
             if (exist != null) {
-                // Giữ checked cũ, chỉ cập nhật quantity nếu khác
                 if (!Objects.equals(safe(qty), safe(exist.getQuantity()))) {
-                    exist.setQuantity(qty); // dirty checking sẽ tự flush
+                    exist.setQuantity(qty);
                 }
+                if (!Boolean.TRUE.equals(exist.getIsFromRecipe())) {
+                    exist.setIsFromRecipe(Boolean.TRUE);
+                }
+                existByKey.remove(key);
             } else {
-                // Thêm mới, checked=false
                 toCreate.add(ShoppingList.builder()
                         .user(user)
                         .recipe(recipe)
                         .ingredient(canonicalize(name))
                         .quantity(qty)
                         .checked(Boolean.FALSE)
+                        .isFromRecipe(Boolean.TRUE)
                         .build());
             }
         }
 
-        if (!toCreate.isEmpty()) shoppingListRepository.saveAll(toCreate);
+        // Lưu các mục mới
+        if (!toCreate.isEmpty()) {
+            shoppingListRepository.saveAll(toCreate);
+        }
 
-        // Trả về toàn bộ list sau merge (bao gồm cả các mục tự thêm từ trước)
+        for (ShoppingList remainingItem : existByKey.values()) {
+            if (Boolean.TRUE.equals(remainingItem.getIsFromRecipe())) {
+                remainingItem.setIsFromRecipe(Boolean.FALSE);
+            }
+        }
+
+        // Trả về toàn bộ list sau merge (tải lại từ DB)
         return shoppingListRepository.findByUser_UserIdAndRecipe_Id(userId, recipeId).stream()
                 .map(s -> toResponse(s, recipeId)).toList();
     }
@@ -137,6 +156,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                                 .ingredient(name)              // canonicalized
                                 .quantity(quantity)
                                 .checked(Boolean.FALSE)        // mặc định chưa tick
+                                .isFromRecipe(Boolean.FALSE)
                                 .build()
                 ));
 
@@ -158,7 +178,19 @@ public class ShoppingListServiceImpl implements ShoppingListService {
         }
 
         String name = canonicalize(ingredient);
+        String key = normalize(name); // Key để kiểm tra sự tồn tại trong công thức
         if (name.isEmpty()) throw new IllegalArgumentException("Tên nguyên liệu trống.");
+
+        // === LOGIC MỚI: KIỂM TRA NGUỒN GỐC ===
+        // Lấy các key nguyên liệu GỐC của recipe
+        List<RecipeIngredient> ingredients = ingredientRepository.findByRecipe_IdOrderByIdAsc(recipeId);
+        Set<String> recipeKeys = ingredients.stream()
+                .map(ri -> normalize(ri.getName())) // Dùng normalize để so sánh
+                .collect(Collectors.toSet());
+
+        // Mục này có trong công thức gốc (true) hay do người dùng tự thêm (false)
+        final boolean isFromRecipeFlag = recipeKeys.contains(key);
+        // ===================================
 
         // Upsert theo (user, recipe_id, ingredient ignoreCase)
         ShoppingList item = shoppingListRepository
@@ -168,6 +200,8 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                     if (!Objects.equals(safe(quantity), safe(exist.getQuantity()))) {
                         exist.setQuantity(quantity);
                     }
+                    // Cập nhật lại cờ (phòng trường hợp nó được thêm tay trước khi đồng bộ)
+                    exist.setIsFromRecipe(isFromRecipeFlag);
                     return exist;
                 })
                 .orElseGet(() -> shoppingListRepository.save(
@@ -177,6 +211,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                                 .ingredient(name)              // canonicalized
                                 .quantity(quantity)
                                 .checked(Boolean.FALSE)
+                                .isFromRecipe(isFromRecipeFlag) // Đặt cờ theo nguồn gốc
                                 .build()
                 ));
 
@@ -198,6 +233,9 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
         // Xác định list (recipe_id có thể null)
         Long recipeId = current.getRecipe() != null ? current.getRecipe().getId() : null;
+
+        // Xác định xem có thay đổi nội dung (tên/số lượng) không
+        boolean contentChanged = newIngredientOrNull != null || newQuantityOrNull != null;
 
         // Chuẩn hoá & re-validate dữ liệu mới (nếu có)
         String nameNew = (newIngredientOrNull != null)
@@ -232,6 +270,10 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                 target.setQuantity(mergedQty);
                 target.setIngredient(nameNew); // canonicalized
 
+                // Khi merge do đổi tên thủ công, kết quả luôn là 'false'
+                target.setIsFromRecipe(Boolean.FALSE);
+
+
                 // Xoá item hiện tại để tránh duplicate
                 shoppingListRepository.delete(current);
 
@@ -244,13 +286,20 @@ public class ShoppingListServiceImpl implements ShoppingListService {
         if (qtyNew != null) current.setQuantity(qtyNew);
         if (newCheckedOrNull != null) current.setChecked(newCheckedOrNull);
 
+        // Nếu tên hoặc số lượng bị thay đổi thủ công qua API này,
+        // thì đánh dấu là do người dùng tự chỉnh sửa (false)
+        if (contentChanged) {
+            current.setIsFromRecipe(Boolean.FALSE);
+        }
+        // Nếu chỉ thay đổi 'checked', không đổi cờ isFromRecipe
+
         return toResponse(current, recipeId);
     }
 
     @Override
     @Transactional
     public ShoppingListResponse moveItem(Long userId, Long itemId, Long targetRecipeIdOrNull) {
-        // ensure user
+        // ensure user exists
         userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User không tồn tại: " + userId));
 
@@ -258,7 +307,6 @@ public class ShoppingListServiceImpl implements ShoppingListService {
         ShoppingList current = shoppingListRepository.findByIdAndUser_UserId(itemId, userId)
                 .orElseThrow(() -> new EntityNotFoundException("Item không tồn tại hoặc không thuộc về bạn: " + itemId));
 
-        // list nguồn/đích
         Long sourceRecipeId = current.getRecipe() != null ? current.getRecipe().getId() : null;
 
         // nếu không đổi list -> no-op
@@ -266,46 +314,93 @@ public class ShoppingListServiceImpl implements ShoppingListService {
             return toResponse(current, sourceRecipeId);
         }
 
-        Recipe targetRecipe = null;
-        if (targetRecipeIdOrNull != null) {
-            targetRecipe = recipeRepository.findById(targetRecipeIdOrNull)
-                    .orElseThrow(() -> new EntityNotFoundException("Recipe đích không tồn tại: " + targetRecipeIdOrNull));
+        Recipe targetRecipe = validateAndGetTargetRecipe(userId, targetRecipeIdOrNull);
 
-            // chỉ owner mới được chuyển vào recipe PRIVATE
-            if (targetRecipe.getPrivacy() == Privacy.PRIVATE
-                    && !Objects.equals(targetRecipe.getUser().getUserId(), userId)) {
-                throw new AccessDeniedException("Bạn không có quyền chuyển vào recipe PRIVATE này.");
-            }
-        }
+        String name = current.getIngredient(); // Tên đã canonicalized
+        String key = normalize(name);         // Key để kiểm tra
 
-        // tên đã lưu của current đã canonicalized từ trước
-        String name = current.getIngredient();
+        // Xác định cờ isFromRecipe cho đích
+        boolean targetIsFromRecipe = (targetRecipe != null) && checkIfIngredientInRecipe(targetRecipe.getId(), key);
 
-        // tìm trùng trong list đích
-        Optional<ShoppingList> dup = (targetRecipe == null)
-                ? shoppingListRepository.findByUser_UserIdAndRecipeIsNullAndIngredientIgnoreCase(userId, name)
-                : shoppingListRepository.findByUser_UserIdAndRecipe_IdAndIngredientIgnoreCase(userId, targetRecipe.getId(), name);
+        // Tìm trùng trong list đích
+        Optional<ShoppingList> dupOpt = findDuplicateInTargetList(userId, targetRecipeIdOrNull, name);
 
-        if (dup.isPresent() && !dup.get().getId().equals(current.getId())) {
-            // MERGE vào item đích
-            ShoppingList target = dup.get();
-
-            boolean mergedChecked = Boolean.TRUE.equals(target.getChecked()) || Boolean.TRUE.equals(current.getChecked());
-            String mergedQty = (target.getQuantity() != null) ? target.getQuantity() : current.getQuantity();
-
-            target.setChecked(mergedChecked);
-            target.setQuantity(mergedQty);
-            // target giữ nguyên ingredient (đã canonical)
-
-            // xoá bản gốc
-            shoppingListRepository.delete(current);
-
-            return toResponse(target, targetRecipeIdOrNull);
+        if (dupOpt.isPresent() && !dupOpt.get().getId().equals(current.getId())) {
+            // Có trùng -> Merge
+            return handleMoveMerge(current, dupOpt.get(), targetIsFromRecipe, targetRecipeIdOrNull);
         } else {
-            // không trùng -> chỉ chuyển list
+            // Không trùng -> Chỉ di chuyển
             current.setRecipe(targetRecipe);
+            current.setIsFromRecipe(targetIsFromRecipe);
+            // shoppingListRepository.save(current); // Không cần thiết nếu @Transactional quản lý
             return toResponse(current, targetRecipeIdOrNull);
         }
+    }
+
+    /**
+     * Helper method: Xử lý logic merge khi di chuyển item và có item trùng ở đích.
+     */
+    private ShoppingListResponse handleMoveMerge(ShoppingList sourceItem, ShoppingList targetItem, boolean targetIsFromRecipe, Long targetRecipeId) {
+        // Merge checked status (OR logic)
+        boolean mergedChecked = Boolean.TRUE.equals(targetItem.getChecked()) || Boolean.TRUE.equals(sourceItem.getChecked());
+        targetItem.setChecked(mergedChecked);
+
+        // Merge quantity (ưu tiên target nếu có, không thì lấy source) - Có thể điều chỉnh logic này
+        String mergedQty = (targetItem.getQuantity() != null) ? targetItem.getQuantity() : sourceItem.getQuantity();
+        targetItem.setQuantity(mergedQty);
+
+        // Cập nhật cờ isFromRecipe dựa trên đích đến
+        targetItem.setIsFromRecipe(targetIsFromRecipe);
+
+        // shoppingListRepository.save(targetItem); // Không cần thiết nếu @Transactional quản lý
+
+        // Xóa item gốc sau khi merge
+        shoppingListRepository.delete(sourceItem);
+
+        return toResponse(targetItem, targetRecipeId);
+    }
+
+    /**
+     * Helper method: Tìm item trùng tên (ignore case) trong danh sách đích.
+     */
+    private Optional<ShoppingList> findDuplicateInTargetList(Long userId, Long targetRecipeId, String ingredientName) {
+        if (targetRecipeId == null) {
+            return shoppingListRepository.findByUser_UserIdAndRecipeIsNullAndIngredientIgnoreCase(userId, ingredientName);
+        } else {
+            return shoppingListRepository.findByUser_UserIdAndRecipe_IdAndIngredientIgnoreCase(userId, targetRecipeId, ingredientName);
+        }
+    }
+
+    /**
+     * Helper method: Kiểm tra và lấy Recipe đích (nếu có).
+     */
+    private Recipe validateAndGetTargetRecipe(Long userId, Long targetRecipeId) {
+        if (targetRecipeId == null) {
+            return null; // Di chuyển đến danh sách standalone
+        }
+        Recipe targetRecipe = recipeRepository.findById(targetRecipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe đích không tồn tại: " + targetRecipeId));
+
+        // Kiểm tra quyền nếu recipe đích là PRIVATE
+        if (targetRecipe.getPrivacy() == Privacy.PRIVATE && !Objects.equals(targetRecipe.getUser().getUserId(), userId)) {
+            throw new AccessDeniedException("Bạn không có quyền chuyển vào recipe PRIVATE này.");
+        }
+        return targetRecipe;
+    }
+
+    /**
+     * Helper method: Kiểm tra xem một nguyên liệu (theo key đã chuẩn hóa) có tồn tại trong công thức không.
+     */
+    private boolean checkIfIngredientInRecipe(Long recipeId, String normalizedKey) {
+        if (recipeId == null || normalizedKey == null || normalizedKey.isEmpty()) {
+            return false;
+        }
+        List<RecipeIngredient> ingredients = ingredientRepository.findByRecipe_IdOrderByIdAsc(recipeId);
+        return ingredients.stream()
+                .map(RecipeIngredient::getName)
+                .filter(Objects::nonNull)
+                .map(ShoppingListUtils::normalize)
+                .anyMatch(normalizedKey::equals);
     }
 
     @Override
@@ -356,6 +451,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                             .ingredient(item.getIngredient())
                             .quantity(item.getQuantity())
                             .checked(item.getChecked())
+                            .isFromRecipe(item.getIsFromRecipe())
                             .build())
                     .collect(Collectors.toList());
 
@@ -460,7 +556,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
     @Transactional(readOnly = true)
     public ShoppingListSyncCheckResponse checkRecipeUpdates(Long userId, Long recipeId) {
         // 1. Tải dữ liệu cần thiết
-        User user = userRepository.findById(userId) // Tải user để kiểm tra tồn tại (không cần thiết nếu đã xác thực)
+        userRepository.findById(userId) // Tải user để kiểm tra tồn tại (không cần thiết nếu đã xác thực)
                 .orElseThrow(() -> new EntityNotFoundException("User không tồn tại: " + userId));
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
@@ -483,14 +579,6 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
         // Nguyên liệu mới nhất từ công thức
         List<RecipeIngredient> recipeIngredients = ingredientRepository.findByRecipe_IdOrderByIdAsc(recipeId);
-        // Map theo key chuẩn hóa
-        Map<String, RecipeIngredient> recipeMap = recipeIngredients.stream()
-                .filter(it -> it.getName() != null && !normalize(it.getName()).isEmpty())
-                .collect(Collectors.toMap(
-                        it -> normalize(it.getName()),
-                        Function.identity(),
-                        (a, b) -> a
-                ));
 
         // 2. Thực hiện so sánh
         List<ShoppingListSyncCheckResponse.SyncItem> addedItems = new ArrayList<>();
