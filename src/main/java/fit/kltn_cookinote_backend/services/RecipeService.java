@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.services;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.request.AddIngredientsRequest;
 import fit.kltn_cookinote_backend.dtos.request.ForkRecipeRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
@@ -61,4 +62,17 @@ public interface RecipeService {
     PageResult<RecipeCardResponse> searchPublicRecipes(String query, int page, int size);
 
     PageResult<RecipeCardResponse> listEasyToCook(int page, int size);
+
+    /**
+     * Thêm một hoặc nhiều nguyên liệu vào cuối danh sách của một công thức đã tồn tại.
+     * Chỉ chủ sở hữu hoặc ADMIN mới có quyền.
+     * Các nguyên liệu trùng tên (sau khi chuẩn hóa) sẽ bị bỏ qua.
+     *
+     * @param actorUserId ID người thực hiện
+     * @param recipeId    ID công thức
+     * @param req         Đối tượng chứa danh sách nguyên liệu cần thêm
+     * @return RecipeResponse đã được cập nhật
+     */
+    RecipeResponse addIngredients(Long actorUserId, Long recipeId, AddIngredientsRequest req);
+
 }

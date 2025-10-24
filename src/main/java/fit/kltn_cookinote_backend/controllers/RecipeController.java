@@ -403,4 +403,20 @@ public class RecipeController {
         RecipeResponse data = stepImageService.reorderSteps(authUser.getUserId(), recipeId, req);
         return ResponseEntity.ok(ApiResponse.success("Sắp xếp lại các bước thành công", data, httpReq.getRequestURI()));
     }
+
+    /**
+     * Thêm một hoặc nhiều nguyên liệu vào cuối danh sách của công thức.
+     * POST /recipes/{recipeId}/ingredients
+     */
+    @PostMapping("/{recipeId}/ingredients")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<RecipeResponse>> addIngredients(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @Valid @RequestBody AddIngredientsRequest req,
+            HttpServletRequest httpReq
+    ) {
+        RecipeResponse data = recipeService.addIngredients(authUser.getUserId(), recipeId, req);
+        return ResponseEntity.ok(ApiResponse.success("Thêm nguyên liệu thành công", data, httpReq.getRequestURI()));
+    }
 }

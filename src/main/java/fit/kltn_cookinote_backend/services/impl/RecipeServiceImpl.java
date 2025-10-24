@@ -17,6 +17,7 @@ import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.*;
 import fit.kltn_cookinote_backend.services.CloudinaryService;
 import fit.kltn_cookinote_backend.services.RecipeService;
+import fit.kltn_cookinote_backend.utils.ShoppingListUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
@@ -541,6 +542,82 @@ public class RecipeServiceImpl implements RecipeService {
 
         Page<Recipe> pageData = recipeRepository.findEasyToCook(pageable);
         return PageResult.of(pageData.map(RecipeCardResponse::from));
+    }
+
+    @Override
+    @Transactional
+    public RecipeResponse addIngredients(Long actorUserId, Long recipeId, AddIngredientsRequest req) {
+        // 1) Tải User (actor) và Recipe, kiểm tra quyền
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        // Kiểm tra Recipe đã bị xóa chưa
+        if (recipe.isDeleted()) {
+            throw new EntityNotFoundException("Không thể thêm nguyên liệu vào công thức đã bị xóa: " + recipeId);
+        }
+
+        Long ownerId = recipe.getUser().getUserId();
+        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        // 2) Lấy danh sách nguyên liệu hiện có (dùng Set để kiểm tra trùng lặp hiệu quả)
+        // Sử dụng tên đã chuẩn hóa làm key để tránh trùng lặp không phân biệt chữ hoa/thường, khoảng trắng
+        Set<String> existingNormalizedNames = recipe.getIngredients().stream()
+                .map(RecipeIngredient::getName)
+                .filter(Objects::nonNull)
+                .map(ShoppingListUtils::normalize) // Chuẩn hóa tên (toLowerCase, trim, gộp khoảng trắng)
+                .collect(Collectors.toSet());
+
+        // 3) Xử lý thêm nguyên liệu mới
+        List<RecipeIngredient> ingredientsToAdd = new ArrayList<>();
+        int addedCount = 0;
+        for (RecipeIngredientCreate newIngDto : req.ingredients()) {
+            String normalizedNewName = ShoppingListUtils.normalize(newIngDto.name());
+
+            // Bỏ qua nếu tên trống hoặc đã tồn tại (sau chuẩn hóa)
+            if (normalizedNewName.isEmpty() || existingNormalizedNames.contains(normalizedNewName)) {
+                continue; // Bỏ qua nguyên liệu này
+            }
+
+            // Tạo entity mới và liên kết với Recipe
+            RecipeIngredient newIngredient = RecipeIngredient.builder()
+                    .recipe(recipe) // Liên kết với recipe hiện tại
+                    .name(ShoppingListUtils.canonicalize(newIngDto.name())) // Lưu tên đã chuẩn hóa (trim, gộp khoảng trắng)
+                    .quantity(ShoppingListUtils.canonicalize(newIngDto.quantity())) // Chuẩn hóa quantity
+                    .build();
+
+            ingredientsToAdd.add(newIngredient);
+            existingNormalizedNames.add(normalizedNewName); // Thêm vào set để kiểm tra các mục tiếp theo trong request
+            addedCount++;
+        }
+
+        // 4) Chỉ cập nhật nếu thực sự có nguyên liệu mới được thêm
+        if (addedCount > 0) {
+            // Thêm các nguyên liệu hợp lệ vào collection của Recipe
+            recipe.getIngredients().addAll(ingredientsToAdd);
+
+            // Cập nhật thời gian
+            recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+
+            // Lưu Recipe (CascadeType.ALL sẽ tự động lưu các ingredientsToAdd)
+            recipeRepository.saveAndFlush(recipe);
+        } else {
+            // Nếu không có gì để thêm (do trùng lặp hoặc rỗng), không cần save lại recipe
+            // Chỉ cần trả về trạng thái hiện tại
+            // Tải lại để đảm bảo dữ liệu mới nhất (phòng trường hợp có thay đổi khác)
+            recipe = recipeRepository.findDetailById(recipeId)
+                    .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+            return RecipeResponse.from(recipe);
+        }
+
+
+        // 5) Tải lại Recipe chi tiết để trả về (đã bao gồm các nguyên liệu mới)
+        Recipe reloaded = recipeRepository.findDetailById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại sau khi cập nhật: " + recipeId)); // Nên có
+
+        return RecipeResponse.from(reloaded);
     }
 
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {
