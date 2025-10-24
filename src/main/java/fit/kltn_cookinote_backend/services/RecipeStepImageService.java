@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.services;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.request.RecipeStepReorderRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,4 +36,16 @@ public interface RecipeStepImageService {
      * @throws IOException
      */
     RecipeResponse addStep(Long actorUserId, Long recipeId, String content, Integer suggestedTime, String tips, List<MultipartFile> addFiles) throws IOException;
+
+    /**
+     * Sắp xếp lại thứ tự (stepNo) của các bước trong một công thức.
+     * Chỉ chủ sở hữu hoặc ADMIN mới có quyền.
+     * Yêu cầu request phải chứa tất cả các step hiện có và stepNo mới phải hợp lệ.
+     *
+     * @param actorUserId ID người thực hiện
+     * @param recipeId    ID công thức
+     * @param req         Đối tượng chứa danh sách thứ tự mới
+     * @return RecipeResponse đã được cập nhật
+     */
+    RecipeResponse reorderSteps(Long actorUserId, Long recipeId, RecipeStepReorderRequest req);
 }

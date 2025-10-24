@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.request.RecipeStepReorderRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
 import fit.kltn_cookinote_backend.entities.Recipe;
@@ -37,6 +38,8 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -298,6 +301,85 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         // 7) Tải lại toàn bộ và trả về
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+        return RecipeResponse.from(reloaded);
+    }
+
+    @Override
+    @Transactional
+    public RecipeResponse reorderSteps(Long actorUserId, Long recipeId, RecipeStepReorderRequest req) {
+        // 1) Load Recipe and check permissions
+        Recipe recipe = loadAndCheckRecipe(actorUserId, recipeId);
+
+        // 2) Load all existing Steps for the Recipe
+        List<RecipeStep> existingSteps = stepRepository.findByRecipe_IdOrderByStepNoAsc(recipeId);
+        Map<Long, RecipeStep> existingStepsMap = existingSteps.stream()
+                .collect(Collectors.toMap(RecipeStep::getId, Function.identity()));
+
+        // 3) Validate Input
+        List<RecipeStepReorderRequest.StepOrder> requestedOrder = req.steps();
+        Map<Long, Integer> requestedOrderMap = requestedOrder.stream()
+                .collect(Collectors.toMap(RecipeStepReorderRequest.StepOrder::stepId, RecipeStepReorderRequest.StepOrder::newStepNo));
+        Set<Integer> newStepNos = new HashSet<>(requestedOrderMap.values());
+
+        // 3.1) Check size consistency
+        if (requestedOrderMap.size() != existingStepsMap.size() || !requestedOrderMap.keySet().containsAll(existingStepsMap.keySet())) {
+            throw new IllegalArgumentException("Reorder request must contain all (" + existingStepsMap.size() + ") existing steps for the recipe and no extras.");
+        }
+
+        // 3.2) Kiểm tra new step numbers là duy nhất và tạo thành dãy liên tục từ 1..N
+        int n = existingSteps.size();
+        if (newStepNos.size() != n) {
+            throw new IllegalArgumentException("New step numbers (newStepNo) must be unique.");
+        }
+        for (int i = 1; i <= n; i++) {
+            if (!newStepNos.contains(i)) {
+                throw new IllegalArgumentException("New step numbers (newStepNo) must form a continuous sequence from 1 to " + n + ".");
+            }
+        }
+
+        // 4) Phase 1: Di chuyển các bước sang số âm tạm thời NẾU vị trí mục tiêu hiện đang bị chiếm bởi
+        //    một bước khác cũng đang được di chuyển đi chỗ khác.
+        Map<Integer, Long> currentStepNoToIdMap = existingSteps.stream()
+                .collect(Collectors.toMap(RecipeStep::getStepNo, RecipeStep::getId));
+
+        int tempStepNoCounter = -1; // Start temporary numbering from -1
+
+        for (RecipeStep step : existingSteps) {
+            Integer targetStepNo = requestedOrderMap.get(step.getId());
+            Long stepIdCurrentlyAtTarget = currentStepNoToIdMap.get(targetStepNo);
+
+            // Check if the target position is occupied by another step that is ALSO moving
+            if (stepIdCurrentlyAtTarget != null && !stepIdCurrentlyAtTarget.equals(step.getId())) {
+                // Check if the occupying step is actually part of this reorder request (should always be true based on validation)
+                if (requestedOrderMap.containsKey(stepIdCurrentlyAtTarget)) {
+                    // Assign temporary negative step number to avoid conflict
+                    step.setStepNo(tempStepNoCounter--);
+                }
+            }
+        }
+        // Immediately flush changes with temporary negative numbers
+        stepRepository.saveAllAndFlush(existingSteps);
+
+
+        // 5) Phase 2: Cập nhật stepNo cuối cùng cho tất cả các bước
+        for (RecipeStep step : existingSteps) {
+            Integer finalStepNo = requestedOrderMap.get(step.getId());
+            step.setStepNo(finalStepNo);
+        }
+        // Save the final state (Hibernate/JPA will handle updates)
+        stepRepository.saveAll(existingSteps);
+
+        // 6) Update Recipe timestamp
+        recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+        recipeRepository.save(recipe);
+
+        // 7) Flush again to ensure all changes are written before reloading
+        em.flush();
+
+        // 8) Reload the detailed Recipe to return the updated state
+        Recipe reloaded = recipeRepository.findDetailById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe not found after update: " + recipeId)); // Should ideally not happen
+
         return RecipeResponse.from(reloaded);
     }
 }
