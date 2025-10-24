@@ -36,8 +36,7 @@ public class ShoppingListController {
     private final ShoppingListService shoppingListService;
 
     /**
-     * Tạo shopping list cho user hiện tại bằng toàn bộ RecipeIngredient của Recipe
-     * - Ghi đè danh sách cũ của (user, recipe) nếu có.
+     * Tạo hoặc Đồng bộ shopping list cho user hiện tại từ RecipeIngredient của Recipe.
      */
     @PostMapping("/recipes/{recipeId}")
     @PreAuthorize("isAuthenticated()")
@@ -46,8 +45,20 @@ public class ShoppingListController {
             @PathVariable Long recipeId,
             HttpServletRequest req
     ) {
-        List<ShoppingListResponse> data = shoppingListService.createFromRecipe(authUser.getUserId(), recipeId);
-        return ResponseEntity.ok(ApiResponse.success("Tạo shopping list từ recipe #" + recipeId + " thành công (" + data.size() + " mục).", data, req.getRequestURI()));
+        // (1) Nhận về DTO mới
+        SyncShoppingListResponse syncResponse = shoppingListService.createFromRecipe(authUser.getUserId(), recipeId);
+
+        // (2) Quyết định message dựa trên cờ existedBefore
+        String message;
+        if (syncResponse.isExistedBefore()) {
+            // Đây là hành động "Đồng bộ"
+            message = String.format("Đồng bộ shopping list từ recipe #%d thành công (%d mục).", recipeId, syncResponse.getItems().size());
+        } else {
+            // Đây là hành động "Tạo mới"
+            message = String.format("Tạo shopping list từ recipe #%d thành công (%d mục).", recipeId, syncResponse.getItems().size());
+        }
+
+        return ResponseEntity.ok(ApiResponse.success(message, syncResponse.getItems(), req.getRequestURI()));
     }
 
     /**

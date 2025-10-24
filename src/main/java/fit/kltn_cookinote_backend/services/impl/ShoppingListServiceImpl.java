@@ -67,7 +67,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
     @Override
     @Transactional
-    public List<ShoppingListResponse> createFromRecipe(Long userId, Long recipeId) {
+    public SyncShoppingListResponse createFromRecipe(Long userId, Long recipeId) {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User không tồn tại: " + userId));
@@ -78,7 +78,12 @@ public class ShoppingListServiceImpl implements ShoppingListService {
         if (recipe.getPrivacy() == Privacy.PRIVATE && !Objects.equals(recipe.getUser().getUserId(), userId)) {
             throw new AccessDeniedException("Bạn không có quyền sử dụng recipe PRIVATE này.");
         }
-        // Lấy các mục shopping list hiện có của user cho recipe này, map theo key chuẩn hóa
+
+        // (2) Kiểm tra xem đã tồn tại trước đó hay chưa
+        // Chúng ta kiểm tra trước khi gọi helper getExistingShoppingListMap
+        boolean existedBefore = shoppingListRepository.findByUser_UserIdAndRecipe_Id(userId, recipeId).stream()
+                .anyMatch(item -> item.getIngredient() != null);
+
         Map<String, ShoppingList> existByKey = getExistingShoppingListMap(userId, recipeId);
 
         // Lấy toàn bộ RecipeIngredient
@@ -95,6 +100,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
             ShoppingList exist = existByKey.get(key);
             if (exist != null) {
+                // Mục đã tồn tại
                 if (!Objects.equals(safe(qty), safe(exist.getQuantity()))) {
                     exist.setQuantity(qty);
                 }
@@ -103,6 +109,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                 }
                 existByKey.remove(key);
             } else {
+                // Thêm mới
                 toCreate.add(ShoppingList.builder()
                         .user(user)
                         .recipe(recipe)
@@ -119,15 +126,19 @@ public class ShoppingListServiceImpl implements ShoppingListService {
             shoppingListRepository.saveAll(toCreate);
         }
 
+        // Xử lý các mục còn lại (mồ côi)
         for (ShoppingList remainingItem : existByKey.values()) {
             if (Boolean.TRUE.equals(remainingItem.getIsFromRecipe())) {
                 remainingItem.setIsFromRecipe(Boolean.FALSE);
             }
         }
 
-        // Trả về toàn bộ list sau merge (tải lại từ DB)
-        return shoppingListRepository.findByUser_UserIdAndRecipe_Id(userId, recipeId).stream()
+        // Tải lại danh sách cuối cùng
+        List<ShoppingListResponse> finalItems = shoppingListRepository.findByUser_UserIdAndRecipe_Id(userId, recipeId).stream()
                 .map(s -> toResponse(s, recipeId)).toList();
+
+        // (3) Trả về DTO mới
+        return new SyncShoppingListResponse(finalItems, existedBefore);
     }
 
     @Override
