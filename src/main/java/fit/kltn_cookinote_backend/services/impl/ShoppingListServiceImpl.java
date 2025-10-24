@@ -134,10 +134,15 @@ public class ShoppingListServiceImpl implements ShoppingListService {
         }
 
         // Tải lại danh sách cuối cùng
-        List<ShoppingListResponse> finalItems = shoppingListRepository.findByUser_UserIdAndRecipe_Id(userId, recipeId).stream()
+        List<ShoppingList> reloadedItems = shoppingListRepository.findByUser_UserIdAndRecipe_Id(userId, recipeId);
+
+        // Sắp xếp theo ID giảm dần (mới nhất xếp trước)
+        reloadedItems.sort(Comparator.comparing(ShoppingList::getId).reversed());
+
+        List<ShoppingListResponse> finalItems = reloadedItems.stream()
                 .map(s -> toResponse(s, recipeId)).toList();
 
-        // (3) Trả về DTO mới
+        // (3) Trả về DTO
         return new SyncShoppingListResponse(finalItems, existedBefore);
     }
 
