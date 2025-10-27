@@ -48,6 +48,7 @@ public class RecipeServiceImpl implements RecipeService {
     private final CloudinaryService cloudinaryService;
     private final ShoppingListRepository shoppingListRepository;
     private final FavoriteRepository favoriteRepository;
+    private final CookedHistoryRepository cookedHistoryRepository;
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 12; // mobile-friendly
@@ -330,15 +331,16 @@ public class RecipeServiceImpl implements RecipeService {
         }
         recipeRepository.save(recipe);
 
-        // CẬP NHẬT: Đánh dấu các shopping list item liên quan
+        // Đánh dấu các shopping list item liên quan
         List<ShoppingList> relatedItems = shoppingListRepository.findByRecipe_Id(recipeId);
         if (!relatedItems.isEmpty()) {
             for (ShoppingList item : relatedItems) {
                 item.setIsRecipeDeleted(true);
-                //item.setOriginalRecipeTitle(recipe.getTitle());
             }
             shoppingListRepository.saveAll(relatedItems);
         }
+
+        cookedHistoryRepository.markAsDeletedByRecipeId(recipeId, recipe.getTitle());
     }
 
     /**
@@ -380,10 +382,11 @@ public class RecipeServiceImpl implements RecipeService {
         Long ownerId = recipe.getUser().getUserId();
         ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
 
-        // CẬP NHẬT: Xử lý các shopping list item trước khi xóa recipe
+        final String recipeTitle = recipe.getTitle();
+
+        // Xử lý các shopping list item trước khi xóa recipe
         List<ShoppingList> relatedItems = shoppingListRepository.findByRecipe_Id(recipeId);
         if (!relatedItems.isEmpty()) {
-            final String recipeTitle = recipe.getTitle();
             for (ShoppingList item : relatedItems) {
                 item.setRecipe(null); // Ngắt kết nối
                 item.setOriginalRecipeTitle(recipeTitle); // Lưu lại tên
@@ -392,16 +395,26 @@ public class RecipeServiceImpl implements RecipeService {
             shoppingListRepository.saveAllAndFlush(relatedItems);
         }
 
-        // CẬP NHẬT: Xử lý các favorite item trước khi xóa recipe
+        // Xử lý các favorite item trước khi xóa recipe
         List<Favorite> relatedFavorites = favoriteRepository.findByRecipe_Id(recipeId);
         if (!relatedFavorites.isEmpty()) {
-            final String recipeTitle = recipe.getTitle();
             for (Favorite favorite : relatedFavorites) {
                 favorite.setRecipe(null);
                 favorite.setOriginalRecipeTitle(recipeTitle);
                 favorite.setIsRecipeDeleted(true);
             }
             favoriteRepository.saveAllAndFlush(relatedFavorites);
+        }
+
+        // Xử lý các CookedHistory item
+        List<CookedHistory> relatedCookedHistories = cookedHistoryRepository.findByRecipe_Id(recipeId);
+        if (!relatedCookedHistories.isEmpty()) {
+            for (CookedHistory history : relatedCookedHistories) {
+                history.setRecipe(null); // Ngắt kết nối
+                history.setOriginalRecipeTitle(recipeTitle); // Lưu lại tên
+                history.setIsRecipeDeleted(true); // Đánh dấu đã xóa
+            }
+            cookedHistoryRepository.saveAllAndFlush(relatedCookedHistories); // <<< Lưu thay đổi
         }
 
         // Thu thập tất cả public ID của ảnh để xóa sau khi commit DB
