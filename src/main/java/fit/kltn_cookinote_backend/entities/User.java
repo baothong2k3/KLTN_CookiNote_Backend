@@ -37,6 +37,7 @@ public class User {
     private Long userId;
 
     @Column(name = "name", length = 100)
+    @Size(min = 3, max = 100)
     private String username;
 
     @Column(length = 255, unique = true, nullable = false)
