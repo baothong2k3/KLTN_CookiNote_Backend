@@ -14,6 +14,8 @@ public record RecipeCardResponse(
         LocalDateTime createdAt,
         String difficulty,  // String để tránh buộc client cập nhật enum
         Long view,
+        Integer prepareTime,
+        Integer cookTime,
         boolean deleted
 ) {
     public static RecipeCardResponse from(Recipe r) {
@@ -26,6 +28,8 @@ public record RecipeCardResponse(
                 .createdAt(r.getCreatedAt())
                 .difficulty(r.getDifficulty() != null ? r.getDifficulty().name() : null)
                 .view(r.getView())
+                .prepareTime(r.getPrepareTime())
+                .cookTime(r.getCookTime())
                 .deleted(r.isDeleted())
                 .build();
     }
