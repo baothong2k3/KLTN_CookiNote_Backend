@@ -72,10 +72,11 @@ public class RecipeController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<RecipeResponse>> getDetail(@AuthenticationPrincipal User authUser,
                                                                  @PathVariable Long id,
                                                                  HttpServletRequest httpReq) {
-        Long viewerId = (authUser != null) ? authUser.getUserId() : null;
+        Long viewerId = authUser.getUserId();
         RecipeResponse data = recipeService.getDetail(viewerId, id);
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết công thức thành công", data, httpReq.getRequestURI()));
     }

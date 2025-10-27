@@ -128,19 +128,19 @@ public class RecipeServiceImpl implements RecipeService {
         }
 
         Recipe saved = recipeRepository.saveAndFlush(recipe);
-        return RecipeResponse.from(saved);
+        return RecipeResponse.from(saved, false);
     }
 
     @Override
     @Transactional
-    public RecipeResponse getDetail(Long viewerUserIdOrNull, Long recipeId) {
+    public RecipeResponse getDetail(Long viewerUserId, Long recipeId) {
         Recipe recipe = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
         Long ownerId = (recipe.getUser() != null) ? recipe.getUser().getUserId() : null;
-        boolean isOwner = (viewerUserIdOrNull != null) && viewerUserIdOrNull.equals(ownerId);
+        boolean isOwner = viewerUserId.equals(ownerId);
 
-        if (!canView(recipe.getPrivacy(), ownerId, viewerUserIdOrNull)) {
+        if (!canView(recipe.getPrivacy(), ownerId, viewerUserId)) {
             throw new AccessDeniedException("Bạn không có quyền xem công thức này.");
         }
 
@@ -149,7 +149,9 @@ public class RecipeServiceImpl implements RecipeService {
             recipe.setView((recipe.getView() == null ? 0 : recipe.getView()) + 1);
         }
 
-        return RecipeResponse.from(recipe);
+        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(viewerUserId, recipeId).isPresent();
+
+        return RecipeResponse.from(recipe, isFavorited);
     }
 
     @Override
@@ -288,8 +290,11 @@ public class RecipeServiceImpl implements RecipeService {
             }
         }
 
+
         Recipe saved = recipeRepository.saveAndFlush(recipe);
-        return RecipeResponse.from(saved);
+
+        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
+        return RecipeResponse.from(saved, isFavorited);
     }
 
     @Override
@@ -507,7 +512,7 @@ public class RecipeServiceImpl implements RecipeService {
         newRecipe.setSteps(steps);
 
         Recipe saved = recipeRepository.save(newRecipe);
-        return RecipeResponse.from(saved);
+        return RecipeResponse.from(saved, false);
     }
 
     @Override
@@ -609,7 +614,9 @@ public class RecipeServiceImpl implements RecipeService {
             // Tải lại để đảm bảo dữ liệu mới nhất (phòng trường hợp có thay đổi khác)
             recipe = recipeRepository.findDetailById(recipeId)
                     .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
-            return RecipeResponse.from(recipe);
+
+            boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
+            return RecipeResponse.from(recipe, isFavorited);
         }
 
 
@@ -617,7 +624,8 @@ public class RecipeServiceImpl implements RecipeService {
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại sau khi cập nhật: " + recipeId)); // Nên có
 
-        return RecipeResponse.from(reloaded);
+        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
+        return RecipeResponse.from(reloaded, isFavorited);
     }
 
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {

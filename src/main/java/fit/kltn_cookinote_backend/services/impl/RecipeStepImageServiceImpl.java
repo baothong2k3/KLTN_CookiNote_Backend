@@ -18,10 +18,7 @@ import fit.kltn_cookinote_backend.entities.RecipeStepImage;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.enums.Role;
-import fit.kltn_cookinote_backend.repositories.RecipeRepository;
-import fit.kltn_cookinote_backend.repositories.RecipeStepImageRepository;
-import fit.kltn_cookinote_backend.repositories.RecipeStepRepository;
-import fit.kltn_cookinote_backend.repositories.UserRepository;
+import fit.kltn_cookinote_backend.repositories.*;
 import fit.kltn_cookinote_backend.services.RecipeImageService;
 import fit.kltn_cookinote_backend.services.RecipeStepImageService;
 import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
@@ -50,6 +47,7 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
     private final RecipeStepImageRepository stepImageRepository;
     private final UserRepository userRepository;
     private final RecipeRepository recipeRepository;
+    private final FavoriteRepository favoriteRepository;
 
     @PersistenceContext
     private EntityManager em;
@@ -241,7 +239,9 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         // 4) Tải lại và trả về
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
-        return RecipeResponse.from(reloaded);
+
+        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
+        return RecipeResponse.from(reloaded, isFavorited);
     }
 
     @Override
@@ -301,7 +301,9 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         // 7) Tải lại toàn bộ và trả về
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
-        return RecipeResponse.from(reloaded);
+
+        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
+        return RecipeResponse.from(reloaded, isFavorited);
     }
 
     @Override
@@ -380,6 +382,7 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe not found after update: " + recipeId)); // Should ideally not happen
 
-        return RecipeResponse.from(reloaded);
+        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
+        return RecipeResponse.from(reloaded, isFavorited);
     }
 }

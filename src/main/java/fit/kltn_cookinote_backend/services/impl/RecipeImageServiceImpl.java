@@ -14,10 +14,7 @@ import fit.kltn_cookinote_backend.dtos.response.AllRecipeImagesResponse;
 import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
 import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Role;
-import fit.kltn_cookinote_backend.repositories.RecipeCoverImageHistoryRepository;
-import fit.kltn_cookinote_backend.repositories.RecipeRepository;
-import fit.kltn_cookinote_backend.repositories.RecipeStepRepository;
-import fit.kltn_cookinote_backend.repositories.UserRepository;
+import fit.kltn_cookinote_backend.repositories.*;
 import fit.kltn_cookinote_backend.services.RecipeImageService;
 import fit.kltn_cookinote_backend.utils.CloudinaryUtils;
 import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
@@ -44,6 +41,7 @@ public class RecipeImageServiceImpl implements RecipeImageService {
     private final RecipeStepRepository stepRepository;
     private final UserRepository userRepository;
     private final RecipeCoverImageHistoryRepository recipeCoverImageHistoryRepository;
+    private final FavoriteRepository favoriteRepository;
 
     @Value("${app.cloudinary.recipe-folder}")
     private String recipeFolder;
@@ -104,7 +102,8 @@ public class RecipeImageServiceImpl implements RecipeImageService {
     @Transactional
     public RecipeResponse updateCover(Long actorUserId, Long recipeId, MultipartFile file) throws IOException {
         Recipe updatedRecipe = processCoverUpdate(actorUserId, recipeId, file);
-        return RecipeResponse.from(updatedRecipe);
+        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
+        return RecipeResponse.from(updatedRecipe, isFavorited);
     }
 
     @Override
