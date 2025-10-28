@@ -655,4 +655,21 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                 .manualItemsNotInRecipe(manualItemsNotInRecipe)
                 .build();
     }
+
+    @Override
+    @Transactional
+    public ShoppingListResponse checkItem(Long userId, Long itemId) {
+        // Tải item và đảm bảo nó thuộc về user
+        ShoppingList item = shoppingListRepository.findByIdAndUser_UserId(itemId, userId)
+                .orElseThrow(() -> new EntityNotFoundException("Mục không tồn tại hoặc không thuộc về bạn: " + itemId));
+
+        // Đánh dấu là true
+        item.setChecked(Boolean.TRUE);
+
+        shoppingListRepository.save(item);
+
+        // Trả về response
+        Long recipeId = item.getRecipe() != null ? item.getRecipe().getId() : null;
+        return toResponse(item, recipeId);
+    }
 }

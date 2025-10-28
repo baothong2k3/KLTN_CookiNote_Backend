@@ -52,4 +52,13 @@ public interface ShoppingListService {
      * @return Đối tượng chứa thông tin các mục thêm, xóa, cập nhật.
      */
     ShoppingListSyncCheckResponse checkRecipeUpdates(Long userId, Long recipeId);
+
+    /**
+     * Đánh dấu một mục trong danh sách mua sắm là đã hoàn thành (checked = true).
+     *
+     * @param userId ID của người dùng.
+     * @param itemId ID của mục cần đánh dấu.
+     * @return Thông tin mục đã được cập nhật.
+     */
+    ShoppingListResponse checkItem(Long userId, Long itemId);
 }

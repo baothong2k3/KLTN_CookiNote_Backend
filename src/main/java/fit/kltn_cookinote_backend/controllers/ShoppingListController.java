@@ -198,4 +198,19 @@ public class ShoppingListController {
         String message = data.hasChanges() ? "Phát hiện thay đổi giữa danh sách mua sắm và công thức." : "Danh sách mua sắm đã khớp với công thức.";
         return ResponseEntity.ok(ApiResponse.success(message, data, req.getRequestURI()));
     }
+
+    /**
+     * Đánh dấu một mục trong shopping list là đã hoàn thành (checked = true).
+     * Sử dụng PATCH vì chỉ cập nhật một phần trạng thái.
+     */
+    @PatchMapping("/items/{itemId}/check")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ShoppingListResponse>> checkShoppingListItem(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long itemId,
+            HttpServletRequest httpReq
+    ) {
+        ShoppingListResponse data = shoppingListService.checkItem(authUser.getUserId(), itemId);
+        return ResponseEntity.ok(ApiResponse.success("Đã đánh dấu mục là hoàn thành.", data, httpReq.getRequestURI()));
+    }
 }
