@@ -12,10 +12,8 @@ package fit.kltn_cookinote_backend.controllers;/*
 import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.User;
-import fit.kltn_cookinote_backend.services.FavoriteService;
-import fit.kltn_cookinote_backend.services.RecipeImageService;
-import fit.kltn_cookinote_backend.services.RecipeService;
-import fit.kltn_cookinote_backend.services.RecipeStepImageService;
+import fit.kltn_cookinote_backend.repositories.FavoriteRepository;
+import fit.kltn_cookinote_backend.services.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +35,8 @@ public class RecipeController {
     private final RecipeImageService recipeImageService;
     private final RecipeStepImageService stepImageService;
     private final FavoriteService favoriteService;
+    private final ShareService shareService;
+    private final FavoriteRepository favoriteRepository;
 
     // PHA 1: Tạo recipe (USER/ADMIN; nếu PUBLIC chỉ ADMIN)
     @PostMapping
@@ -419,5 +419,37 @@ public class RecipeController {
     ) {
         RecipeResponse data = recipeService.addIngredients(authUser.getUserId(), recipeId, req);
         return ResponseEntity.ok(ApiResponse.success("Thêm nguyên liệu thành công", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Tạo link chia sẻ và mã QR cho một công thức.
+     * POST /recipes/{recipeId}/share
+     */
+    @PostMapping("/{recipeId}/share")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ShareResponse>> shareRecipe(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        ShareResponse data = shareService.createShareLink(authUser.getUserId(), recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Tạo link chia sẻ thành công.", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Truy cập chi tiết công thức thông qua mã chia sẻ.
+     * GET /recipes/shared/{shareCode}
+     */
+    @GetMapping("/shared/{shareCode}")
+    public ResponseEntity<ApiResponse<RecipeResponse>> getRecipeByShareCode(
+            @PathVariable String shareCode,
+            @AuthenticationPrincipal User authUserOrNull,
+            HttpServletRequest httpReq
+    ) {
+        Long viewerId = (authUserOrNull != null) ? authUserOrNull.getUserId() : null;
+
+        RecipeResponse data = shareService.getRecipeByShareCode(shareCode, viewerId);
+
+        return ResponseEntity.ok(ApiResponse.success("Lấy công thức chia sẻ thành công.", data, httpReq.getRequestURI()));
     }
 }
