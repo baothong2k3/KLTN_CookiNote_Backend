@@ -13,6 +13,7 @@ import fit.kltn_cookinote_backend.dtos.response.*;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Map;
 
 public interface ShoppingListService {
     SyncShoppingListResponse createFromRecipe(Long userId, Long recipeId);
@@ -61,4 +62,13 @@ public interface ShoppingListService {
      * @return Thông tin mục đã được cập nhật.
      */
     ShoppingListResponse checkItem(Long userId, Long itemId);
+
+    /**
+     * Xóa một hoặc nhiều mục khỏi danh sách mua sắm của người dùng.
+     *
+     * @param userId  ID của người dùng.
+     * @param itemIds Danh sách ID của các mục cần xóa.
+     * @return Map chứa số lượng mục đã xóa thành công.
+     */
+    Map<String, Integer> deleteItems(Long userId, List<Long> itemIds);
 }

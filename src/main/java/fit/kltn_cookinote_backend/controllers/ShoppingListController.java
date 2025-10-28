@@ -9,10 +9,7 @@ package fit.kltn_cookinote_backend.controllers;/*
  * @version: 1.0
  */
 
-import fit.kltn_cookinote_backend.dtos.request.ShoppingListMoveRequest;
-import fit.kltn_cookinote_backend.dtos.request.ShoppingListUpdateRequest;
-import fit.kltn_cookinote_backend.dtos.request.ShoppingListUpsertRequest;
-import fit.kltn_cookinote_backend.dtos.request.SuggestRecipesRequest;
+import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.services.ShoppingListService;
@@ -27,6 +24,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -212,5 +210,21 @@ public class ShoppingListController {
     ) {
         ShoppingListResponse data = shoppingListService.checkItem(authUser.getUserId(), itemId);
         return ResponseEntity.ok(ApiResponse.success("Đã đánh dấu mục là hoàn thành.", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Xóa một hoặc nhiều mục khỏi shopping list.
+     */
+    @DeleteMapping("/items")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> deleteShoppingListItems(
+            @AuthenticationPrincipal User authUser,
+            @Valid @RequestBody DeleteShoppingListItemsRequest req,
+            HttpServletRequest httpReq
+    ) {
+        Map<String, Integer> result = shoppingListService.deleteItems(authUser.getUserId(), req.itemIds());
+        int deletedCount = result.getOrDefault("deletedCount", 0);
+        String message = String.format("Đã xóa thành công %d mục khỏi danh sách mua sắm.", deletedCount);
+        return ResponseEntity.ok(ApiResponse.success(message, result, httpReq.getRequestURI()));
     }
 }

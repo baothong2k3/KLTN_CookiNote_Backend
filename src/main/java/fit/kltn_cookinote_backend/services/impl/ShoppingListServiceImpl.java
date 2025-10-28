@@ -672,4 +672,59 @@ public class ShoppingListServiceImpl implements ShoppingListService {
         Long recipeId = item.getRecipe() != null ? item.getRecipe().getId() : null;
         return toResponse(item, recipeId);
     }
+
+    @Override
+    @Transactional
+    public Map<String, Integer> deleteItems(Long userId, List<Long> itemIds) {
+        if (itemIds == null || itemIds.isEmpty()) {
+            throw new IllegalArgumentException("Danh sách ID cần xóa không được rỗng.");
+        }
+
+        // Kiểm tra user tồn tại (nếu cần)
+        userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User không tồn tại: " + userId));
+
+        // Tải tất cả items dựa trên danh sách ID được yêu cầu
+        List<ShoppingList> foundItems = shoppingListRepository.findAllById(itemIds);
+        Map<Long, ShoppingList> foundItemsMap = foundItems.stream()
+                .collect(Collectors.toMap(ShoppingList::getId, item -> item));
+
+        // --- KIỂM TRA TÍNH HỢP LỆ CỦA itemIds ---
+        List<Long> invalidIds = new ArrayList<>(); // Lưu các ID không tìm thấy
+        List<Long> unauthorizedIds = new ArrayList<>(); // Lưu các ID không thuộc về user
+
+        for (Long requestedId : itemIds) {
+            ShoppingList item = foundItemsMap.get(requestedId);
+            if (item == null) {
+                invalidIds.add(requestedId); // ID không tồn tại trong DB
+            } else if (!item.getUser().getUserId().equals(userId)) {
+                unauthorizedIds.add(requestedId); // ID tồn tại nhưng không thuộc về user này
+            }
+        }
+
+        // Nếu có bất kỳ ID không hợp lệ hoặc không được phép, ném Exception
+        if (!invalidIds.isEmpty() || !unauthorizedIds.isEmpty()) {
+            StringBuilder errorMessage = new StringBuilder("Không thể xóa các mục sau: ");
+            if (!invalidIds.isEmpty()) {
+                errorMessage.append("Không tìm thấy ID: ").append(invalidIds).append(". ");
+            }
+            if (!unauthorizedIds.isEmpty()) {
+                errorMessage.append("Không có quyền xóa ID: ").append(unauthorizedIds).append(".");
+            }
+            throw new IllegalArgumentException(errorMessage.toString().trim());
+        }
+        // --- KẾT THÚC KIỂM TRA ---
+
+        // Nếu tất cả ID đều hợp lệ và thuộc về user, tiến hành xóa
+        // Lúc này, list `foundItems` chính là danh sách các items cần xóa
+        int deletedCount = foundItems.size();
+
+        if (deletedCount > 0) {
+            shoppingListRepository.deleteAll(foundItems); // Xóa các mục hợp lệ đã tìm thấy
+        }
+
+        Map<String, Integer> result = new HashMap<>();
+        result.put("deletedCount", deletedCount);
+        return result;
+    }
 }
