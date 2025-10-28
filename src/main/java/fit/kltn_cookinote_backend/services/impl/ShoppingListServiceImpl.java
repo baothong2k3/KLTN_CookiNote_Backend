@@ -22,6 +22,7 @@ import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.GeminiApiClient;
 import fit.kltn_cookinote_backend.services.ShoppingListService;
 import fit.kltn_cookinote_backend.utils.ShoppingListUtils;
+import jakarta.annotation.Nullable;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -674,61 +675,6 @@ public class ShoppingListServiceImpl implements ShoppingListService {
     }
 
     @Override
-    @Transactional
-    public Map<String, Integer> deleteItems(Long userId, List<Long> itemIds) {
-        if (itemIds == null || itemIds.isEmpty()) {
-            throw new IllegalArgumentException("Danh sách ID cần xóa không được rỗng.");
-        }
-
-        // Kiểm tra user tồn tại (nếu cần)
-        userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("User không tồn tại: " + userId));
-
-        // Tải tất cả items dựa trên danh sách ID được yêu cầu
-        List<ShoppingList> foundItems = shoppingListRepository.findAllById(itemIds);
-        Map<Long, ShoppingList> foundItemsMap = foundItems.stream()
-                .collect(Collectors.toMap(ShoppingList::getId, item -> item));
-
-        // --- KIỂM TRA TÍNH HỢP LỆ CỦA itemIds ---
-        List<Long> invalidIds = new ArrayList<>(); // Lưu các ID không tìm thấy
-        List<Long> unauthorizedIds = new ArrayList<>(); // Lưu các ID không thuộc về user
-
-        for (Long requestedId : itemIds) {
-            ShoppingList item = foundItemsMap.get(requestedId);
-            if (item == null) {
-                invalidIds.add(requestedId); // ID không tồn tại trong DB
-            } else if (!item.getUser().getUserId().equals(userId)) {
-                unauthorizedIds.add(requestedId); // ID tồn tại nhưng không thuộc về user này
-            }
-        }
-
-        // Nếu có bất kỳ ID không hợp lệ hoặc không được phép, ném Exception
-        if (!invalidIds.isEmpty() || !unauthorizedIds.isEmpty()) {
-            StringBuilder errorMessage = new StringBuilder("Không thể xóa các mục sau: ");
-            if (!invalidIds.isEmpty()) {
-                errorMessage.append("Không tìm thấy ID: ").append(invalidIds).append(". ");
-            }
-            if (!unauthorizedIds.isEmpty()) {
-                errorMessage.append("Không có quyền xóa ID: ").append(unauthorizedIds).append(".");
-            }
-            throw new IllegalArgumentException(errorMessage.toString().trim());
-        }
-        // --- KẾT THÚC KIỂM TRA ---
-
-        // Nếu tất cả ID đều hợp lệ và thuộc về user, tiến hành xóa
-        // Lúc này, list `foundItems` chính là danh sách các items cần xóa
-        int deletedCount = foundItems.size();
-
-        if (deletedCount > 0) {
-            shoppingListRepository.deleteAll(foundItems); // Xóa các mục hợp lệ đã tìm thấy
-        }
-
-        Map<String, Integer> result = new HashMap<>();
-        result.put("deletedCount", deletedCount);
-        return result;
-    }
-
-    @Override
     @Transactional(readOnly = true)
     public List<ShoppingListResponse> getItems(Long userId, Optional<Long> recipeIdOpt) {
         // Kiểm tra user tồn tại
@@ -770,5 +716,74 @@ public class ShoppingListServiceImpl implements ShoppingListService {
         return items.stream()
                 .map(item -> toResponse(item, recipeId))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Integer> deleteItemsByIds(Long userId, List<Long> itemIds) { // <<< ĐỔI TÊN deleteItems thành deleteItemsByIds
+        if (itemIds == null || itemIds.isEmpty()) {
+            throw new IllegalArgumentException("Danh sách ID cần xóa không được rỗng.");
+        }
+        userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User không tồn tại: " + userId));
+
+        // Tải các item thuộc user để kiểm tra quyền trước khi xóa
+        List<ShoppingList> itemsToDelete = shoppingListRepository.findByIdInAndUser_UserId(itemIds, userId);
+
+        // Kiểm tra xem có ID nào không tìm thấy hoặc không thuộc về user không
+        if (itemsToDelete.size() != itemIds.size()) {
+            Set<Long> foundIds = itemsToDelete.stream().map(ShoppingList::getId).collect(Collectors.toSet());
+            List<Long> missingOrUnauthorizedIds = itemIds.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .toList();
+            throw new IllegalArgumentException("Không thể xóa các mục sau (không tìm thấy hoặc không có quyền): " + missingOrUnauthorizedIds);
+        }
+
+        int deletedCount = itemsToDelete.size();
+        if (deletedCount > 0) {
+            shoppingListRepository.deleteAllInBatch(itemsToDelete); // Dùng deleteAllInBatch hiệu quả hơn cho nhiều entity
+        }
+
+        Map<String, Integer> result = new HashMap<>();
+        result.put("deletedCount", deletedCount);
+        return result;
+    }
+
+
+    @Override
+    @Transactional
+    public Map<String, Integer> deleteItemsByFilter(Long userId, String filter, @Nullable Long recipeId) {
+        userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User không tồn tại: " + userId));
+
+        int deletedCount;
+        String normalizedFilter = filter.toLowerCase().trim();
+
+        switch (normalizedFilter) {
+            case "checked":
+                deletedCount = shoppingListRepository.deleteCheckedItems(userId);
+                break;
+            case "recipe":
+                if (recipeId == null) {
+                    throw new IllegalArgumentException("Cần cung cấp 'recipeId' khi xóa theo 'recipe'.");
+                }
+                // Kiểm tra xem recipe có tồn tại không (không cần kiểm tra quyền vì chỉ xóa item của user hiện tại)
+                recipeRepository.findById(recipeId)
+                        .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+                deletedCount = shoppingListRepository.deleteByRecipeId(userId, recipeId);
+                break;
+            case "standalone":
+                deletedCount = shoppingListRepository.deleteStandaloneItems(userId);
+                break;
+            case "all":
+                deletedCount = shoppingListRepository.deleteAllItems(userId);
+                break;
+            default:
+                throw new IllegalArgumentException("Giá trị 'filter' không hợp lệ: " + filter);
+        }
+
+        Map<String, Integer> result = new HashMap<>();
+        result.put("deletedCount", deletedCount);
+        return result;
     }
 }

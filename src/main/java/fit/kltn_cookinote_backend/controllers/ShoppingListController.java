@@ -214,18 +214,60 @@ public class ShoppingListController {
     }
 
     /**
-     * Xóa một hoặc nhiều mục khỏi shopping list.
+     * Xóa một hoặc nhiều mục khỏi shopping list theo danh sách ID cụ thể.
+     * Endpoint: DELETE /shopping-lists/items-by-ids
      */
-    @DeleteMapping("/items")
+    @DeleteMapping("/items-by-ids")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Map<String, Integer>>> deleteShoppingListItems(
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> deleteShoppingListItemsByIds(
             @AuthenticationPrincipal User authUser,
-            @Valid @RequestBody DeleteShoppingListItemsRequest req,
+            @Valid @RequestBody DeleteShoppingListItemsRequest reqBody, // Nhận ID từ body
             HttpServletRequest httpReq
     ) {
-        Map<String, Integer> result = shoppingListService.deleteItems(authUser.getUserId(), req.itemIds());
+        // Validate IDs trước khi xóa
+        if (reqBody.itemIds() == null || reqBody.itemIds().isEmpty()) {
+            throw new IllegalArgumentException("Danh sách ID cần xóa không được rỗng.");
+        }
+
+        Map<String, Integer> result = shoppingListService.deleteItemsByIds(authUser.getUserId(), reqBody.itemIds());
         int deletedCount = result.getOrDefault("deletedCount", 0);
-        String message = String.format("Đã xóa thành công %d mục khỏi danh sách mua sắm.", deletedCount);
+        String message = String.format("Đã xóa thành công %d mục được chọn.", deletedCount);
+
+        return ResponseEntity.ok(ApiResponse.success(message, result, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Xóa hàng loạt các mục shopping list theo filter.
+     * Endpoint: DELETE /shopping-lists/items-by-filter?filter=...[&recipeId=...]
+     * Filters hợp lệ: "checked", "recipe", "standalone", "all".
+     */
+    @DeleteMapping("/items-by-filter")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> deleteShoppingListItemsByFilter(
+            @AuthenticationPrincipal User authUser,
+            @RequestParam String filter, // Bắt buộc phải có filter
+            @RequestParam(required = false) Long recipeId, // Chỉ cần khi filter=recipe
+            HttpServletRequest httpReq
+    ) {
+        Map<String, Integer> result = shoppingListService.deleteItemsByFilter(authUser.getUserId(), filter, recipeId);
+        int deletedCount = result.getOrDefault("deletedCount", 0);
+        String message;
+
+        // Tạo message dựa trên filter
+        message = switch (filter.toLowerCase()) {
+            case "checked" -> String.format("Đã xóa %d mục đã hoàn thành.", deletedCount);
+            case "recipe" -> {
+                if (recipeId == null) { // Bắt lỗi nếu recipeId thiếu khi filter=recipe (dù service đã check)
+                    throw new IllegalArgumentException("Cần cung cấp 'recipeId' khi filter='recipe'.");
+                }
+                yield String.format("Đã xóa %d mục thuộc Recipe ID %d.", deletedCount, recipeId);
+            }
+            case "standalone" -> String.format("Đã xóa %d mục lẻ loi.", deletedCount);
+            case "all" -> String.format("Đã xóa tất cả %d mục.", deletedCount);
+            default ->
+                    throw new IllegalArgumentException("Giá trị 'filter' không hợp lệ: " + filter); // Bắt filter không hợp lệ
+        };
+
         return ResponseEntity.ok(ApiResponse.success(message, result, httpReq.getRequestURI()));
     }
 

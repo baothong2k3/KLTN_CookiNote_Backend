@@ -11,6 +11,9 @@ package fit.kltn_cookinote_backend.repositories;/*
 
 import fit.kltn_cookinote_backend.entities.ShoppingList;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +28,8 @@ public interface ShoppingListRepository extends JpaRepository<ShoppingList, Long
     );
 
     List<ShoppingList> findByUser_UserIdAndRecipeIsNull(Long userId);
+
+    List<ShoppingList> findByIdInAndUser_UserId(List<Long> ids, Long userId);
 
     Optional<ShoppingList> findByUser_UserIdAndRecipeIsNullAndIngredientIgnoreCase(
             Long userId, String ingredient
@@ -49,4 +54,20 @@ public interface ShoppingListRepository extends JpaRepository<ShoppingList, Long
      * @return Danh sách các mục ShoppingList lẻ loi.
      */
     List<ShoppingList> findByUser_UserIdAndRecipeIsNullOrderByIdDesc(Long userId);
+
+    @Modifying
+    @Query("DELETE FROM ShoppingList sl WHERE sl.user.userId = :userId AND sl.checked = true")
+    int deleteCheckedItems(@Param("userId") Long userId);
+
+    @Modifying
+    @Query("DELETE FROM ShoppingList sl WHERE sl.user.userId = :userId AND sl.recipe.id = :recipeId")
+    int deleteByRecipeId(@Param("userId") Long userId, @Param("recipeId") Long recipeId);
+
+    @Modifying
+    @Query("DELETE FROM ShoppingList sl WHERE sl.user.userId = :userId AND sl.recipe IS NULL")
+    int deleteStandaloneItems(@Param("userId") Long userId);
+
+    @Modifying
+    @Query("DELETE FROM ShoppingList sl WHERE sl.user.userId = :userId")
+    int deleteAllItems(@Param("userId") Long userId);
 }
