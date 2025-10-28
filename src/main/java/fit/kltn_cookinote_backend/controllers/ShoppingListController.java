@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequiredArgsConstructor
@@ -226,5 +227,28 @@ public class ShoppingListController {
         int deletedCount = result.getOrDefault("deletedCount", 0);
         String message = String.format("Đã xóa thành công %d mục khỏi danh sách mua sắm.", deletedCount);
         return ResponseEntity.ok(ApiResponse.success(message, result, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Lấy danh sách các mục shopping list.
+     * Có thể lọc theo recipeId (dùng ?recipeId=...) hoặc lấy các mục lẻ loi (không truyền recipeId).
+     */
+    @GetMapping("/items")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<ShoppingListResponse>>> getShoppingListItems(
+            @AuthenticationPrincipal User authUser,
+            @RequestParam(required = false) Long recipeId, // Dùng RequestParam, không bắt buộc
+            HttpServletRequest httpReq
+    ) {
+        // Chuyển Long thành Optional<Long>
+        Optional<Long> recipeIdOpt = Optional.ofNullable(recipeId);
+
+        List<ShoppingListResponse> data = shoppingListService.getItems(authUser.getUserId(), recipeIdOpt);
+
+        String message = recipeIdOpt
+                .map(id -> String.format("Lấy danh sách mua sắm cho Recipe #%d thành công.", id)) // Nếu có recipeId
+                .orElse("Lấy danh sách mua sắm lẻ loi thành công."); // Nếu không có recipeId
+
+        return ResponseEntity.ok(ApiResponse.success(message, data, httpReq.getRequestURI()));
     }
 }

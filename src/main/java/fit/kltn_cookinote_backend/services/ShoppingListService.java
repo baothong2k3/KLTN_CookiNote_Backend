@@ -14,6 +14,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public interface ShoppingListService {
     SyncShoppingListResponse createFromRecipe(Long userId, Long recipeId);
@@ -71,4 +72,15 @@ public interface ShoppingListService {
      * @return Map chứa số lượng mục đã xóa thành công.
      */
     Map<String, Integer> deleteItems(Long userId, List<Long> itemIds);
+
+    /**
+     * Lấy danh sách các mục trong shopping list của người dùng.
+     * Nếu recipeId có giá trị, lấy các mục cho recipe đó.
+     * Nếu recipeId rỗng (empty Optional), lấy các mục lẻ loi (không thuộc recipe nào).
+     *
+     * @param userId   ID của người dùng.
+     * @param recipeId Optional chứa ID của công thức, hoặc rỗng để lấy mục lẻ loi.
+     * @return Danh sách các mục ShoppingListResponse.
+     */
+    List<ShoppingListResponse> getItems(Long userId, Optional<Long> recipeId);
 }
