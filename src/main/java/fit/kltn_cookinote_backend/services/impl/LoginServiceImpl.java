@@ -42,8 +42,12 @@ public class LoginServiceImpl implements LoginService {
                 .or(() -> userRepo.findByEmail(req.username()))
                 .orElseThrow(() -> new IllegalArgumentException("Tài khoản hoặc mật khẩu không đúng."));
 
-        if (!user.isEnabled() || !user.isEmailVerified()) {
-            throw new IllegalStateException("Tài khoản chưa kích hoạt hoặc chưa xác thực email.");
+        if (!user.isEmailVerified()) { // Kiểm tra email verified
+            throw new IllegalStateException("Tài khoản chưa xác thực email. Vui lòng kiểm tra email để xác thực.");
+        }
+
+        if (!user.isEnabled()) { // Kiểm tra enabled
+            throw new IllegalStateException("Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.");
         }
         if (!encoder.matches(req.password(), user.getPassword())) {
             throw new IllegalArgumentException("Tài khoản hoặc mật khẩu không đúng.");

@@ -64,11 +64,26 @@ public class AdminController {
     @PostMapping("/export/recipes") // Endpoint mới
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> exportAllRecipesMergedToFile(
-                                                                             @RequestBody(required = false) ExportRequest request,
-                                                                             HttpServletRequest httpReq) throws IOException {
+            @RequestBody(required = false) ExportRequest request,
+            HttpServletRequest httpReq) throws IOException {
 
         String savedFilePath = excelExportService.exportAllRecipesMergedToExcelFile(request);
         String message = "Xuất file Excel thành công. Đã lưu tại: " + savedFilePath;
         return ResponseEntity.ok(ApiResponse.success(message, savedFilePath, httpReq.getRequestURI()));
+    }
+
+    /**
+     * API để Admin vô hiệu hóa tài khoản người dùng (không phải Admin).
+     * Sẽ thu hồi tất cả phiên đăng nhập của người dùng đó.
+     */
+    @PatchMapping("/users/{id}/disable") // Sử dụng PATCH vì chỉ cập nhật một phần trạng thái
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<UserDetailDto>> disableUser(
+            @PathVariable Long id,
+            HttpServletRequest httpReq) {
+
+        UserDetailDto updatedUserDetails = userService.disableUser(id); // Gọi service mới
+        String message = String.format("Đã vô hiệu hóa thành công tài khoản người dùng ID: %d", id);
+        return ResponseEntity.ok(ApiResponse.success(message, updatedUserDetails, httpReq.getRequestURI()));
     }
 }
