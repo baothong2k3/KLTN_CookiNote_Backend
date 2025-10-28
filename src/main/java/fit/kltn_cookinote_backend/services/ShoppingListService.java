@@ -74,7 +74,7 @@ public interface ShoppingListService {
      * @param recipeId Optional chứa ID của công thức, hoặc rỗng để lấy mục lẻ loi.
      * @return Danh sách các mục ShoppingListResponse.
      */
-    List<ShoppingListResponse> getItems(Long userId, Optional<Long> recipeId);
+    List<ShoppingListResponse> getItems(Long userId, @Nullable Long recipeId);
 
     /**
      * Xóa các mục theo danh sách ID cụ thể.

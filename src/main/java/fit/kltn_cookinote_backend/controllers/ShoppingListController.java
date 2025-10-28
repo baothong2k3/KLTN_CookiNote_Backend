@@ -279,17 +279,14 @@ public class ShoppingListController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<ShoppingListResponse>>> getShoppingListItems(
             @AuthenticationPrincipal User authUser,
-            @RequestParam(required = false) Long recipeId, // Dùng RequestParam, không bắt buộc
+            @RequestParam(required = false) Long recipeId,
             HttpServletRequest httpReq
     ) {
-        // Chuyển Long thành Optional<Long>
-        Optional<Long> recipeIdOpt = Optional.ofNullable(recipeId);
+        List<ShoppingListResponse> data = shoppingListService.getItems(authUser.getUserId(), recipeId);
 
-        List<ShoppingListResponse> data = shoppingListService.getItems(authUser.getUserId(), recipeIdOpt);
-
-        String message = recipeIdOpt
-                .map(id -> String.format("Lấy danh sách mua sắm cho Recipe #%d thành công.", id)) // Nếu có recipeId
-                .orElse("Lấy danh sách mua sắm lẻ loi thành công."); // Nếu không có recipeId
+        String message = (recipeId != null)
+                ? String.format("Lấy danh sách mua sắm cho Recipe #%d thành công.", recipeId)
+                : "Lấy danh sách mua sắm lẻ loi thành công.";
 
         return ResponseEntity.ok(ApiResponse.success(message, data, httpReq.getRequestURI()));
     }

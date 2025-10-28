@@ -676,13 +676,11 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ShoppingListResponse> getItems(Long userId, Optional<Long> recipeIdOpt) {
-        // Kiểm tra user tồn tại
+    public List<ShoppingListResponse> getItems(Long userId, @Nullable Long recipeId) {
         userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User không tồn tại: " + userId));
 
         List<ShoppingList> items;
-        Long recipeId = recipeIdOpt.orElse(null); // Lấy giá trị Long hoặc null
 
         if (recipeId != null) {
             // --- Trường hợp có recipeId ---
@@ -695,26 +693,20 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                 throw new AccessDeniedException("Bạn không có quyền xem shopping list của recipe PRIVATE này.");
             }
             if (recipe.isDeleted()) {
-                // Nếu recipe bị xóa, trả về danh sách rỗng thay vì lỗi
-                // Hoặc bạn có thể truy vấn các item có isRecipeDeleted = true nếu muốn
                 return Collections.emptyList();
             }
 
-            // Truy vấn các mục theo userId và recipeId
             items = shoppingListRepository.findByUser_UserIdAndRecipe_Id(userId, recipeId);
-            // Sắp xếp theo ID tăng dần
             items.sort(Comparator.comparing(ShoppingList::getId));
 
         } else {
-            // --- Trường hợp không có recipeId (lấy mục lẻ loi) ---
+            // --- Trường hợp recipeId là null (lấy mục lẻ loi) ---
             items = shoppingListRepository.findByUser_UserIdAndRecipeIsNullOrderByIdDesc(userId);
-            // Repository đã sắp xếp theo ID giảm dần (mới nhất trước)
         }
 
         // Chuyển đổi sang DTO và trả về
-        // Truyền recipeId (có thể là null) vào toResponse
         return items.stream()
-                .map(item -> toResponse(item, recipeId))
+                .map(item -> toResponse(item, recipeId)) // recipeId có thể null
                 .collect(Collectors.toList());
     }
 
