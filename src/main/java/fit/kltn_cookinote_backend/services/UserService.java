@@ -35,4 +35,12 @@ public interface UserService {
      * @return Thông tin chi tiết của người dùng đã được cập nhật.
      */
     UserDetailDto disableUser(Long userId);
+
+    /**
+     * Kích hoạt lại tài khoản người dùng đã bị vô hiệu hóa (chỉ dành cho Admin).
+     *
+     * @param userId ID của người dùng cần kích hoạt lại.
+     * @return Thông tin chi tiết của người dùng đã được cập nhật.
+     */
+    UserDetailDto enableUser(Long userId);
 }

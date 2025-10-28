@@ -143,4 +143,31 @@ public class UserServiceImpl implements UserService {
 
         return userMapper.toDetailDto(user); // Trả về thông tin chi tiết đã cập nhật
     }
+
+    @Override
+    @Transactional
+    public UserDetailDto enableUser(Long userId) {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người dùng với id: " + userId));
+
+        // Có thể thêm kiểm tra để đảm bảo chỉ Admin mới kích hoạt được,
+        // nhưng @PreAuthorize ở Controller đã đủ an toàn.
+
+        if (user.isEnabled()) {
+            // Nếu tài khoản đã được kích hoạt rồi thì không cần làm gì
+            return userMapper.toDetailDto(user);
+        }
+
+        // Chỉ kích hoạt lại nếu email đã được xác thực trước đó
+        if (!user.isEmailVerified()) {
+            throw new IllegalStateException("Không thể kích hoạt tài khoản chưa xác thực email. Người dùng cần xác thực email trước.");
+        }
+
+        user.setEnabled(true); // Đặt trạng thái thành true
+        userRepo.save(user);
+
+        // Lưu ý: Không cần thu hồi token khi enable lại. Người dùng có thể đăng nhập bình thường.
+
+        return userMapper.toDetailDto(user); // Trả về thông tin chi tiết đã cập nhật
+    }
 }

@@ -82,8 +82,23 @@ public class AdminController {
             @PathVariable Long id,
             HttpServletRequest httpReq) {
 
-        UserDetailDto updatedUserDetails = userService.disableUser(id); // Gọi service mới
+        UserDetailDto updatedUserDetails = userService.disableUser(id);
         String message = String.format("Đã vô hiệu hóa thành công tài khoản người dùng ID: %d", id);
+        return ResponseEntity.ok(ApiResponse.success(message, updatedUserDetails, httpReq.getRequestURI()));
+    }
+
+    /**
+     * API để Admin kích hoạt lại tài khoản người dùng đã bị vô hiệu hóa.
+     * Yêu cầu email của người dùng phải đã được xác thực.
+     */
+    @PatchMapping("/users/{id}/enable")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<UserDetailDto>> enableUser(
+            @PathVariable Long id,
+            HttpServletRequest httpReq) {
+
+        UserDetailDto updatedUserDetails = userService.enableUser(id);
+        String message = String.format("Đã kích hoạt lại thành công tài khoản người dùng ID: %d", id);
         return ResponseEntity.ok(ApiResponse.success(message, updatedUserDetails, httpReq.getRequestURI()));
     }
 }
