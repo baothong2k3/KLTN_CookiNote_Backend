@@ -510,6 +510,8 @@ public class RecipeServiceImpl implements RecipeService {
                 .difficulty(req.difficulty())
                 .privacy(req.privacy()) // Theo lựa chọn của người dùng
                 .view(0L) // Bắt đầu từ 0
+                .averageRating(0.0)
+                .ratingCount(0)
                 .createdAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 

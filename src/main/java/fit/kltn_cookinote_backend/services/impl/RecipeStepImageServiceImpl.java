@@ -238,11 +238,7 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
-        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId)
-                .map(RecipeRating::getScore)
-                .orElse(null);
-        return RecipeResponse.from(reloaded, isFavorited, myRating);
+        return buildRecipeResponse(actorUserId, reloaded);
     }
 
     @Override
@@ -303,11 +299,7 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
-        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId)
-                .map(RecipeRating::getScore)
-                .orElse(null);
-        return RecipeResponse.from(reloaded, isFavorited, myRating);
+        return buildRecipeResponse(actorUserId, reloaded);
     }
 
     @Override
@@ -384,12 +376,23 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
 
         // 8) Reload the detailed Recipe to return the updated state
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
-                .orElseThrow(() -> new EntityNotFoundException("Recipe not found after update: " + recipeId)); // Should ideally not happen
+                .orElseThrow(() -> new EntityNotFoundException("Recipe not found after update: " + recipeId));
 
-        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId)
+        return buildRecipeResponse(actorUserId, reloaded);
+    }
+
+    /**
+     * Phương thức helper private để lấy isFavorited, myRating và tạo RecipeResponse.
+     *
+     * @param actorUserId ID của người dùng thực hiện hành động (để kiểm tra favorite/rating).
+     * @param recipe      Đối tượng Recipe đã được cập nhật và tải lại.
+     * @return RecipeResponse hoàn chỉnh.
+     */
+    private RecipeResponse buildRecipeResponse(Long actorUserId, Recipe recipe) {
+        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipe.getId()).isPresent();
+        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipe.getId())
                 .map(RecipeRating::getScore)
                 .orElse(null);
-        return RecipeResponse.from(reloaded, isFavorited, myRating);
+        return RecipeResponse.from(recipe, isFavorited, myRating);
     }
 }
