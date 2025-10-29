@@ -29,4 +29,13 @@ public interface RatingService {
      * @param recipeId ID của công thức cần cập nhật.
      */
     void updateRecipeRatingStats(Long recipeId);
+
+    /**
+     * Xóa đánh giá của người dùng cho một công thức cụ thể.
+     * Nếu không có đánh giá nào tồn tại, phương thức sẽ không làm gì cả.
+     *
+     * @param userId   ID của người dùng muốn xóa đánh giá.
+     * @param recipeId ID của công thức có đánh giá cần xóa.
+     */
+    void deleteMyRating(Long userId, Long recipeId);
 }

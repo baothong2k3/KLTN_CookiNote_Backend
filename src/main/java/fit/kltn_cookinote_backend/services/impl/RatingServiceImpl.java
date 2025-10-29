@@ -130,6 +130,24 @@ public class RatingServiceImpl implements RatingService {
         recipeRepository.save(recipe);
     }
 
+    @Override
+    @Transactional
+    public void deleteMyRating(Long userId, Long recipeId) {
+        userRepository.findById(userId).orElseThrow(() -> new EntityNotFoundException("User not found"));
+        recipeRepository.findById(recipeId).orElseThrow(() -> new EntityNotFoundException("Recipe not found"));
+
+        // Tìm đánh giá hiện có của người dùng cho công thức này
+        Optional<RecipeRating> ratingOpt = ratingRepository.findByUser_UserIdAndRecipe_Id(userId, recipeId);
+
+        if (ratingOpt.isPresent()) {
+            // Nếu tìm thấy, xóa nó đi
+            ratingRepository.delete(ratingOpt.get());
+
+            // Sau khi xóa, cập nhật lại thống kê rating cho công thức
+            updateRecipeRatingStats(recipeId);
+        }
+    }
+
     // Helper kiểm tra quyền xem
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {
         return switch (privacy) {

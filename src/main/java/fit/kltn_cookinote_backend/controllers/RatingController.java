@@ -46,4 +46,20 @@ public class RatingController {
         String message = "Đánh giá công thức thành công.";
         return ResponseEntity.ok(ApiResponse.success(message, data, httpReq.getRequestURI()));
     }
+
+    /**
+     * API để người dùng xóa đánh giá của chính mình cho một công thức.
+     * Endpoint: DELETE /recipes/{recipeId}/ratings/me
+     */
+    @DeleteMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> deleteMyRating(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq) {
+
+        ratingService.deleteMyRating(authUser.getUserId(), recipeId);
+        String message = "Đã xóa đánh giá của bạn cho công thức thành công.";
+        return ResponseEntity.ok(ApiResponse.success(message, httpReq.getRequestURI()));
+    }
 }
