@@ -76,7 +76,7 @@ public class AdminController {
      * API để Admin vô hiệu hóa tài khoản người dùng (không phải Admin).
      * Sẽ thu hồi tất cả phiên đăng nhập của người dùng đó.
      */
-    @PatchMapping("/users/{id}/disable") // Sử dụng PATCH vì chỉ cập nhật một phần trạng thái
+    @PatchMapping("/users/{id}/disable")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UserDetailDto>> disableUser(
             @PathVariable Long id,

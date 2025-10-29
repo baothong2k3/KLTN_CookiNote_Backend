@@ -12,6 +12,8 @@ package fit.kltn_cookinote_backend.entities;/*
 import fit.kltn_cookinote_backend.enums.Difficulty;
 import fit.kltn_cookinote_backend.enums.Privacy;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import lombok.*;
 import org.hibernate.annotations.Fetch;
 import org.hibernate.annotations.FetchMode;
@@ -87,7 +89,19 @@ public class Recipe {
     @OnDelete(action = OnDeleteAction.SET_NULL) // Nếu recipe gốc bị xóa, trường này sẽ thành null
     private Recipe originalRecipe;
 
+    @Column(name = "average_rating")
+    @DecimalMin("0.0")
+    @DecimalMax("5.0") // Giữ giá trị trong khoảng 0.0 - 5.0
+    private Double averageRating; // Điểm rating trung bình
+
+    @Column(name = "rating_count")
+    private Integer ratingCount;
+
     // children
+    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<RecipeRating> ratings = new HashSet<>();
+
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("stepNo ASC")
     @Builder.Default

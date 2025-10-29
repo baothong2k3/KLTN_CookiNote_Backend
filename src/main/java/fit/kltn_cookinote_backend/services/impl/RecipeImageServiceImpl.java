@@ -42,6 +42,7 @@ public class RecipeImageServiceImpl implements RecipeImageService {
     private final UserRepository userRepository;
     private final RecipeCoverImageHistoryRepository recipeCoverImageHistoryRepository;
     private final FavoriteRepository favoriteRepository;
+    private final RecipeRatingRepository ratingRepository;
 
     @Value("${app.cloudinary.recipe-folder}")
     private String recipeFolder;
@@ -103,7 +104,10 @@ public class RecipeImageServiceImpl implements RecipeImageService {
     public RecipeResponse updateCover(Long actorUserId, Long recipeId, MultipartFile file) throws IOException {
         Recipe updatedRecipe = processCoverUpdate(actorUserId, recipeId, file);
         boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        return RecipeResponse.from(updatedRecipe, isFavorited);
+        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId)
+                .map(RecipeRating::getScore)
+                .orElse(null);
+        return RecipeResponse.from(updatedRecipe, isFavorited, myRating);
     }
 
     @Override

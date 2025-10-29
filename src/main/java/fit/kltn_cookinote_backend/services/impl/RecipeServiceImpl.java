@@ -49,6 +49,7 @@ public class RecipeServiceImpl implements RecipeService {
     private final ShoppingListRepository shoppingListRepository;
     private final FavoriteRepository favoriteRepository;
     private final CookedHistoryRepository cookedHistoryRepository;
+    private final RecipeRatingRepository ratingRepository;
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 12; // mobile-friendly
@@ -78,6 +79,8 @@ public class RecipeServiceImpl implements RecipeService {
                 .cookTime(req.cookTime())
                 .difficulty(req.difficulty())
                 .view(0L)
+                .averageRating(0.0)
+                .ratingCount(0)
                 .createdAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
@@ -129,7 +132,7 @@ public class RecipeServiceImpl implements RecipeService {
         }
 
         Recipe saved = recipeRepository.saveAndFlush(recipe);
-        return RecipeResponse.from(saved, false);
+        return RecipeResponse.from(saved, false, null);
     }
 
     @Override
@@ -152,7 +155,12 @@ public class RecipeServiceImpl implements RecipeService {
 
         boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(viewerUserId, recipeId).isPresent();
 
-        return RecipeResponse.from(recipe, isFavorited);
+        // Lấy rating của người dùng hiện tại
+        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(viewerUserId, recipeId) // Sửa: Dùng viewerUserId
+                .map(RecipeRating::getScore)
+                .orElse(null);
+
+        return RecipeResponse.from(recipe, isFavorited, myRating);
     }
 
     @Override
@@ -295,7 +303,11 @@ public class RecipeServiceImpl implements RecipeService {
         Recipe saved = recipeRepository.saveAndFlush(recipe);
 
         boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        return RecipeResponse.from(saved, isFavorited);
+        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId)
+                .map(RecipeRating::getScore)
+                .orElse(null);
+
+        return RecipeResponse.from(saved, isFavorited, myRating);
     }
 
     @Override
@@ -525,7 +537,7 @@ public class RecipeServiceImpl implements RecipeService {
         newRecipe.setSteps(steps);
 
         Recipe saved = recipeRepository.save(newRecipe);
-        return RecipeResponse.from(saved, false);
+        return RecipeResponse.from(saved, false, null);
     }
 
     @Override
@@ -629,7 +641,11 @@ public class RecipeServiceImpl implements RecipeService {
                     .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
             boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-            return RecipeResponse.from(recipe, isFavorited);
+            Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId)
+                    .map(RecipeRating::getScore)
+                    .orElse(null);
+
+            return RecipeResponse.from(recipe, isFavorited, myRating);
         }
 
 
@@ -638,7 +654,10 @@ public class RecipeServiceImpl implements RecipeService {
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại sau khi cập nhật: " + recipeId)); // Nên có
 
         boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        return RecipeResponse.from(reloaded, isFavorited);
+        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId)
+                .map(RecipeRating::getScore)
+                .orElse(null);
+        return RecipeResponse.from(reloaded, isFavorited, myRating);
     }
 
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {

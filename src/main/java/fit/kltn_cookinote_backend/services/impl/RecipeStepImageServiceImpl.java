@@ -12,10 +12,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepReorderRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
-import fit.kltn_cookinote_backend.entities.Recipe;
-import fit.kltn_cookinote_backend.entities.RecipeStep;
-import fit.kltn_cookinote_backend.entities.RecipeStepImage;
-import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.*;
@@ -48,6 +45,7 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
     private final UserRepository userRepository;
     private final RecipeRepository recipeRepository;
     private final FavoriteRepository favoriteRepository;
+    private final RecipeRatingRepository ratingRepository;
 
     @PersistenceContext
     private EntityManager em;
@@ -241,7 +239,10 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
         boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        return RecipeResponse.from(reloaded, isFavorited);
+        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId)
+                .map(RecipeRating::getScore)
+                .orElse(null);
+        return RecipeResponse.from(reloaded, isFavorited, myRating);
     }
 
     @Override
@@ -303,7 +304,10 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
         boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        return RecipeResponse.from(reloaded, isFavorited);
+        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId)
+                .map(RecipeRating::getScore)
+                .orElse(null);
+        return RecipeResponse.from(reloaded, isFavorited, myRating);
     }
 
     @Override
@@ -383,6 +387,9 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
                 .orElseThrow(() -> new EntityNotFoundException("Recipe not found after update: " + recipeId)); // Should ideally not happen
 
         boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        return RecipeResponse.from(reloaded, isFavorited);
+        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId)
+                .map(RecipeRating::getScore)
+                .orElse(null);
+        return RecipeResponse.from(reloaded, isFavorited, myRating);
     }
 }
