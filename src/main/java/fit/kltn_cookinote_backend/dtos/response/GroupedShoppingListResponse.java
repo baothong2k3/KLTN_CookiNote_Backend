@@ -18,6 +18,7 @@ public record GroupedShoppingListResponse(
         Long recipeId,
         String recipeTitle,
         String recipeImageUrl,
+        Boolean isRecipeDeleted,
         List<ShoppingListItem> items
 ) {
     @Builder
@@ -25,7 +26,8 @@ public record GroupedShoppingListResponse(
             Long id,
             String ingredient,
             String quantity,
-            Boolean checked
+            Boolean checked,
+            Boolean isFromRecipe
     ) {
     }
 }

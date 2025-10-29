@@ -23,4 +23,7 @@ public interface RecipeCoverImageHistoryRepository extends JpaRepository<RecipeC
     @Modifying
     @Query("UPDATE RecipeCoverImageHistory h SET h.active = false WHERE h.recipe.id = :recipeId")
     void deactivateAllByRecipeId(@Param("recipeId") Long recipeId);
+
+    @Query("SELECT h FROM RecipeCoverImageHistory h JOIN FETCH h.recipe r JOIN FETCH r.user u WHERE h.id IN :ids")
+    List<RecipeCoverImageHistory> findByIdInWithRecipeAndUser(@Param("ids") List<Long> ids);
 }

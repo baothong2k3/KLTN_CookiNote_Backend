@@ -38,9 +38,9 @@ public class UserController {
 
     // Kiểm tra access token
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<UserDto>> me(@AuthenticationPrincipal User user,
+    public ResponseEntity<ApiResponse<UserDetailDto>> me(@AuthenticationPrincipal User user,
                                                                HttpServletRequest httpReq) {
-        UserDto data = userMapper.toDto(user);
+        UserDetailDto data = userMapper.toDetailDto(user);
         return ResponseEntity.ok(ApiResponse.success("OK", data, httpReq.getRequestURI()));
     }
 

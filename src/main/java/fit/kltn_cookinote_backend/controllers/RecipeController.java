@@ -9,16 +9,11 @@ package fit.kltn_cookinote_backend.controllers;/*
  * @version: 1.0
  */
 
-import fit.kltn_cookinote_backend.dtos.request.ForkRecipeRequest;
-import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
-import fit.kltn_cookinote_backend.dtos.request.RecipeStepUpdateRequest;
-import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
+import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.User;
-import fit.kltn_cookinote_backend.services.FavoriteService;
-import fit.kltn_cookinote_backend.services.RecipeImageService;
-import fit.kltn_cookinote_backend.services.RecipeService;
-import fit.kltn_cookinote_backend.services.RecipeStepImageService;
+import fit.kltn_cookinote_backend.repositories.FavoriteRepository;
+import fit.kltn_cookinote_backend.services.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +35,8 @@ public class RecipeController {
     private final RecipeImageService recipeImageService;
     private final RecipeStepImageService stepImageService;
     private final FavoriteService favoriteService;
+    private final ShareService shareService;
+    private final FavoriteRepository favoriteRepository;
 
     // PHA 1: Tạo recipe (USER/ADMIN; nếu PUBLIC chỉ ADMIN)
     @PostMapping
@@ -75,10 +72,11 @@ public class RecipeController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<RecipeResponse>> getDetail(@AuthenticationPrincipal User authUser,
                                                                  @PathVariable Long id,
                                                                  HttpServletRequest httpReq) {
-        Long viewerId = (authUser != null) ? authUser.getUserId() : null;
+        Long viewerId = authUser.getUserId();
         RecipeResponse data = recipeService.getDetail(viewerId, id);
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết công thức thành công", data, httpReq.getRequestURI()));
     }
@@ -367,5 +365,91 @@ public class RecipeController {
     ) {
         PageResult<RecipeCardResponse> data = recipeService.listEasyToCook(page, size);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức dễ nấu thành công", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Thêm một bước mới vào cuối công thức (chỉ chủ sở hữu hoặc ADMIN).
+     * POST /recipes/{recipeId}/steps
+     */
+    @PostMapping(value = "/{recipeId}/steps", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<RecipeResponse>> addStep(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @RequestParam(value = "content") String content,
+            @RequestParam(value = "suggestedTime") Integer suggestedTime,
+            @RequestParam(value = "tips") String tips,
+            @RequestPart(value = "addFiles", required = false) List<MultipartFile> addFiles,
+            HttpServletRequest httpReq
+    ) throws IOException {
+
+        RecipeResponse data = stepImageService.addStep(
+                authUser.getUserId(), recipeId, content, suggestedTime, tips, addFiles
+        );
+        return ResponseEntity.ok(ApiResponse.success("Thêm bước mới thành công", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Sắp xếp lại thứ tự các bước của một công thức.
+     * PUT /recipes/{recipeId}/steps/reorder
+     */
+    @PutMapping("/{recipeId}/steps/reorder")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<RecipeResponse>> reorderSteps(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @Valid @RequestBody RecipeStepReorderRequest req,
+            HttpServletRequest httpReq
+    ) {
+        RecipeResponse data = stepImageService.reorderSteps(authUser.getUserId(), recipeId, req);
+        return ResponseEntity.ok(ApiResponse.success("Sắp xếp lại các bước thành công", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Thêm một hoặc nhiều nguyên liệu vào cuối danh sách của công thức.
+     * POST /recipes/{recipeId}/ingredients
+     */
+    @PostMapping("/{recipeId}/ingredients")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<RecipeResponse>> addIngredients(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @Valid @RequestBody AddIngredientsRequest req,
+            HttpServletRequest httpReq
+    ) {
+        RecipeResponse data = recipeService.addIngredients(authUser.getUserId(), recipeId, req);
+        return ResponseEntity.ok(ApiResponse.success("Thêm nguyên liệu thành công", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Tạo link chia sẻ và mã QR cho một công thức.
+     * POST /recipes/{recipeId}/share
+     */
+    @PostMapping("/{recipeId}/share")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ShareResponse>> shareRecipe(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        ShareResponse data = shareService.createShareLink(authUser.getUserId(), recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Tạo link chia sẻ thành công.", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Truy cập chi tiết công thức thông qua mã chia sẻ.
+     * GET /recipes/shared/{shareCode}
+     */
+    @GetMapping("/shared/{shareCode}")
+    public ResponseEntity<ApiResponse<RecipeResponse>> getRecipeByShareCode(
+            @PathVariable String shareCode,
+            @AuthenticationPrincipal User authUserOrNull,
+            HttpServletRequest httpReq
+    ) {
+        Long viewerId = (authUserOrNull != null) ? authUserOrNull.getUserId() : null;
+
+        RecipeResponse data = shareService.getRecipeByShareCode(shareCode, viewerId);
+
+        return ResponseEntity.ok(ApiResponse.success("Lấy công thức chia sẻ thành công.", data, httpReq.getRequestURI()));
     }
 }

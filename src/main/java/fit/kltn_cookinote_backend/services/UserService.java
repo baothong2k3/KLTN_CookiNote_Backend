@@ -16,8 +16,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
 @Service
 public interface UserService {
     UserDto updateDisplayName(Long userId, UpdateDisplayNameRequest req);
@@ -29,4 +27,20 @@ public interface UserService {
     Page<UserDto> getAllUsers(Pageable pageable);
 
     UserDetailDto getUserDetails(Long userId);
+
+    /**
+     * Vô hiệu hóa tài khoản người dùng (chỉ dành cho Admin).
+     *
+     * @param userId ID của người dùng cần vô hiệu hóa.
+     * @return Thông tin chi tiết của người dùng đã được cập nhật.
+     */
+    UserDetailDto disableUser(Long userId);
+
+    /**
+     * Kích hoạt lại tài khoản người dùng đã bị vô hiệu hóa (chỉ dành cho Admin).
+     *
+     * @param userId ID của người dùng cần kích hoạt lại.
+     * @return Thông tin chi tiết của người dùng đã được cập nhật.
+     */
+    UserDetailDto enableUser(Long userId);
 }

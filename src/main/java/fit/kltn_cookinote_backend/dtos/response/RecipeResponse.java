@@ -34,6 +34,7 @@ public record RecipeResponse(
         String imageUrl,
         Long view,
         LocalDateTime createdAt,
+        Boolean isFavorited,
         List<IngredientDto> ingredients,
         List<StepDto> steps
 ) {
@@ -46,7 +47,7 @@ public record RecipeResponse(
                           List<String> images) {
     }
 
-    public static RecipeResponse from(Recipe r) {
+    public static RecipeResponse from(Recipe r, boolean isFavorited) {
         // ingredients
         List<IngredientDto> ingDtos = new ArrayList<>();
         if (r.getIngredients() != null) {
@@ -97,6 +98,7 @@ public record RecipeResponse(
                 .imageUrl(r.getImageUrl())
                 .view(r.getView())
                 .createdAt(r.getCreatedAt())
+                .isFavorited(isFavorited)
                 .ingredients(ingDtos)
                 .steps(stepDtos)
                 .build();

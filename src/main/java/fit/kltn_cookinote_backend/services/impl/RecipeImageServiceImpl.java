@@ -14,10 +14,7 @@ import fit.kltn_cookinote_backend.dtos.response.AllRecipeImagesResponse;
 import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
 import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Role;
-import fit.kltn_cookinote_backend.repositories.RecipeCoverImageHistoryRepository;
-import fit.kltn_cookinote_backend.repositories.RecipeRepository;
-import fit.kltn_cookinote_backend.repositories.RecipeStepRepository;
-import fit.kltn_cookinote_backend.repositories.UserRepository;
+import fit.kltn_cookinote_backend.repositories.*;
 import fit.kltn_cookinote_backend.services.RecipeImageService;
 import fit.kltn_cookinote_backend.utils.CloudinaryUtils;
 import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
@@ -31,6 +28,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -42,6 +41,7 @@ public class RecipeImageServiceImpl implements RecipeImageService {
     private final RecipeStepRepository stepRepository;
     private final UserRepository userRepository;
     private final RecipeCoverImageHistoryRepository recipeCoverImageHistoryRepository;
+    private final FavoriteRepository favoriteRepository;
 
     @Value("${app.cloudinary.recipe-folder}")
     private String recipeFolder;
@@ -64,7 +64,7 @@ public class RecipeImageServiceImpl implements RecipeImageService {
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Công thức không tồn tại: " + recipeId));
 
-        // ***KIỂM TRA TRẠNG THÁI DELETED * * *
+        // KIỂM TRA TRẠNG THÁI DELETED
         if (recipe.isDeleted()) {
             throw new EntityNotFoundException("Công thức không tồn tại hoặc đã bị xóa: " + recipeId);
         }
@@ -76,7 +76,11 @@ public class RecipeImageServiceImpl implements RecipeImageService {
         String publicId = recipeFolder + "/r_" + recipeId + "/cover_" + Instant.now().getEpochSecond();
         String newUrl = CloudinaryUtils.uploadImage(cloudinary, file, recipeFolder, publicId);
 
+        recipeCoverImageHistoryRepository.deactivateAllByRecipeId(recipe.getId());
+
         recipe.setImageUrl(newUrl);
+
+        recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
 
         RecipeCoverImageHistory historyRecord = RecipeCoverImageHistory.builder()
                 .recipe(recipe)
@@ -98,7 +102,8 @@ public class RecipeImageServiceImpl implements RecipeImageService {
     @Transactional
     public RecipeResponse updateCover(Long actorUserId, Long recipeId, MultipartFile file) throws IOException {
         Recipe updatedRecipe = processCoverUpdate(actorUserId, recipeId, file);
-        return RecipeResponse.from(updatedRecipe);
+        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
+        return RecipeResponse.from(updatedRecipe, isFavorited);
     }
 
     @Override

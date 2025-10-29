@@ -17,6 +17,7 @@ import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.*;
 import fit.kltn_cookinote_backend.services.CloudinaryService;
 import fit.kltn_cookinote_backend.services.RecipeService;
+import fit.kltn_cookinote_backend.utils.ShoppingListUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
@@ -47,6 +48,7 @@ public class RecipeServiceImpl implements RecipeService {
     private final CloudinaryService cloudinaryService;
     private final ShoppingListRepository shoppingListRepository;
     private final FavoriteRepository favoriteRepository;
+    private final CookedHistoryRepository cookedHistoryRepository;
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 12; // mobile-friendly
@@ -127,19 +129,19 @@ public class RecipeServiceImpl implements RecipeService {
         }
 
         Recipe saved = recipeRepository.saveAndFlush(recipe);
-        return RecipeResponse.from(saved);
+        return RecipeResponse.from(saved, false);
     }
 
     @Override
     @Transactional
-    public RecipeResponse getDetail(Long viewerUserIdOrNull, Long recipeId) {
+    public RecipeResponse getDetail(Long viewerUserId, Long recipeId) {
         Recipe recipe = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
         Long ownerId = (recipe.getUser() != null) ? recipe.getUser().getUserId() : null;
-        boolean isOwner = (viewerUserIdOrNull != null) && viewerUserIdOrNull.equals(ownerId);
+        boolean isOwner = viewerUserId.equals(ownerId);
 
-        if (!canView(recipe.getPrivacy(), ownerId, viewerUserIdOrNull)) {
+        if (!canView(recipe.getPrivacy(), ownerId, viewerUserId)) {
             throw new AccessDeniedException("Bạn không có quyền xem công thức này.");
         }
 
@@ -148,7 +150,9 @@ public class RecipeServiceImpl implements RecipeService {
             recipe.setView((recipe.getView() == null ? 0 : recipe.getView()) + 1);
         }
 
-        return RecipeResponse.from(recipe);
+        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(viewerUserId, recipeId).isPresent();
+
+        return RecipeResponse.from(recipe, isFavorited);
     }
 
     @Override
@@ -287,8 +291,11 @@ public class RecipeServiceImpl implements RecipeService {
             }
         }
 
+
         Recipe saved = recipeRepository.saveAndFlush(recipe);
-        return RecipeResponse.from(saved);
+
+        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
+        return RecipeResponse.from(saved, isFavorited);
     }
 
     @Override
@@ -324,15 +331,16 @@ public class RecipeServiceImpl implements RecipeService {
         }
         recipeRepository.save(recipe);
 
-        // CẬP NHẬT: Đánh dấu các shopping list item liên quan
+        // Đánh dấu các shopping list item liên quan
         List<ShoppingList> relatedItems = shoppingListRepository.findByRecipe_Id(recipeId);
         if (!relatedItems.isEmpty()) {
             for (ShoppingList item : relatedItems) {
                 item.setIsRecipeDeleted(true);
-                //item.setOriginalRecipeTitle(recipe.getTitle());
             }
             shoppingListRepository.saveAll(relatedItems);
         }
+
+        cookedHistoryRepository.markAsDeletedByRecipeId(recipeId, recipe.getTitle());
     }
 
     /**
@@ -374,10 +382,11 @@ public class RecipeServiceImpl implements RecipeService {
         Long ownerId = recipe.getUser().getUserId();
         ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
 
-        // CẬP NHẬT: Xử lý các shopping list item trước khi xóa recipe
+        final String recipeTitle = recipe.getTitle();
+
+        // Xử lý các shopping list item trước khi xóa recipe
         List<ShoppingList> relatedItems = shoppingListRepository.findByRecipe_Id(recipeId);
         if (!relatedItems.isEmpty()) {
-            final String recipeTitle = recipe.getTitle();
             for (ShoppingList item : relatedItems) {
                 item.setRecipe(null); // Ngắt kết nối
                 item.setOriginalRecipeTitle(recipeTitle); // Lưu lại tên
@@ -386,16 +395,26 @@ public class RecipeServiceImpl implements RecipeService {
             shoppingListRepository.saveAllAndFlush(relatedItems);
         }
 
-        // CẬP NHẬT: Xử lý các favorite item trước khi xóa recipe
+        // Xử lý các favorite item trước khi xóa recipe
         List<Favorite> relatedFavorites = favoriteRepository.findByRecipe_Id(recipeId);
         if (!relatedFavorites.isEmpty()) {
-            final String recipeTitle = recipe.getTitle();
             for (Favorite favorite : relatedFavorites) {
                 favorite.setRecipe(null);
                 favorite.setOriginalRecipeTitle(recipeTitle);
                 favorite.setIsRecipeDeleted(true);
             }
             favoriteRepository.saveAllAndFlush(relatedFavorites);
+        }
+
+        // Xử lý các CookedHistory item
+        List<CookedHistory> relatedCookedHistories = cookedHistoryRepository.findByRecipe_Id(recipeId);
+        if (!relatedCookedHistories.isEmpty()) {
+            for (CookedHistory history : relatedCookedHistories) {
+                history.setRecipe(null); // Ngắt kết nối
+                history.setOriginalRecipeTitle(recipeTitle); // Lưu lại tên
+                history.setIsRecipeDeleted(true); // Đánh dấu đã xóa
+            }
+            cookedHistoryRepository.saveAllAndFlush(relatedCookedHistories); // <<< Lưu thay đổi
         }
 
         // Thu thập tất cả public ID của ảnh để xóa sau khi commit DB
@@ -506,7 +525,7 @@ public class RecipeServiceImpl implements RecipeService {
         newRecipe.setSteps(steps);
 
         Recipe saved = recipeRepository.save(newRecipe);
-        return RecipeResponse.from(saved);
+        return RecipeResponse.from(saved, false);
     }
 
     @Override
@@ -541,6 +560,85 @@ public class RecipeServiceImpl implements RecipeService {
 
         Page<Recipe> pageData = recipeRepository.findEasyToCook(pageable);
         return PageResult.of(pageData.map(RecipeCardResponse::from));
+    }
+
+    @Override
+    @Transactional
+    public RecipeResponse addIngredients(Long actorUserId, Long recipeId, AddIngredientsRequest req) {
+        // 1) Tải User (actor) và Recipe, kiểm tra quyền
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        // Kiểm tra Recipe đã bị xóa chưa
+        if (recipe.isDeleted()) {
+            throw new EntityNotFoundException("Không thể thêm nguyên liệu vào công thức đã bị xóa: " + recipeId);
+        }
+
+        Long ownerId = recipe.getUser().getUserId();
+        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        // 2) Lấy danh sách nguyên liệu hiện có (dùng Set để kiểm tra trùng lặp hiệu quả)
+        // Sử dụng tên đã chuẩn hóa làm key để tránh trùng lặp không phân biệt chữ hoa/thường, khoảng trắng
+        Set<String> existingNormalizedNames = recipe.getIngredients().stream()
+                .map(RecipeIngredient::getName)
+                .filter(Objects::nonNull)
+                .map(ShoppingListUtils::normalize) // Chuẩn hóa tên (toLowerCase, trim, gộp khoảng trắng)
+                .collect(Collectors.toSet());
+
+        // 3) Xử lý thêm nguyên liệu mới
+        List<RecipeIngredient> ingredientsToAdd = new ArrayList<>();
+        int addedCount = 0;
+        for (RecipeIngredientCreate newIngDto : req.ingredients()) {
+            String normalizedNewName = ShoppingListUtils.normalize(newIngDto.name());
+
+            // Bỏ qua nếu tên trống hoặc đã tồn tại (sau chuẩn hóa)
+            if (normalizedNewName.isEmpty() || existingNormalizedNames.contains(normalizedNewName)) {
+                continue; // Bỏ qua nguyên liệu này
+            }
+
+            // Tạo entity mới và liên kết với Recipe
+            RecipeIngredient newIngredient = RecipeIngredient.builder()
+                    .recipe(recipe) // Liên kết với recipe hiện tại
+                    .name(ShoppingListUtils.canonicalize(newIngDto.name())) // Lưu tên đã chuẩn hóa (trim, gộp khoảng trắng)
+                    .quantity(ShoppingListUtils.canonicalize(newIngDto.quantity())) // Chuẩn hóa quantity
+                    .build();
+
+            ingredientsToAdd.add(newIngredient);
+            existingNormalizedNames.add(normalizedNewName); // Thêm vào set để kiểm tra các mục tiếp theo trong request
+            addedCount++;
+        }
+
+        // 4) Chỉ cập nhật nếu thực sự có nguyên liệu mới được thêm
+        if (addedCount > 0) {
+            // Thêm các nguyên liệu hợp lệ vào collection của Recipe
+            recipe.getIngredients().addAll(ingredientsToAdd);
+
+            // Cập nhật thời gian
+            recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+
+            // Lưu Recipe (CascadeType.ALL sẽ tự động lưu các ingredientsToAdd)
+            recipeRepository.saveAndFlush(recipe);
+        } else {
+            // Nếu không có gì để thêm (do trùng lặp hoặc rỗng), không cần save lại recipe
+            // Chỉ cần trả về trạng thái hiện tại
+            // Tải lại để đảm bảo dữ liệu mới nhất (phòng trường hợp có thay đổi khác)
+            recipe = recipeRepository.findDetailById(recipeId)
+                    .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+            boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
+            return RecipeResponse.from(recipe, isFavorited);
+        }
+
+
+        // 5) Tải lại Recipe chi tiết để trả về (đã bao gồm các nguyên liệu mới)
+        Recipe reloaded = recipeRepository.findDetailById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại sau khi cập nhật: " + recipeId)); // Nên có
+
+        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
+        return RecipeResponse.from(reloaded, isFavorited);
     }
 
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {

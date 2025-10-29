@@ -12,6 +12,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.TransactionSystemException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -79,6 +81,24 @@ public class GlobalExceptionHandler {
         String message = joinViolationMessages(ex.getConstraintViolations());
         return ResponseEntity.status(400)
                 .body(ApiResponse.error(400, message, req.getRequestURI()));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodArgumentNotValid(
+            MethodArgumentNotValidException ex, HttpServletRequest req) {
+
+        // Lấy lỗi đầu tiên (thường đủ cho hiển thị UI)
+        FieldError fieldError = ex.getBindingResult().getFieldError();
+        String message = "Dữ liệu không hợp lệ."; // Mặc định
+        if (fieldError != null) {
+            message = fieldError.getDefaultMessage(); // Lấy message từ annotation (@Pattern, @Size, @NotBlank...)
+        }
+
+        // Nếu muốn lấy tất cả lỗi, bạn có thể lặp qua ex.getBindingResult().getFieldErrors()
+        // và nối chúng lại tương tự như joinViolationMessages
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST) // Luôn là 400 Bad Request cho validation
+                .body(ApiResponse.error(HttpStatus.BAD_REQUEST.value(), message, req.getRequestURI()));
     }
 
     // ---------- Helpers ----------
