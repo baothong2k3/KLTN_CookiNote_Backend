@@ -100,8 +100,7 @@ public class RatingServiceImpl implements RatingService {
 
                     if (count > 0) {
                         double average = (double) totalScore / count;
-                        // Làm tròn đến 0.5 gần nhất
-                        double roundedAverage = Math.round(average * 2) / 2.0;
+                        double roundedAverage = Math.round(average * 10.0) / 10.0;
 
                         recipe.setAverageRating(roundedAverage);
                         recipe.setRatingCount((int) count);
