@@ -103,6 +103,10 @@ public class Recipe {
     private Set<RecipeRating> ratings = new HashSet<>();
 
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<RecipeComment> comments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("stepNo ASC")
     @Builder.Default
     @Fetch(FetchMode.SUBSELECT)
