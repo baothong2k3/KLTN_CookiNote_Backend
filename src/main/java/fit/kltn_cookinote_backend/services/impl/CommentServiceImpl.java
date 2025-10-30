@@ -65,6 +65,25 @@ public class CommentServiceImpl implements CommentService {
         return recipe;
     }
 
+    /**
+     * Helper đệ quy để đếm số lượng replies (con cháu) của một bình luận.
+     * Phải được gọi TRƯỚC KHI xóa bình luận cha.
+     */
+    private int countRepliesRecursively(RecipeComment comment) {
+        // Tải collection replies một cách rõ ràng
+        Hibernate.initialize(comment.getReplies());
+
+        int count = 0;
+        List<RecipeComment> replies = comment.getReplies();
+        if (replies != null && !replies.isEmpty()) {
+            count = replies.size(); // Đếm các con trực tiếp
+            for (RecipeComment reply : replies) {
+                count += countRepliesRecursively(reply); // Đếm các cháu (đệ quy)
+            }
+        }
+        return count;
+    }
+
     @Override
     @Transactional(readOnly = true)
     public List<CommentResponse> getCommentsByRecipe(Long recipeId, Long viewerId) {
@@ -105,7 +124,6 @@ public class CommentServiceImpl implements CommentService {
         RecipeComment parent = null;
         // 2. Nếu là một reply (có parentId), tải và kiểm tra comment cha
         if (request.parentId() != null) {
-            // *** SỬA ĐỔI: Tải parent VÀ user của nó (sử dụng query đã tạo) ***
             parent = commentRepository.findByIdWithUser(request.parentId())
                     .orElseThrow(() -> new EntityNotFoundException("Bình luận cha không tồn tại: " + request.parentId()));
 
@@ -123,20 +141,20 @@ public class CommentServiceImpl implements CommentService {
                 .parent(parent) // Set cha (nếu có)
                 .build();
 
-        // *** SỬA ĐỔI: Nếu là reply, thêm vào danh sách replies của cha ***
         if (parent != null) {
-            // Khởi tạo collection replies nếu nó đang là lazy/null
             Hibernate.initialize(parent.getReplies());
-            // Thêm comment mới vào collection của cha
             parent.getReplies().add(newComment);
         }
 
         // 4. Lưu bình luận mới
         RecipeComment savedComment = commentRepository.save(newComment);
 
-        // 5. Trả về DTO
-        // Không cần tải lại vì 'savedComment' đã được quản lý (managed)
-        // và 'author' (User) cũng đã được quản lý.
+        // 5. Cập nhật bộ đếm (Tăng 1)
+        int currentCount = recipe.getCommentCount() != null ? recipe.getCommentCount() : 0;
+        recipe.setCommentCount(currentCount + 1);
+        recipeRepository.save(recipe); // Lưu recipe
+
+        // 6. Trả về DTO
         return CommentResponse.from(savedComment);
     }
 
@@ -166,14 +184,17 @@ public class CommentServiceImpl implements CommentService {
         RecipeComment comment = commentRepository.findByIdWithUser(commentId)
                 .orElseThrow(() -> new EntityNotFoundException("Bình luận không tồn tại: " + commentId));
 
-        Long recipeOwnerId = comment.getRecipe().getUser() != null ? comment.getRecipe().getUser().getUserId() : null;
+        Recipe recipe = comment.getRecipe(); // Lấy recipe TRƯỚC KHI XÓA
 
-        // Kiểm tra quyền:
-        // 1. Chủ sở hữu bình luận
+        // Đếm số lượng bình luận sẽ bị xóa (chính nó + con cháu)
+        // Phải tải đệ quy tất cả replies TRƯỚC KHI xóa
+        int totalToDelete = 1 + countRepliesRecursively(comment);
+
+        Long recipeOwnerId = recipe.getUser() != null ? recipe.getUser().getUserId() : null;
+
+        // ... (Kiểm tra quyền)
         boolean isOwner = Objects.equals(comment.getUser().getUserId(), author.getUserId());
-        // 2. Chủ sở hữu công thức
         boolean isRecipeOwner = Objects.equals(recipeOwnerId, author.getUserId());
-        // 3. Admin
         boolean isAdmin = author.getRole() == Role.ADMIN;
 
         if (!isOwner && !isRecipeOwner && !isAdmin) {
@@ -182,5 +203,11 @@ public class CommentServiceImpl implements CommentService {
 
         // Xóa (CascadeType.ALL và orphanRemoval=true trên 'replies' sẽ xóa đệ quy)
         commentRepository.delete(comment);
+        commentRepository.flush(); // Đảm bảo xóa xong
+
+        // Cập nhật bộ đếm (Giảm đi)
+        int currentCount = recipe.getCommentCount() != null ? recipe.getCommentCount() : 0;
+        recipe.setCommentCount(Math.max(0, currentCount - totalToDelete));
+        recipeRepository.save(recipe);
     }
 }

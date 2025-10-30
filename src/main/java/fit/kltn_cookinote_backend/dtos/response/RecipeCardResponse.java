@@ -16,6 +16,7 @@ public record RecipeCardResponse(
         Long view,
         Double averageRating,
         Integer ratingCount,
+        Integer commentCount,
         Integer prepareTime,
         Integer cookTime,
         boolean deleted
@@ -32,6 +33,7 @@ public record RecipeCardResponse(
                 .view(r.getView())
                 .averageRating(r.getAverageRating())
                 .ratingCount(r.getRatingCount())
+                .commentCount(r.getCommentCount())
                 .prepareTime(r.getPrepareTime())
                 .cookTime(r.getCookTime())
                 .deleted(r.isDeleted())

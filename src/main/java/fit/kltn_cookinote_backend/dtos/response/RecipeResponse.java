@@ -37,6 +37,7 @@ public record RecipeResponse(
         Boolean isFavorited,
         Double averageRating,
         Integer ratingCount,
+        Integer commentCount,
         Integer myRating,
         List<IngredientDto> ingredients,
         List<StepDto> steps,
@@ -105,6 +106,7 @@ public record RecipeResponse(
                 .isFavorited(isFavorited)
                 .averageRating(r.getAverageRating())
                 .ratingCount(r.getRatingCount())
+                .commentCount(r.getCommentCount())
                 .myRating(myRating)
                 .ingredients(ingDtos)
                 .steps(stepDtos)

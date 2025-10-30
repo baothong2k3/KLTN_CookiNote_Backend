@@ -97,6 +97,10 @@ public class Recipe {
     @Column(name = "rating_count")
     private Integer ratingCount;
 
+    @Column(name = "comment_count")
+    @Builder.Default
+    private Integer commentCount = 0;
+
     // children
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

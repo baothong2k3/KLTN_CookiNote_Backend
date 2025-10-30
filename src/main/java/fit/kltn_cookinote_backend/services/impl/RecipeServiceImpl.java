@@ -83,6 +83,7 @@ public class RecipeServiceImpl implements RecipeService {
                 .view(0L)
                 .averageRating(0.0)
                 .ratingCount(0)
+                .commentCount(0)
                 .createdAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
@@ -502,6 +503,7 @@ public class RecipeServiceImpl implements RecipeService {
                 .view(0L) // Bắt đầu từ 0
                 .averageRating(0.0)
                 .ratingCount(0)
+                .commentCount(0)
                 .createdAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
