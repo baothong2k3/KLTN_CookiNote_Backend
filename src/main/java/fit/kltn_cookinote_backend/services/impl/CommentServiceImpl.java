@@ -27,6 +27,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -150,6 +152,7 @@ public class CommentServiceImpl implements CommentService {
         }
 
         comment.setContent(request.content());
+        comment.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
         RecipeComment savedComment = commentRepository.save(comment);
 
         // Cần tải lại các replies (nếu có) để trả về DTO hoàn chỉnh
