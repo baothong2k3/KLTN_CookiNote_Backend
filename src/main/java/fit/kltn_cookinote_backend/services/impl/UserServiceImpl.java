@@ -106,12 +106,14 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<UserDto> getAllUsers(Pageable pageable) {
         Page<User> userPage = userRepo.findAll(pageable);
         return userPage.map(userMapper::toDto);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UserDetailDto getUserDetails(Long userId) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người dùng với id: " + userId));

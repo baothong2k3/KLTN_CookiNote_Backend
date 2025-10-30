@@ -19,8 +19,15 @@ import org.mapstruct.Mapping;
 public interface UserMapper {
     @Mapping(target = "role", expression = "java(user.getRole().name())")
     @Mapping(source = "username", target = "username")
+    @Mapping(target = "enabled", source = "enabled")
+    @Mapping(target = "emailVerified", source = "emailVerified")
+    @Mapping(target = "createdAt", source = "createdAt")
+    @Mapping(target = "recipeCount", expression = "java(user.getRecipes() != null ? user.getRecipes().size() : 0)")
+    @Mapping(target = "favoriteCount", expression = "java(user.getFavorites() != null ? user.getFavorites().size() : 0)")
     UserDto toDto(User user);
 
     @Mapping(source = "username", target = "username")
+    @Mapping(target = "recipeCount", expression = "java(user.getRecipes() != null ? user.getRecipes().size() : 0)")
+    @Mapping(target = "favoriteCount", expression = "java(user.getFavorites() != null ? user.getFavorites().size() : 0)")
     UserDetailDto toDetailDto(User user);
 }

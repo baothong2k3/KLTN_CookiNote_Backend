@@ -61,7 +61,7 @@ public class AdminController {
      * API xuất toàn bộ công thức ra file Excel và lưu trên server. Chỉ Admin.
      * Nhận đường dẫn tùy chọn qua Request Body.
      */
-    @PostMapping("/export/recipes") // Endpoint mới
+    @PostMapping("/export/recipes")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> exportAllRecipesMergedToFile(
             @RequestBody(required = false) ExportRequest request,
