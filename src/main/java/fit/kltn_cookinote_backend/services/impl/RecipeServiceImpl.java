@@ -662,6 +662,63 @@ public class RecipeServiceImpl implements RecipeService {
         return RecipeResponse.from(reloaded, isFavorited, myRating);
     }
 
+    @Override
+    @Transactional
+    public Map<String, Integer> deleteIngredients(Long actorUserId, Long recipeId, DeleteIngredientsRequest req) {
+        // 1) Tải User (actor) và Recipe, kiểm tra quyền
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        // Kiểm tra Recipe đã bị xóa chưa
+        if (recipe.isDeleted()) {
+            throw new EntityNotFoundException("Không thể xóa nguyên liệu khỏi công thức đã bị xóa: " + recipeId);
+        }
+
+        Long ownerId = recipe.getUser().getUserId();
+        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        // 2) Tải các RecipeIngredient cần xóa
+        List<Long> idsToDelete = req.ingredientIds();
+        if (idsToDelete == null || idsToDelete.isEmpty()) {
+            throw new IllegalArgumentException("Danh sách ID nguyên liệu cần xóa không được rỗng.");
+        }
+
+        List<RecipeIngredient> ingredientsToDelete = recipeIngredientRepository.findAllById(idsToDelete);
+
+        // 3) Kiểm tra xem tất cả ID có hợp lệ và thuộc về Recipe này không
+        Set<Long> foundIds = ingredientsToDelete.stream()
+                .map(RecipeIngredient::getId)
+                .collect(Collectors.toSet());
+        List<Long> missingOrInvalidIds = idsToDelete.stream()
+                .filter(id -> !foundIds.contains(id))
+                .toList();
+
+        if (!missingOrInvalidIds.isEmpty()) {
+            throw new IllegalArgumentException("Không tìm thấy các ID nguyên liệu sau: " + missingOrInvalidIds);
+        }
+
+        // Kiểm tra xem các nguyên liệu tìm thấy có thực sự thuộc về recipeId không
+        for (RecipeIngredient ingredient : ingredientsToDelete) {
+            if (!ingredient.getRecipe().getId().equals(recipeId)) {
+                throw new AccessDeniedException("Nguyên liệu ID " + ingredient.getId() + " không thuộc về công thức này.");
+            }
+        }
+
+        // 4) Thực hiện xóa
+        // Sử dụng orphanRemoval=true trên Recipe.ingredients hoặc xóa trực tiếp qua repository
+        recipeIngredientRepository.deleteAllInBatch(ingredientsToDelete); // Hiệu quả hơn khi xóa nhiều
+
+        // Cập nhật thời gian update cho Recipe
+        recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+        recipeRepository.save(recipe);
+
+        // 5) Trả về số lượng đã xóa
+        return Map.of("deletedCount", ingredientsToDelete.size());
+    }
+
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {
         return switch (privacy) {
             case PUBLIC, SHARED -> true;
