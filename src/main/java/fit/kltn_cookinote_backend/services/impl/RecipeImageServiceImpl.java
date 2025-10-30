@@ -16,6 +16,7 @@ import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.*;
 import fit.kltn_cookinote_backend.services.RecipeImageService;
+import fit.kltn_cookinote_backend.services.RecipeService;
 import fit.kltn_cookinote_backend.utils.CloudinaryUtils;
 import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
 import jakarta.persistence.EntityNotFoundException;
@@ -41,8 +42,7 @@ public class RecipeImageServiceImpl implements RecipeImageService {
     private final RecipeStepRepository stepRepository;
     private final UserRepository userRepository;
     private final RecipeCoverImageHistoryRepository recipeCoverImageHistoryRepository;
-    private final FavoriteRepository favoriteRepository;
-    private final RecipeRatingRepository ratingRepository;
+    private final RecipeService recipeService;
 
     @Value("${app.cloudinary.recipe-folder}")
     private String recipeFolder;
@@ -103,11 +103,7 @@ public class RecipeImageServiceImpl implements RecipeImageService {
     @Transactional
     public RecipeResponse updateCover(Long actorUserId, Long recipeId, MultipartFile file) throws IOException {
         Recipe updatedRecipe = processCoverUpdate(actorUserId, recipeId, file);
-        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId)
-                .map(RecipeRating::getScore)
-                .orElse(null);
-        return RecipeResponse.from(updatedRecipe, isFavorited, myRating);
+        return recipeService.buildRecipeResponse(updatedRecipe, actorUserId);
     }
 
     @Override

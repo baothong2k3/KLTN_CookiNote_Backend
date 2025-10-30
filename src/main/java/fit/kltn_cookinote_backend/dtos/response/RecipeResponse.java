@@ -39,7 +39,8 @@ public record RecipeResponse(
         Integer ratingCount,
         Integer myRating,
         List<IngredientDto> ingredients,
-        List<StepDto> steps
+        List<StepDto> steps,
+        List<CommentResponse> comments
 ) {
     @Builder
     public record IngredientDto(Long id, String name, String quantity) {
@@ -50,7 +51,7 @@ public record RecipeResponse(
                           List<String> images) {
     }
 
-    public static RecipeResponse from(Recipe r, boolean isFavorited, Integer myRating) {
+    public static RecipeResponse from(Recipe r, boolean isFavorited, Integer myRating, List<CommentResponse> comments) {
         // ingredients
         List<IngredientDto> ingDtos = new ArrayList<>();
         if (r.getIngredients() != null) {
@@ -107,6 +108,7 @@ public record RecipeResponse(
                 .myRating(myRating)
                 .ingredients(ingDtos)
                 .steps(stepDtos)
+                .comments(comments)
                 .build();
     }
 }

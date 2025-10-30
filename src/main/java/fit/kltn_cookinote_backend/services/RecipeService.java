@@ -11,6 +11,7 @@ package fit.kltn_cookinote_backend.services;/*
 
 import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
+import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.entities.User;
 
 import java.util.List;
@@ -83,5 +84,15 @@ public interface RecipeService {
      * @return Map chứa số lượng nguyên liệu đã xóa ("deletedCount")
      */
     Map<String, Integer> deleteIngredients(Long actorUserId, Long recipeId, DeleteIngredientsRequest req);
+
+    /**
+     * Helper tập trung để xây dựng một RecipeResponse hoàn chỉnh
+     * (bao gồm favorite, rating, comments).
+     *
+     * @param recipe       Đối tượng Recipe đã tải
+     * @param viewerUserId ID của người xem (có thể null)
+     * @return RecipeResponse hoàn chỉnh
+     */
+    RecipeResponse buildRecipeResponse(Recipe recipe, Long viewerUserId);
 
 }

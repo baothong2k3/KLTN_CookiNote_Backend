@@ -17,9 +17,7 @@ import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.*;
-import fit.kltn_cookinote_backend.services.CloudinaryService;
-import fit.kltn_cookinote_backend.services.RecipeImageService;
-import fit.kltn_cookinote_backend.services.RecipeStepImageService;
+import fit.kltn_cookinote_backend.services.*;
 import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
@@ -53,6 +51,9 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
     private final FavoriteRepository favoriteRepository;
     private final RecipeRatingRepository ratingRepository;
     private final CloudinaryService cloudinaryService;
+    private final CommentService commentService;
+
+    private final RecipeService recipeService;
 
     @PersistenceContext
     private EntityManager em;
@@ -245,7 +246,7 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
-        return buildRecipeResponse(actorUserId, reloaded);
+        return recipeService.buildRecipeResponse(reloaded, actorUserId);
     }
 
     @Override
@@ -306,7 +307,7 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
-        return buildRecipeResponse(actorUserId, reloaded);
+        return recipeService.buildRecipeResponse(reloaded, actorUserId);
     }
 
     @Override
@@ -385,7 +386,7 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe not found after update: " + recipeId));
 
-        return buildRecipeResponse(actorUserId, reloaded);
+        return recipeService.buildRecipeResponse(reloaded, actorUserId);
     }
 
     @Override
@@ -477,20 +478,5 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
                 "deletedCount", stepsToDelete.size(),
                 "reorderedCount", remainingSteps.size()
         );
-    }
-
-    /**
-     * Phương thức helper private để lấy isFavorited, myRating và tạo RecipeResponse.
-     *
-     * @param actorUserId ID của người dùng thực hiện hành động (để kiểm tra favorite/rating).
-     * @param recipe      Đối tượng Recipe đã được cập nhật và tải lại.
-     * @return RecipeResponse hoàn chỉnh.
-     */
-    private RecipeResponse buildRecipeResponse(Long actorUserId, Recipe recipe) {
-        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipe.getId()).isPresent();
-        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipe.getId())
-                .map(RecipeRating::getScore)
-                .orElse(null);
-        return RecipeResponse.from(recipe, isFavorited, myRating);
     }
 }

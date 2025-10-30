@@ -12,11 +12,11 @@ package fit.kltn_cookinote_backend.services.impl;/*
 import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
 import fit.kltn_cookinote_backend.dtos.response.ShareResponse;
 import fit.kltn_cookinote_backend.entities.Recipe;
-import fit.kltn_cookinote_backend.entities.RecipeRating;
 import fit.kltn_cookinote_backend.entities.Share;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.repositories.*;
+import fit.kltn_cookinote_backend.services.RecipeService;
 import fit.kltn_cookinote_backend.services.ShareService;
 import fit.kltn_cookinote_backend.utils.QrCodeUtil;
 import jakarta.persistence.EntityNotFoundException;
@@ -36,8 +36,7 @@ public class ShareServiceImpl implements ShareService {
     private final RecipeRepository recipeRepository;
     private final UserRepository userRepository;
     private final ShareRepository shareRepository;
-    private final FavoriteRepository favoriteRepository;
-    private final RecipeRatingRepository ratingRepository;
+    private final RecipeService recipeService;
 
     @Value("${app.baseUrl}")
     private String baseUrl;
@@ -120,21 +119,6 @@ public class ShareServiceImpl implements ShareService {
             throw new AccessDeniedException("Công thức này đã được chuyển về chế độ riêng tư.");
         }
 
-        // 1. Kiểm tra favorite
-        boolean isFavorited = false;
-        if (viewerUserIdOrNull != null) {
-            isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(viewerUserIdOrNull, recipe.getId()).isPresent();
-        }
-
-        // 2. Get the viewer's rating (myRating)
-        Integer myRating = null;
-        if (viewerUserIdOrNull != null) {
-            myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(viewerUserIdOrNull, recipe.getId())
-                    .map(RecipeRating::getScore)
-                    .orElse(null);
-        }
-
-        // 3. Trả về DTO
-        return RecipeResponse.from(recipe, isFavorited, myRating);
+        return recipeService.buildRecipeResponse(recipe, viewerUserIdOrNull);
     }
 }

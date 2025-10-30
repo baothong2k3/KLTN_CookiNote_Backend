@@ -16,6 +16,7 @@ import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.*;
 import fit.kltn_cookinote_backend.services.CloudinaryService;
+import fit.kltn_cookinote_backend.services.CommentService;
 import fit.kltn_cookinote_backend.services.RecipeService;
 import fit.kltn_cookinote_backend.utils.ShoppingListUtils;
 import jakarta.persistence.EntityNotFoundException;
@@ -50,6 +51,7 @@ public class RecipeServiceImpl implements RecipeService {
     private final FavoriteRepository favoriteRepository;
     private final CookedHistoryRepository cookedHistoryRepository;
     private final RecipeRatingRepository ratingRepository;
+    private final CommentService commentService;
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 12; // mobile-friendly
@@ -132,7 +134,7 @@ public class RecipeServiceImpl implements RecipeService {
         }
 
         Recipe saved = recipeRepository.saveAndFlush(recipe);
-        return RecipeResponse.from(saved, false, null);
+        return RecipeResponse.from(saved, false, null, List.of());
     }
 
     @Override
@@ -153,14 +155,7 @@ public class RecipeServiceImpl implements RecipeService {
             recipe.setView((recipe.getView() == null ? 0 : recipe.getView()) + 1);
         }
 
-        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(viewerUserId, recipeId).isPresent();
-
-        // Lấy rating của người dùng hiện tại
-        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(viewerUserId, recipeId) // Sửa: Dùng viewerUserId
-                .map(RecipeRating::getScore)
-                .orElse(null);
-
-        return RecipeResponse.from(recipe, isFavorited, myRating);
+        return buildRecipeResponse(recipe, viewerUserId);
     }
 
     @Override
@@ -302,12 +297,7 @@ public class RecipeServiceImpl implements RecipeService {
 
         Recipe saved = recipeRepository.saveAndFlush(recipe);
 
-        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId)
-                .map(RecipeRating::getScore)
-                .orElse(null);
-
-        return RecipeResponse.from(saved, isFavorited, myRating);
+        return buildRecipeResponse(saved, actorUserId);
     }
 
     @Override
@@ -539,7 +529,7 @@ public class RecipeServiceImpl implements RecipeService {
         newRecipe.setSteps(steps);
 
         Recipe saved = recipeRepository.save(newRecipe);
-        return RecipeResponse.from(saved, false, null);
+        return RecipeResponse.from(saved, false, null, List.of());
     }
 
     @Override
@@ -642,12 +632,7 @@ public class RecipeServiceImpl implements RecipeService {
             recipe = recipeRepository.findDetailById(recipeId)
                     .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
-            boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-            Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId)
-                    .map(RecipeRating::getScore)
-                    .orElse(null);
-
-            return RecipeResponse.from(recipe, isFavorited, myRating);
+            return buildRecipeResponse(recipe, actorUserId);
         }
 
 
@@ -655,11 +640,7 @@ public class RecipeServiceImpl implements RecipeService {
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại sau khi cập nhật: " + recipeId)); // Nên có
 
-        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        Integer myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId)
-                .map(RecipeRating::getScore)
-                .orElse(null);
-        return RecipeResponse.from(reloaded, isFavorited, myRating);
+        return buildRecipeResponse(reloaded, actorUserId);
     }
 
     @Override
@@ -731,5 +712,27 @@ public class RecipeServiceImpl implements RecipeService {
         if (!Objects.equals(actorId, ownerId)) {
             throw new AccessDeniedException("Chỉ chủ sở hữu hoặc ADMIN mới được chỉnh sửa.");
         }
+    }
+
+    /**
+     * Helper private để gói gọn logic xây dựng RecipeResponse
+     */
+    @Override
+    public RecipeResponse buildRecipeResponse(Recipe recipe, Long viewerUserId) {
+        boolean isFavorited = false;
+        Integer myRating = null;
+
+        // Xử lý trường hợp viewerUserId là null (khách vãng lai)
+        if (viewerUserId != null) {
+            isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(viewerUserId, recipe.getId()).isPresent();
+            myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(viewerUserId, recipe.getId())
+                    .map(RecipeRating::getScore)
+                    .orElse(null);
+        }
+
+        // Lấy danh sách bình luận (CommentService đã xử lý quyền xem)
+        List<CommentResponse> comments = commentService.getCommentsByRecipe(recipe.getId(), viewerUserId);
+
+        return RecipeResponse.from(recipe, isFavorited, myRating, comments);
     }
 }
