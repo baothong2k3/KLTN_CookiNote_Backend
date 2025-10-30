@@ -472,4 +472,23 @@ public class RecipeController {
 
         return ResponseEntity.ok(ApiResponse.success(message, result, httpReq.getRequestURI()));
     }
+
+    /**
+     * Xóa một hoặc nhiều bước (step) khỏi công thức.
+     * DELETE /recipes/{recipeId}/steps
+     */
+    @DeleteMapping("/{recipeId}/steps")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> deleteSteps(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @Valid @RequestBody DeleteRecipeStepsRequest req,
+            HttpServletRequest httpReq
+    ) {
+        Map<String, Integer> result = stepImageService.deleteSteps(authUser.getUserId(), recipeId, req);
+        int deletedCount = result.getOrDefault("deletedCount", 0);
+        String message = String.format("Đã xóa thành công %d bước. Các bước còn lại đã được sắp xếp lại.", deletedCount);
+
+        return ResponseEntity.ok(ApiResponse.success(message, result, httpReq.getRequestURI()));
+    }
 }
