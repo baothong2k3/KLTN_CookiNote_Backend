@@ -42,8 +42,16 @@ public class AdminController {
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "10") int size,
             HttpServletRequest httpReq) {
+        // Tạo đối tượng Sort với nhiều tiêu chí:
+        // 1. Sắp xếp theo 'role' tăng dần (Enum 'ADMIN' (0) sẽ đứng trước 'USER' (1))
+        // 2. Sau đó, sắp xếp theo 'createdAt' giảm dần (mới nhất lên đầu)
+        Sort sort = Sort.by(
+                Sort.Order.asc("role"),
+                Sort.Order.desc("createdAt")
+        );
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Pageable pageable = PageRequest.of(page, size, sort);
+
         Page<UserDto> userPage = userService.getAllUsers(pageable);
         PagedUserResponse responseData = PagedUserResponse.from(userPage);
 
