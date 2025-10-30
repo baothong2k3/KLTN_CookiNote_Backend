@@ -12,10 +12,12 @@ package fit.kltn_cookinote_backend.services.impl;/*
 import fit.kltn_cookinote_backend.dtos.UserDto;
 import fit.kltn_cookinote_backend.dtos.request.UpdateDisplayNameRequest;
 import fit.kltn_cookinote_backend.dtos.request.UserDetailDto;
+import fit.kltn_cookinote_backend.dtos.response.UserStatsResponse;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.AuthProvider;
 import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.mappers.UserMapper;
+import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.RefreshTokenService;
 import fit.kltn_cookinote_backend.services.SessionAllowlistService;
@@ -36,6 +38,7 @@ import java.time.ZoneOffset;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
     private final UserRepository userRepo;
+    private final RecipeRepository recipeRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder encoder;
     private final RefreshTokenService refreshService;
@@ -171,5 +174,21 @@ public class UserServiceImpl implements UserService {
         // Lưu ý: Không cần thu hồi token khi enable lại. Người dùng có thể đăng nhập bình thường.
 
         return userMapper.toDetailDto(user); // Trả về thông tin chi tiết đã cập nhật
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserStatsResponse getUserStats() {
+        long totalUsers = userRepo.count();
+        long totalRecipes = recipeRepository.count(); // Đếm tất cả công thức
+        long activeUsers = userRepo.countByEnabledTrue();
+        long newUsersToday = userRepo.countNewUsersToday();
+
+        return UserStatsResponse.builder()
+                .totalUsers(totalUsers)
+                .totalRecipes(totalRecipes)
+                .activeUsers(activeUsers)
+                .newUsersToday(newUsersToday)
+                .build();
     }
 }

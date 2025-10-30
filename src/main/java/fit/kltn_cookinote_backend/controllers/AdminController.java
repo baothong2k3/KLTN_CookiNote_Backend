@@ -14,6 +14,7 @@ import fit.kltn_cookinote_backend.dtos.request.ExportRequest;
 import fit.kltn_cookinote_backend.dtos.request.UserDetailDto;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
 import fit.kltn_cookinote_backend.dtos.response.PagedUserResponse;
+import fit.kltn_cookinote_backend.dtos.response.UserStatsResponse;
 import fit.kltn_cookinote_backend.services.ExcelExportService;
 import fit.kltn_cookinote_backend.services.UserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -108,5 +109,12 @@ public class AdminController {
         UserDetailDto updatedUserDetails = userService.enableUser(id);
         String message = String.format("Đã kích hoạt lại thành công tài khoản người dùng ID: %d", id);
         return ResponseEntity.ok(ApiResponse.success(message, updatedUserDetails, httpReq.getRequestURI()));
+    }
+
+    @GetMapping("/stats/users")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<UserStatsResponse>> getUserStats(HttpServletRequest httpReq) {
+        UserStatsResponse stats = userService.getUserStats();
+        return ResponseEntity.ok(ApiResponse.success("Lấy thống kê người dùng thành công", stats, httpReq.getRequestURI()));
     }
 }
