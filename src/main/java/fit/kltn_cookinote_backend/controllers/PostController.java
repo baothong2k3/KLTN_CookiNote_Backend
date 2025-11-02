@@ -10,12 +10,16 @@ package fit.kltn_cookinote_backend.controllers;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
+import fit.kltn_cookinote_backend.dtos.response.PageResult;
 import fit.kltn_cookinote_backend.dtos.response.PostResponse;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.services.PostService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -91,5 +95,19 @@ public class PostController {
     ) {
         postService.deletePost(postId, adminUser);
         return ResponseEntity.ok(ApiResponse.success("Xóa bài viết thành công", httpReq.getRequestURI()));
+    }
+
+    /**
+     * API Lấy danh sách bài viết (công khai, phân trang)
+     */
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResult<PostResponse>>> getAllPosts(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size,
+            HttpServletRequest httpReq
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        PageResult<PostResponse> data = postService.getAllPosts(pageable);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách bài viết thành công", data, httpReq.getRequestURI()));
     }
 }

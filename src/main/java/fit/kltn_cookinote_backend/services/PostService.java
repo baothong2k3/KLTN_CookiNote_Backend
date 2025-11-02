@@ -38,4 +38,9 @@ public interface PostService {
      * Admin xóa bài viết
      */
     void deletePost(Long postId, User adminUser);
+
+    /**
+     * Lấy danh sách bài viết (công khai, phân trang)
+     */
+    PageResult<PostResponse> getAllPosts(Pageable pageable);
 }

@@ -10,6 +10,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
  */
 
 import com.cloudinary.Cloudinary;
+import fit.kltn_cookinote_backend.dtos.response.PageResult;
 import fit.kltn_cookinote_backend.dtos.response.PostResponse;
 import fit.kltn_cookinote_backend.entities.Post;
 import fit.kltn_cookinote_backend.entities.User;
@@ -21,6 +22,8 @@ import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -148,5 +151,13 @@ public class PostServiceImpl implements PostService {
                 });
             }
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<PostResponse> getAllPosts(Pageable pageable) {
+        Page<Post> postPage = postRepository.findAllWithAuthor(pageable);
+        Page<PostResponse> responsePage = postPage.map(PostResponse::from);
+        return PageResult.of(responsePage);
     }
 }
