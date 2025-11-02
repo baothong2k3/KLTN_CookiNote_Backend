@@ -110,4 +110,16 @@ public class PostController {
         PageResult<PostResponse> data = postService.getAllPosts(pageable);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách bài viết thành công", data, httpReq.getRequestURI()));
     }
+
+    /**
+     * API Lấy chi tiết 1 bài viết (công khai)
+     */
+    @GetMapping("/{postId}")
+    public ResponseEntity<ApiResponse<PostResponse>> getPostById(
+            @PathVariable Long postId,
+            HttpServletRequest httpReq
+    ) {
+        PostResponse data = postService.getPostById(postId);
+        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết bài viết thành công", data, httpReq.getRequestURI()));
+    }
 }

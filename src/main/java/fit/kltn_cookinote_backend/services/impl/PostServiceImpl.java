@@ -160,4 +160,12 @@ public class PostServiceImpl implements PostService {
         Page<PostResponse> responsePage = postPage.map(PostResponse::from);
         return PageResult.of(responsePage);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PostResponse getPostById(Long postId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy bài viết: " + postId));
+        return PostResponse.from(post);
+    }
 }

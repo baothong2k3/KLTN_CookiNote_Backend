@@ -43,4 +43,9 @@ public interface PostService {
      * Lấy danh sách bài viết (công khai, phân trang)
      */
     PageResult<PostResponse> getAllPosts(Pageable pageable);
+
+    /**
+     * Lấy chi tiết 1 bài viết (công khai)
+     */
+    PostResponse getPostById(Long postId);
 }
