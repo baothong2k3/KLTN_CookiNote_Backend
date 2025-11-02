@@ -23,4 +23,9 @@ public interface PostService {
      * Admin tạo bài viết mới (bắt buộc có ảnh)
      */
     PostResponse createPost(User adminUser, String title, String content, MultipartFile image) throws IOException;
+
+    /**
+     * Admin cập nhật nội dung bài viết (không đổi ảnh)
+     */
+    PostResponse updatePostContent(Long postId, User adminUser, String title, String content);
 }

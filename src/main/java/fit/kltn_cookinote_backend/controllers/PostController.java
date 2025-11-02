@@ -39,12 +39,28 @@ public class PostController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PostResponse>> createPost(
             @AuthenticationPrincipal User adminUser,
-            @RequestParam("title") @NotBlank String title,
-            @RequestParam("content") @NotBlank String content,
-            @RequestPart("image") MultipartFile image,
+            @RequestParam(value = "title") @NotBlank String title,
+            @RequestParam(value = "content") @NotBlank String content,
+            @RequestPart(value = "image") MultipartFile image,
             HttpServletRequest httpReq
     ) throws IOException {
         PostResponse data = postService.createPost(adminUser, title, content, image);
         return ResponseEntity.ok(ApiResponse.success("Tạo bài viết thành công", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * API Admin cập nhật nội dung bài viết (title, content)
+     */
+    @PutMapping(value = "/{postId}/content", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PostResponse>> updatePostContent(
+            @AuthenticationPrincipal User adminUser,
+            @PathVariable Long postId,
+            @RequestParam(value = "title", required = false) String title,
+            @RequestParam(value = "content", required = false) String content,
+            HttpServletRequest httpReq
+    ) {
+        PostResponse data = postService.updatePostContent(postId, adminUser, title, content);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật nội dung bài viết thành công", data, httpReq.getRequestURI()));
     }
 }

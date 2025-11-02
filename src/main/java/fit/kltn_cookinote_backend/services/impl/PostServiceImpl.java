@@ -18,14 +18,18 @@ import fit.kltn_cookinote_backend.services.CloudinaryService;
 import fit.kltn_cookinote_backend.services.PostService;
 import fit.kltn_cookinote_backend.utils.CloudinaryUtils;
 import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Service
 @RequiredArgsConstructor
@@ -59,5 +63,29 @@ public class PostServiceImpl implements PostService {
         postRepository.save(savedPost);
 
         return PostResponse.from(savedPost);
+    }
+
+    @Override
+    @Transactional
+    public PostResponse updatePostContent(Long postId, User adminUser, String title, String content) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy bài viết: " + postId));
+
+        // Mặc dù đã check @PreAuthorize, service nên check lại author
+        if (!post.getAuthor().getUserId().equals(adminUser.getUserId())) {
+            throw new SecurityException("Bạn không có quyền chỉnh sửa bài viết này");
+        }
+
+        if (StringUtils.hasText(title)) {
+            post.setTitle(title);
+        }
+        if (StringUtils.hasText(content)) {
+            post.setContent(content);
+        }
+
+        post.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+
+        Post updatedPost = postRepository.save(post);
+        return PostResponse.from(updatedPost);
     }
 }
