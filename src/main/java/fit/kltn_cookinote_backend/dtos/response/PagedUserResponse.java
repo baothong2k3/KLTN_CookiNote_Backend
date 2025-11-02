@@ -14,8 +14,6 @@ import lombok.Builder;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Builder
 public record PagedUserResponse(
@@ -24,20 +22,10 @@ public record PagedUserResponse(
         long totalElements,
         int totalPages,
         boolean hasNext,
-        GroupedUsers items
+        List<UserDto> items
 ) {
-    @Builder
-    public record GroupedUsers(List<UserDto> admins, List<UserDto> users) {
-    }
 
     public static PagedUserResponse from(Page<UserDto> userPage) {
-        Map<String, List<UserDto>> groupedByRole = userPage.getContent().stream()
-                .collect(Collectors.groupingBy(UserDto::role));
-
-        GroupedUsers groupedUsers = GroupedUsers.builder()
-                .admins(groupedByRole.get("ADMIN"))
-                .users(groupedByRole.get("USER"))
-                .build();
 
         return PagedUserResponse.builder()
                 .page(userPage.getNumber())
@@ -45,7 +33,7 @@ public record PagedUserResponse(
                 .totalElements(userPage.getTotalElements())
                 .totalPages(userPage.getTotalPages())
                 .hasNext(userPage.hasNext())
-                .items(groupedUsers)
+                .items(userPage.getContent())
                 .build();
     }
 }

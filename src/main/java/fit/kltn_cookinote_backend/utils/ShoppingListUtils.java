@@ -37,6 +37,7 @@ public class ShoppingListUtils {
                 .ingredient(s.getIngredient())
                 .quantity(s.getQuantity())
                 .checked(Boolean.TRUE.equals(s.getChecked()))
+                .isFromRecipe(Boolean.TRUE.equals(s.getIsFromRecipe()))
                 .build();
     }
 
@@ -53,4 +54,6 @@ public class ShoppingListUtils {
         if (q.length() > 50) throw new IllegalArgumentException("Số lượng tối đa 50 ký tự.");
         return q;
     }
+
+
 }

@@ -34,8 +34,14 @@ public record RecipeResponse(
         String imageUrl,
         Long view,
         LocalDateTime createdAt,
+        Boolean isFavorited,
+        Double averageRating,
+        Integer ratingCount,
+        Integer commentCount,
+        Integer myRating,
         List<IngredientDto> ingredients,
-        List<StepDto> steps
+        List<StepDto> steps,
+        List<CommentResponse> comments
 ) {
     @Builder
     public record IngredientDto(Long id, String name, String quantity) {
@@ -46,7 +52,7 @@ public record RecipeResponse(
                           List<String> images) {
     }
 
-    public static RecipeResponse from(Recipe r) {
+    public static RecipeResponse from(Recipe r, boolean isFavorited, Integer myRating, List<CommentResponse> comments) {
         // ingredients
         List<IngredientDto> ingDtos = new ArrayList<>();
         if (r.getIngredients() != null) {
@@ -97,8 +103,14 @@ public record RecipeResponse(
                 .imageUrl(r.getImageUrl())
                 .view(r.getView())
                 .createdAt(r.getCreatedAt())
+                .isFavorited(isFavorited)
+                .averageRating(r.getAverageRating())
+                .ratingCount(r.getRatingCount())
+                .commentCount(r.getCommentCount())
+                .myRating(myRating)
                 .ingredients(ingDtos)
                 .steps(stepDtos)
+                .comments(comments)
                 .build();
     }
 }

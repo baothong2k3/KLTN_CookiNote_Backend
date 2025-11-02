@@ -12,11 +12,10 @@ package fit.kltn_cookinote_backend.services;/*
 import fit.kltn_cookinote_backend.dtos.UserDto;
 import fit.kltn_cookinote_backend.dtos.request.UpdateDisplayNameRequest;
 import fit.kltn_cookinote_backend.dtos.request.UserDetailDto;
+import fit.kltn_cookinote_backend.dtos.response.UserStatsResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 public interface UserService {
@@ -29,4 +28,27 @@ public interface UserService {
     Page<UserDto> getAllUsers(Pageable pageable);
 
     UserDetailDto getUserDetails(Long userId);
+
+    /**
+     * Vô hiệu hóa tài khoản người dùng (chỉ dành cho Admin).
+     *
+     * @param userId ID của người dùng cần vô hiệu hóa.
+     * @return Thông tin chi tiết của người dùng đã được cập nhật.
+     */
+    UserDetailDto disableUser(Long userId);
+
+    /**
+     * Kích hoạt lại tài khoản người dùng đã bị vô hiệu hóa (chỉ dành cho Admin).
+     *
+     * @param userId ID của người dùng cần kích hoạt lại.
+     * @return Thông tin chi tiết của người dùng đã được cập nhật.
+     */
+    UserDetailDto enableUser(Long userId);
+
+    /**
+     * Lấy thống kê tổng quan về người dùng cho Admin.
+     *
+     * @return DTO chứa các số liệu thống kê.
+     */
+    UserStatsResponse getUserStats();
 }

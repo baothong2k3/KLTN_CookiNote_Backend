@@ -45,6 +45,14 @@ public class ShoppingList {
     @Column(length = 255)
     private String originalRecipeTitle; // Lưu tên recipe khi bị hard-delete
 
+    /**
+     * Đánh dấu item này được đồng bộ từ Recipe (true)
+     * hay do người dùng tự thêm (false).
+     */
+    @Builder.Default
+    @Column(name = "is_from_recipe", nullable = false)
+    private Boolean isFromRecipe = false;
+
     @Builder.Default
     @Column(name = "is_recipe_deleted")
     private Boolean isRecipeDeleted = false; // Đánh dấu khi recipe bị soft-delete

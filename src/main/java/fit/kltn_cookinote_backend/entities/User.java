@@ -37,6 +37,7 @@ public class User {
     private Long userId;
 
     @Column(name = "name", length = 100)
+    @Size(min = 3, max = 100)
     private String username;
 
     @Column(length = 255, unique = true, nullable = false)
@@ -83,6 +84,10 @@ public class User {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Recipe> recipes = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<RecipeComment> comments = new ArrayList<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

@@ -12,9 +12,12 @@ package fit.kltn_cookinote_backend.services.impl;/*
 import fit.kltn_cookinote_backend.dtos.UserDto;
 import fit.kltn_cookinote_backend.dtos.request.UpdateDisplayNameRequest;
 import fit.kltn_cookinote_backend.dtos.request.UserDetailDto;
+import fit.kltn_cookinote_backend.dtos.response.UserStatsResponse;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.AuthProvider;
+import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.mappers.UserMapper;
+import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.RefreshTokenService;
 import fit.kltn_cookinote_backend.services.SessionAllowlistService;
@@ -23,6 +26,7 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +38,7 @@ import java.time.ZoneOffset;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
     private final UserRepository userRepo;
+    private final RecipeRepository recipeRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder encoder;
     private final RefreshTokenService refreshService;
@@ -104,15 +109,86 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<UserDto> getAllUsers(Pageable pageable) {
         Page<User> userPage = userRepo.findAll(pageable);
         return userPage.map(userMapper::toDto);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UserDetailDto getUserDetails(Long userId) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người dùng với id: " + userId));
         return userMapper.toDetailDto(user);
+    }
+
+    @Override
+    @Transactional
+    public UserDetailDto disableUser(Long userId) {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người dùng với id: " + userId));
+
+        // Ngăn chặn việc vô hiệu hóa tài khoản Admin khác
+        if (user.getRole() == Role.ADMIN) {
+            throw new AccessDeniedException("Không thể vô hiệu hóa tài khoản Admin.");
+        }
+
+        if (!user.isEnabled()) {
+            // Nếu đã bị vô hiệu hóa rồi thì không cần làm gì, trả về thông tin hiện tại
+            return userMapper.toDetailDto(user);
+        }
+
+        user.setEnabled(false); // Đặt trạng thái thành false
+        userRepo.save(user);
+
+        // Thu hồi tất cả phiên đăng nhập và refresh token của người dùng này
+        refreshService.revokeAllForUser(userId);
+        sessionService.revokeAllForUser(userId);
+
+        return userMapper.toDetailDto(user); // Trả về thông tin chi tiết đã cập nhật
+    }
+
+    @Override
+    @Transactional
+    public UserDetailDto enableUser(Long userId) {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người dùng với id: " + userId));
+
+        // Có thể thêm kiểm tra để đảm bảo chỉ Admin mới kích hoạt được,
+        // nhưng @PreAuthorize ở Controller đã đủ an toàn.
+
+        if (user.isEnabled()) {
+            // Nếu tài khoản đã được kích hoạt rồi thì không cần làm gì
+            return userMapper.toDetailDto(user);
+        }
+
+        // Chỉ kích hoạt lại nếu email đã được xác thực trước đó
+        if (!user.isEmailVerified()) {
+            throw new IllegalStateException("Không thể kích hoạt tài khoản chưa xác thực email. Người dùng cần xác thực email trước.");
+        }
+
+        user.setEnabled(true); // Đặt trạng thái thành true
+        userRepo.save(user);
+
+        // Lưu ý: Không cần thu hồi token khi enable lại. Người dùng có thể đăng nhập bình thường.
+
+        return userMapper.toDetailDto(user); // Trả về thông tin chi tiết đã cập nhật
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserStatsResponse getUserStats() {
+        long totalUsers = userRepo.count();
+        long totalRecipes = recipeRepository.count(); // Đếm tất cả công thức
+        long activeUsers = userRepo.countByEnabledTrue();
+        long newUsersToday = userRepo.countNewUsersToday();
+
+        return UserStatsResponse.builder()
+                .totalUsers(totalUsers)
+                .totalRecipes(totalRecipes)
+                .activeUsers(activeUsers)
+                .newUsersToday(newUsersToday)
+                .build();
     }
 }
