@@ -28,4 +28,9 @@ public interface PostService {
      * Admin cập nhật nội dung bài viết (không đổi ảnh)
      */
     PostResponse updatePostContent(Long postId, User adminUser, String title, String content);
+
+    /**
+     * Admin cập nhật ảnh bài viết
+     */
+    PostResponse updatePostImage(Long postId, User adminUser, MultipartFile image) throws IOException;
 }

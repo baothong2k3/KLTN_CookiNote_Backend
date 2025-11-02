@@ -23,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -86,6 +88,40 @@ public class PostServiceImpl implements PostService {
         post.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
 
         Post updatedPost = postRepository.save(post);
+        return PostResponse.from(updatedPost);
+    }
+
+    @Override
+    @Transactional
+    public PostResponse updatePostImage(Long postId, User adminUser, MultipartFile image) throws IOException {
+        ImageValidationUtils.validateImage(image);
+
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy bài viết: " + postId));
+
+        final String oldUrl = post.getImageUrl();
+
+        // Upload ảnh mới
+        String publicId = "p_" + post.getId() + "_" + Instant.now().getEpochSecond();
+        String newUrl = CloudinaryUtils.uploadImage(cloudinary, image, postFolder, publicId);
+
+        // Cập nhật DB
+        post.setImageUrl(newUrl);
+        Post updatedPost = postRepository.save(post);
+
+        // Xóa ảnh cũ (nếu có) sau khi commit DB thành công
+        if (StringUtils.hasText(oldUrl)) {
+            String oldPublicId = cloudinaryService.extractPublicIdFromUrl(oldUrl);
+            if (StringUtils.hasText(oldPublicId)) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        cloudinaryService.safeDeleteByPublicId(oldPublicId);
+                    }
+                });
+            }
+        }
+
         return PostResponse.from(updatedPost);
     }
 }

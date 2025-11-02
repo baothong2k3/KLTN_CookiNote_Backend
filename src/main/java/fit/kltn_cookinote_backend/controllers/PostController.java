@@ -63,4 +63,19 @@ public class PostController {
         PostResponse data = postService.updatePostContent(postId, adminUser, title, content);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật nội dung bài viết thành công", data, httpReq.getRequestURI()));
     }
+
+    /**
+     * API Admin cập nhật ảnh bài viết
+     */
+    @PutMapping(value = "/{postId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PostResponse>> updatePostImage(
+            @AuthenticationPrincipal User adminUser,
+            @PathVariable Long postId,
+            @RequestPart("image") MultipartFile image,
+            HttpServletRequest httpReq
+    ) throws IOException {
+        PostResponse data = postService.updatePostImage(postId, adminUser, image);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật ảnh bài viết thành công", data, httpReq.getRequestURI()));
+    }
 }
