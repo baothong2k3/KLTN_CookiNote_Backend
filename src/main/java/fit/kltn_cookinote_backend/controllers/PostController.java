@@ -78,4 +78,18 @@ public class PostController {
         PostResponse data = postService.updatePostImage(postId, adminUser, image);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật ảnh bài viết thành công", data, httpReq.getRequestURI()));
     }
+
+    /**
+     * API Admin xóa bài viết
+     */
+    @DeleteMapping("/{postId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deletePost(
+            @AuthenticationPrincipal User adminUser,
+            @PathVariable Long postId,
+            HttpServletRequest httpReq
+    ) {
+        postService.deletePost(postId, adminUser);
+        return ResponseEntity.ok(ApiResponse.success("Xóa bài viết thành công", httpReq.getRequestURI()));
+    }
 }

@@ -33,4 +33,9 @@ public interface PostService {
      * Admin cập nhật ảnh bài viết
      */
     PostResponse updatePostImage(Long postId, User adminUser, MultipartFile image) throws IOException;
+
+    /**
+     * Admin xóa bài viết
+     */
+    void deletePost(Long postId, User adminUser);
 }

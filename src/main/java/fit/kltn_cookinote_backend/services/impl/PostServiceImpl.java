@@ -124,4 +124,29 @@ public class PostServiceImpl implements PostService {
 
         return PostResponse.from(updatedPost);
     }
+
+    @Override
+    @Transactional
+    public void deletePost(Long postId, User adminUser) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy bài viết: " + postId));
+
+        final String imageUrl = post.getImageUrl();
+
+        // Xóa khỏi DB
+        postRepository.delete(post);
+
+        // Xóa ảnh trên Cloudinary sau khi commit
+        if (StringUtils.hasText(imageUrl)) {
+            String publicId = cloudinaryService.extractPublicIdFromUrl(imageUrl);
+            if (StringUtils.hasText(publicId)) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        cloudinaryService.safeDeleteByPublicId(publicId);
+                    }
+                });
+            }
+        }
+    }
 }
