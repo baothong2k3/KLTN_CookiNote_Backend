@@ -14,6 +14,7 @@ import fit.kltn_cookinote_backend.dtos.request.ExportRequest;
 import fit.kltn_cookinote_backend.dtos.request.UserDetailDto;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
 import fit.kltn_cookinote_backend.dtos.response.PagedUserResponse;
+import fit.kltn_cookinote_backend.dtos.response.UserStatsResponse;
 import fit.kltn_cookinote_backend.services.ExcelExportService;
 import fit.kltn_cookinote_backend.services.UserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,8 +43,16 @@ public class AdminController {
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "10") int size,
             HttpServletRequest httpReq) {
+        // Tạo đối tượng Sort với nhiều tiêu chí:
+        // 1. Sắp xếp theo 'role' tăng dần (Enum 'ADMIN' (0) sẽ đứng trước 'USER' (1))
+        // 2. Sau đó, sắp xếp theo 'createdAt' giảm dần (mới nhất lên đầu)
+        Sort sort = Sort.by(
+                Sort.Order.asc("role"),
+                Sort.Order.desc("createdAt")
+        );
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Pageable pageable = PageRequest.of(page, size, sort);
+
         Page<UserDto> userPage = userService.getAllUsers(pageable);
         PagedUserResponse responseData = PagedUserResponse.from(userPage);
 
@@ -61,7 +70,7 @@ public class AdminController {
      * API xuất toàn bộ công thức ra file Excel và lưu trên server. Chỉ Admin.
      * Nhận đường dẫn tùy chọn qua Request Body.
      */
-    @PostMapping("/export/recipes") // Endpoint mới
+    @PostMapping("/export/recipes")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> exportAllRecipesMergedToFile(
             @RequestBody(required = false) ExportRequest request,
@@ -76,7 +85,7 @@ public class AdminController {
      * API để Admin vô hiệu hóa tài khoản người dùng (không phải Admin).
      * Sẽ thu hồi tất cả phiên đăng nhập của người dùng đó.
      */
-    @PatchMapping("/users/{id}/disable") // Sử dụng PATCH vì chỉ cập nhật một phần trạng thái
+    @PatchMapping("/users/{id}/disable")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UserDetailDto>> disableUser(
             @PathVariable Long id,
@@ -100,5 +109,12 @@ public class AdminController {
         UserDetailDto updatedUserDetails = userService.enableUser(id);
         String message = String.format("Đã kích hoạt lại thành công tài khoản người dùng ID: %d", id);
         return ResponseEntity.ok(ApiResponse.success(message, updatedUserDetails, httpReq.getRequestURI()));
+    }
+
+    @GetMapping("/stats/users")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<UserStatsResponse>> getUserStats(HttpServletRequest httpReq) {
+        UserStatsResponse stats = userService.getUserStats();
+        return ResponseEntity.ok(ApiResponse.success("Lấy thống kê người dùng thành công", stats, httpReq.getRequestURI()));
     }
 }

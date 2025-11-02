@@ -26,6 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -451,5 +452,43 @@ public class RecipeController {
         RecipeResponse data = shareService.getRecipeByShareCode(shareCode, viewerId);
 
         return ResponseEntity.ok(ApiResponse.success("Lấy công thức chia sẻ thành công.", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Xóa một hoặc nhiều nguyên liệu khỏi công thức.
+     * DELETE /recipes/{recipeId}/ingredients
+     */
+    @DeleteMapping("/{recipeId}/ingredients")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> deleteIngredients(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @Valid @RequestBody DeleteIngredientsRequest req, // Nhận ID từ body
+            HttpServletRequest httpReq
+    ) {
+        Map<String, Integer> result = recipeService.deleteIngredients(authUser.getUserId(), recipeId, req);
+        int deletedCount = result.getOrDefault("deletedCount", 0);
+        String message = String.format("Đã xóa thành công %d nguyên liệu khỏi công thức.", deletedCount);
+
+        return ResponseEntity.ok(ApiResponse.success(message, result, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Xóa một hoặc nhiều bước (step) khỏi công thức.
+     * DELETE /recipes/{recipeId}/steps
+     */
+    @DeleteMapping("/{recipeId}/steps")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> deleteSteps(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @Valid @RequestBody DeleteRecipeStepsRequest req,
+            HttpServletRequest httpReq
+    ) {
+        Map<String, Integer> result = stepImageService.deleteSteps(authUser.getUserId(), recipeId, req);
+        int deletedCount = result.getOrDefault("deletedCount", 0);
+        String message = String.format("Đã xóa thành công %d bước. Các bước còn lại đã được sắp xếp lại.", deletedCount);
+
+        return ResponseEntity.ok(ApiResponse.success(message, result, httpReq.getRequestURI()));
     }
 }

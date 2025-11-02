@@ -90,4 +90,13 @@ public interface ShoppingListService {
      * @return Map chứa số lượng mục đã xóa.
      */
     Map<String, Integer> deleteItemsByFilter(Long userId, String filter, @Nullable Long recipeId);
+
+    /**
+     * Bỏ đánh dấu một mục trong danh sách mua sắm (checked = false).
+     *
+     * @param userId ID của người dùng.
+     * @param itemId ID của mục cần bỏ đánh dấu.
+     * @return Thông tin mục đã được cập nhật.
+     */
+    ShoppingListResponse uncheckItem(Long userId, Long itemId);
 }

@@ -213,6 +213,21 @@ public class ShoppingListController {
     }
 
     /**
+     * Bỏ đánh dấu một mục trong shopping list (checked = false).
+     * Sử dụng PATCH vì chỉ cập nhật một phần trạng thái.
+     */
+    @PatchMapping("/items/{itemId}/uncheck")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ShoppingListResponse>> uncheckShoppingListItem(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long itemId,
+            HttpServletRequest httpReq
+    ) {
+        ShoppingListResponse data = shoppingListService.uncheckItem(authUser.getUserId(), itemId);
+        return ResponseEntity.ok(ApiResponse.success("Đã bỏ đánh dấu hoàn thành mục.", data, httpReq.getRequestURI()));
+    }
+
+    /**
      * Xóa một hoặc nhiều mục khỏi shopping list theo danh sách ID cụ thể.
      * Endpoint: DELETE /shopping-lists/items-by-ids
      */

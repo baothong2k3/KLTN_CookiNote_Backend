@@ -12,8 +12,11 @@ public record RecipeCardResponse(
         String imageUrl,
         String ownerName,
         LocalDateTime createdAt,
-        String difficulty,  // String để tránh buộc client cập nhật enum
+        String difficulty,
         Long view,
+        Double averageRating,
+        Integer ratingCount,
+        Integer commentCount,
         Integer prepareTime,
         Integer cookTime,
         boolean deleted
@@ -28,6 +31,9 @@ public record RecipeCardResponse(
                 .createdAt(r.getCreatedAt())
                 .difficulty(r.getDifficulty() != null ? r.getDifficulty().name() : null)
                 .view(r.getView())
+                .averageRating(r.getAverageRating())
+                .ratingCount(r.getRatingCount())
+                .commentCount(r.getCommentCount())
                 .prepareTime(r.getPrepareTime())
                 .cookTime(r.getCookTime())
                 .deleted(r.isDeleted())

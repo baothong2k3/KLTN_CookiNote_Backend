@@ -11,6 +11,7 @@ package fit.kltn_cookinote_backend.repositories;/*
 
 import fit.kltn_cookinote_backend.entities.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 import java.util.Optional;
 
@@ -24,4 +25,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByUsername(String username);
 
     Optional<User> findByUsernameAndEmail(String username, String email);
+
+    /**
+     * Đếm số lượng người dùng đang ở trạng thái enabled = true.
+     */
+    Long countByEnabledTrue();
+
+    /**
+     * Đếm số lượng người dùng mới được tạo trong ngày hôm nay (dựa trên múi giờ của DB).
+     */
+    @Query("SELECT COUNT(u) FROM User u WHERE DATE(u.createdAt) = CURRENT_DATE")
+    Long countNewUsersToday();
 }

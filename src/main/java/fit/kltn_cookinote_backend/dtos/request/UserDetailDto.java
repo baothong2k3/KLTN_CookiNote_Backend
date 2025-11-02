@@ -26,6 +26,8 @@ public record UserDetailDto(
         LocalDateTime createdAt,
         Role role,
         AuthProvider authProvider,
+        Integer recipeCount,
+        Integer favoriteCount,
         boolean emailVerified,
         boolean enabled
 ) {

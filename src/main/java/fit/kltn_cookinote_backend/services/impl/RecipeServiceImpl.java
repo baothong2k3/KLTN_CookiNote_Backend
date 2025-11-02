@@ -16,6 +16,7 @@ import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.*;
 import fit.kltn_cookinote_backend.services.CloudinaryService;
+import fit.kltn_cookinote_backend.services.CommentService;
 import fit.kltn_cookinote_backend.services.RecipeService;
 import fit.kltn_cookinote_backend.utils.ShoppingListUtils;
 import jakarta.persistence.EntityNotFoundException;
@@ -49,6 +50,8 @@ public class RecipeServiceImpl implements RecipeService {
     private final ShoppingListRepository shoppingListRepository;
     private final FavoriteRepository favoriteRepository;
     private final CookedHistoryRepository cookedHistoryRepository;
+    private final RecipeRatingRepository ratingRepository;
+    private final CommentService commentService;
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 12; // mobile-friendly
@@ -78,6 +81,9 @@ public class RecipeServiceImpl implements RecipeService {
                 .cookTime(req.cookTime())
                 .difficulty(req.difficulty())
                 .view(0L)
+                .averageRating(0.0)
+                .ratingCount(0)
+                .commentCount(0)
                 .createdAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
@@ -129,7 +135,7 @@ public class RecipeServiceImpl implements RecipeService {
         }
 
         Recipe saved = recipeRepository.saveAndFlush(recipe);
-        return RecipeResponse.from(saved, false);
+        return RecipeResponse.from(saved, false, null, List.of());
     }
 
     @Override
@@ -150,9 +156,7 @@ public class RecipeServiceImpl implements RecipeService {
             recipe.setView((recipe.getView() == null ? 0 : recipe.getView()) + 1);
         }
 
-        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(viewerUserId, recipeId).isPresent();
-
-        return RecipeResponse.from(recipe, isFavorited);
+        return buildRecipeResponse(recipe, viewerUserId);
     }
 
     @Override
@@ -294,8 +298,7 @@ public class RecipeServiceImpl implements RecipeService {
 
         Recipe saved = recipeRepository.saveAndFlush(recipe);
 
-        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        return RecipeResponse.from(saved, isFavorited);
+        return buildRecipeResponse(saved, actorUserId);
     }
 
     @Override
@@ -498,6 +501,9 @@ public class RecipeServiceImpl implements RecipeService {
                 .difficulty(req.difficulty())
                 .privacy(req.privacy()) // Theo lựa chọn của người dùng
                 .view(0L) // Bắt đầu từ 0
+                .averageRating(0.0)
+                .ratingCount(0)
+                .commentCount(0)
                 .createdAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
@@ -525,7 +531,7 @@ public class RecipeServiceImpl implements RecipeService {
         newRecipe.setSteps(steps);
 
         Recipe saved = recipeRepository.save(newRecipe);
-        return RecipeResponse.from(saved, false);
+        return RecipeResponse.from(saved, false, null, List.of());
     }
 
     @Override
@@ -628,8 +634,7 @@ public class RecipeServiceImpl implements RecipeService {
             recipe = recipeRepository.findDetailById(recipeId)
                     .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
-            boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-            return RecipeResponse.from(recipe, isFavorited);
+            return buildRecipeResponse(recipe, actorUserId);
         }
 
 
@@ -637,8 +642,64 @@ public class RecipeServiceImpl implements RecipeService {
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại sau khi cập nhật: " + recipeId)); // Nên có
 
-        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        return RecipeResponse.from(reloaded, isFavorited);
+        return buildRecipeResponse(reloaded, actorUserId);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Integer> deleteIngredients(Long actorUserId, Long recipeId, DeleteIngredientsRequest req) {
+        // 1) Tải User (actor) và Recipe, kiểm tra quyền
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        // Kiểm tra Recipe đã bị xóa chưa
+        if (recipe.isDeleted()) {
+            throw new EntityNotFoundException("Không thể xóa nguyên liệu khỏi công thức đã bị xóa: " + recipeId);
+        }
+
+        Long ownerId = recipe.getUser().getUserId();
+        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        // 2) Tải các RecipeIngredient cần xóa
+        List<Long> idsToDelete = req.ingredientIds();
+        if (idsToDelete == null || idsToDelete.isEmpty()) {
+            throw new IllegalArgumentException("Danh sách ID nguyên liệu cần xóa không được rỗng.");
+        }
+
+        List<RecipeIngredient> ingredientsToDelete = recipeIngredientRepository.findAllById(idsToDelete);
+
+        // 3) Kiểm tra xem tất cả ID có hợp lệ và thuộc về Recipe này không
+        Set<Long> foundIds = ingredientsToDelete.stream()
+                .map(RecipeIngredient::getId)
+                .collect(Collectors.toSet());
+        List<Long> missingOrInvalidIds = idsToDelete.stream()
+                .filter(id -> !foundIds.contains(id))
+                .toList();
+
+        if (!missingOrInvalidIds.isEmpty()) {
+            throw new IllegalArgumentException("Không tìm thấy các ID nguyên liệu sau: " + missingOrInvalidIds);
+        }
+
+        // Kiểm tra xem các nguyên liệu tìm thấy có thực sự thuộc về recipeId không
+        for (RecipeIngredient ingredient : ingredientsToDelete) {
+            if (!ingredient.getRecipe().getId().equals(recipeId)) {
+                throw new AccessDeniedException("Nguyên liệu ID " + ingredient.getId() + " không thuộc về công thức này.");
+            }
+        }
+
+        // 4) Thực hiện xóa
+        // Sử dụng orphanRemoval=true trên Recipe.ingredients hoặc xóa trực tiếp qua repository
+        recipeIngredientRepository.deleteAllInBatch(ingredientsToDelete); // Hiệu quả hơn khi xóa nhiều
+
+        // Cập nhật thời gian update cho Recipe
+        recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+        recipeRepository.save(recipe);
+
+        // 5) Trả về số lượng đã xóa
+        return Map.of("deletedCount", ingredientsToDelete.size());
     }
 
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {
@@ -653,5 +714,27 @@ public class RecipeServiceImpl implements RecipeService {
         if (!Objects.equals(actorId, ownerId)) {
             throw new AccessDeniedException("Chỉ chủ sở hữu hoặc ADMIN mới được chỉnh sửa.");
         }
+    }
+
+    /**
+     * Helper private để gói gọn logic xây dựng RecipeResponse
+     */
+    @Override
+    public RecipeResponse buildRecipeResponse(Recipe recipe, Long viewerUserId) {
+        boolean isFavorited = false;
+        Integer myRating = null;
+
+        // Xử lý trường hợp viewerUserId là null (khách vãng lai)
+        if (viewerUserId != null) {
+            isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(viewerUserId, recipe.getId()).isPresent();
+            myRating = ratingRepository.findByUser_UserIdAndRecipe_Id(viewerUserId, recipe.getId())
+                    .map(RecipeRating::getScore)
+                    .orElse(null);
+        }
+
+        // Lấy danh sách bình luận (CommentService đã xử lý quyền xem)
+        List<CommentResponse> comments = commentService.getCommentsByRecipe(recipe.getId(), viewerUserId);
+
+        return RecipeResponse.from(recipe, isFavorited, myRating, comments);
     }
 }

@@ -15,10 +15,8 @@ import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.entities.Share;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.Privacy;
-import fit.kltn_cookinote_backend.repositories.FavoriteRepository;
-import fit.kltn_cookinote_backend.repositories.RecipeRepository;
-import fit.kltn_cookinote_backend.repositories.ShareRepository;
-import fit.kltn_cookinote_backend.repositories.UserRepository;
+import fit.kltn_cookinote_backend.repositories.*;
+import fit.kltn_cookinote_backend.services.RecipeService;
 import fit.kltn_cookinote_backend.services.ShareService;
 import fit.kltn_cookinote_backend.utils.QrCodeUtil;
 import jakarta.persistence.EntityNotFoundException;
@@ -38,7 +36,7 @@ public class ShareServiceImpl implements ShareService {
     private final RecipeRepository recipeRepository;
     private final UserRepository userRepository;
     private final ShareRepository shareRepository;
-    private final FavoriteRepository favoriteRepository;
+    private final RecipeService recipeService;
 
     @Value("${app.baseUrl}")
     private String baseUrl;
@@ -121,13 +119,6 @@ public class ShareServiceImpl implements ShareService {
             throw new AccessDeniedException("Công thức này đã được chuyển về chế độ riêng tư.");
         }
 
-        // 1. Kiểm tra favorite
-        boolean isFavorited = false;
-        if (viewerUserIdOrNull != null) {
-            isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(viewerUserIdOrNull, recipe.getId()).isPresent();
-        }
-
-        // 3. Trả về DTO
-        return RecipeResponse.from(recipe, isFavorited);
+        return recipeService.buildRecipeResponse(recipe, viewerUserIdOrNull);
     }
 }

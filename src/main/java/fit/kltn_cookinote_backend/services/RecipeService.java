@@ -9,14 +9,13 @@ package fit.kltn_cookinote_backend.services;/*
  * @version: 1.0
  */
 
-import fit.kltn_cookinote_backend.dtos.request.AddIngredientsRequest;
-import fit.kltn_cookinote_backend.dtos.request.ForkRecipeRequest;
-import fit.kltn_cookinote_backend.dtos.request.RecipeCreateRequest;
-import fit.kltn_cookinote_backend.dtos.request.RecipeUpdateRequest;
+import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
+import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.entities.User;
 
 import java.util.List;
+import java.util.Map;
 
 public interface RecipeService {
     RecipeResponse createByRecipe(Long id, RecipeCreateRequest req);
@@ -74,5 +73,26 @@ public interface RecipeService {
      * @return RecipeResponse đã được cập nhật
      */
     RecipeResponse addIngredients(Long actorUserId, Long recipeId, AddIngredientsRequest req);
+
+    /**
+     * Xóa một hoặc nhiều nguyên liệu khỏi một công thức đã tồn tại.
+     * Chỉ chủ sở hữu hoặc ADMIN mới có quyền.
+     *
+     * @param actorUserId ID người thực hiện
+     * @param recipeId    ID công thức
+     * @param req         Đối tượng chứa danh sách ID nguyên liệu cần xóa
+     * @return Map chứa số lượng nguyên liệu đã xóa ("deletedCount")
+     */
+    Map<String, Integer> deleteIngredients(Long actorUserId, Long recipeId, DeleteIngredientsRequest req);
+
+    /**
+     * Helper tập trung để xây dựng một RecipeResponse hoàn chỉnh
+     * (bao gồm favorite, rating, comments).
+     *
+     * @param recipe       Đối tượng Recipe đã tải
+     * @param viewerUserId ID của người xem (có thể null)
+     * @return RecipeResponse hoàn chỉnh
+     */
+    RecipeResponse buildRecipeResponse(Recipe recipe, Long viewerUserId);
 
 }

@@ -9,26 +9,27 @@ package fit.kltn_cookinote_backend.services.impl;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.request.DeleteRecipeStepsRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepReorderRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
-import fit.kltn_cookinote_backend.entities.Recipe;
-import fit.kltn_cookinote_backend.entities.RecipeStep;
-import fit.kltn_cookinote_backend.entities.RecipeStepImage;
-import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.*;
-import fit.kltn_cookinote_backend.services.RecipeImageService;
-import fit.kltn_cookinote_backend.services.RecipeStepImageService;
+import fit.kltn_cookinote_backend.services.*;
 import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -48,6 +49,11 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
     private final UserRepository userRepository;
     private final RecipeRepository recipeRepository;
     private final FavoriteRepository favoriteRepository;
+    private final RecipeRatingRepository ratingRepository;
+    private final CloudinaryService cloudinaryService;
+    private final CommentService commentService;
+
+    private final RecipeService recipeService;
 
     @PersistenceContext
     private EntityManager em;
@@ -240,8 +246,7 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
-        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        return RecipeResponse.from(reloaded, isFavorited);
+        return recipeService.buildRecipeResponse(reloaded, actorUserId);
     }
 
     @Override
@@ -302,8 +307,7 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
-        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        return RecipeResponse.from(reloaded, isFavorited);
+        return recipeService.buildRecipeResponse(reloaded, actorUserId);
     }
 
     @Override
@@ -380,9 +384,99 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
 
         // 8) Reload the detailed Recipe to return the updated state
         Recipe reloaded = recipeRepository.findDetailById(recipeId)
-                .orElseThrow(() -> new EntityNotFoundException("Recipe not found after update: " + recipeId)); // Should ideally not happen
+                .orElseThrow(() -> new EntityNotFoundException("Recipe not found after update: " + recipeId));
 
-        boolean isFavorited = favoriteRepository.findByUser_UserIdAndRecipe_Id(actorUserId, recipeId).isPresent();
-        return RecipeResponse.from(reloaded, isFavorited);
+        return recipeService.buildRecipeResponse(reloaded, actorUserId);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Integer> deleteSteps(Long actorUserId, Long recipeId, DeleteRecipeStepsRequest req) {
+        // 1) Tải Recipe và kiểm tra quyền
+        Recipe recipe = loadAndCheckRecipe(actorUserId, recipeId);
+
+        List<Long> idsToDelete = req.stepIds();
+        if (idsToDelete == null || idsToDelete.isEmpty()) {
+            throw new IllegalArgumentException("Danh sách ID các bước cần xóa không được rỗng.");
+        }
+
+        // 2) Tải các Step entity cần xóa (bao gồm cả ảnh của chúng để chuẩn bị xóa)
+        // Chúng ta cần tải các ảnh (images) của step một cách rõ ràng (EAGER)
+        List<RecipeStep> stepsToDelete = stepRepository.findAllById(idsToDelete);
+        stepsToDelete.forEach(step -> Hibernate.initialize(step.getImages())); // Tải EAGER
+
+        // 3) Validate và thu thập Public IDs
+        final List<String> publicIdsToDeleteOnCloudinary = new ArrayList<>();
+        Set<Long> foundIds = new HashSet<>();
+
+        for (RecipeStep step : stepsToDelete) {
+            // 3.1) Kiểm tra xem step có thuộc đúng recipe không
+            if (!step.getRecipe().getId().equals(recipeId)) {
+                throw new AccessDeniedException("Bước ID " + step.getId() + " không thuộc về công thức này.");
+            }
+            foundIds.add(step.getId());
+
+            // 3.2) Thu thập public ID từ ảnh của step
+            if (step.getImages() != null) {
+                for (RecipeStepImage image : step.getImages()) {
+                    String publicId = cloudinaryService.extractPublicIdFromUrl(image.getImageUrl());
+                    if (StringUtils.hasText(publicId)) {
+                        publicIdsToDeleteOnCloudinary.add(publicId);
+                    }
+                }
+            }
+        }
+
+        // 3.3) Kiểm tra xem có ID nào yêu cầu xóa mà không tìm thấy không
+        List<Long> missingIds = idsToDelete.stream()
+                .filter(id -> !foundIds.contains(id))
+                .toList();
+        if (!missingIds.isEmpty()) {
+            throw new EntityNotFoundException("Không tìm thấy các bước có ID: " + missingIds);
+        }
+
+        // 4) Đăng ký xóa ảnh trên Cloudinary (SAU KHI COMMIT DB)
+        if (!publicIdsToDeleteOnCloudinary.isEmpty()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    for (String publicId : publicIdsToDeleteOnCloudinary) {
+                        cloudinaryService.safeDeleteByPublicId(publicId);
+                    }
+                }
+            });
+        }
+
+        // 5) Xóa các Step khỏi DB
+        // Do RecipeStep có cascade = ALL và orphanRemoval = true
+        // nên việc xóa RecipeStep cũng sẽ tự động xóa RecipeStepImage khỏi DB.
+        stepRepository.deleteAll(stepsToDelete);
+        em.flush(); // Đẩy các thay đổi xóa xuống DB
+
+        // 6) Đánh số lại thứ tự (re-number) các bước còn lại
+        List<RecipeStep> remainingSteps = stepRepository.findByRecipe_IdOrderByStepNoAsc(recipeId);
+        int newStepNo = 1;
+        boolean reordered = false;
+        for (RecipeStep step : remainingSteps) {
+            if (step.getStepNo() != newStepNo) {
+                step.setStepNo(newStepNo);
+                reordered = true;
+            }
+            newStepNo++;
+        }
+
+        if (reordered) {
+            stepRepository.saveAll(remainingSteps);
+        }
+
+        // 7) Cập nhật thời gian cho Recipe
+        recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+        recipeRepository.save(recipe);
+
+        // 8) Trả về kết quả
+        return Map.of(
+                "deletedCount", stepsToDelete.size(),
+                "reorderedCount", remainingSteps.size()
+        );
     }
 }

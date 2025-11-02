@@ -2,6 +2,8 @@ package fit.kltn_cookinote_backend.dtos;
 
 import lombok.Builder;
 
+import java.time.LocalDateTime;
+
 @Builder
 public record UserDto(
         Long userId,
@@ -9,6 +11,11 @@ public record UserDto(
         String email,
         String avatarUrl,
         String displayName,
-        String role
+        String role,
+        boolean enabled,
+        boolean emailVerified,
+        LocalDateTime createdAt,
+        Integer recipeCount,
+        Integer favoriteCount
 ) {
 }
