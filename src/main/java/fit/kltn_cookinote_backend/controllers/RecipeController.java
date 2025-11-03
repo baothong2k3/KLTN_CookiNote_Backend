@@ -23,10 +23,12 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
@@ -38,6 +40,32 @@ public class RecipeController {
     private final FavoriteService favoriteService;
     private final ShareService shareService;
     private final FavoriteRepository favoriteRepository;
+
+    @PostMapping(value = "/create-with-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<RecipeResponse>> createRecipeFull(
+            @AuthenticationPrincipal User authUser,
+            @RequestPart("recipe") String recipeJson, // Pha 1: JSON data
+            @RequestPart(value = "cover", required = false) MultipartFile coverImage, // Pha 2a: Cover
+            MultipartHttpServletRequest httpReq // Dùng để lấy các part ảnh step (Pha 2b)
+    ) throws IOException {
+
+        // Lọc ra các file ảnh của steps (Pha 2b)
+        // Lấy tất cả các file parts có key bắt đầu bằng "stepImages_"
+        Map<String, List<MultipartFile>> stepImagesMap = httpReq.getMultiFileMap().entrySet().stream()
+                .filter(entry -> entry.getKey().startsWith("stepImages_"))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        // Gọi service mới
+        RecipeResponse data = recipeService.createRecipeFull(
+                authUser.getUserId(),
+                recipeJson,
+                coverImage,
+                stepImagesMap
+        );
+
+        return ResponseEntity.ok(ApiResponse.success("Tạo công thức thành công", data, httpReq.getRequestURI()));
+    }
 
     // PHA 1: Tạo recipe (USER/ADMIN; nếu PUBLIC chỉ ADMIN)
     @PostMapping

@@ -9,6 +9,8 @@ package fit.kltn_cookinote_backend.services.impl;/*
  * @version: 1.0
  */
 
+import com.cloudinary.Cloudinary;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.*;
@@ -18,10 +20,18 @@ import fit.kltn_cookinote_backend.repositories.*;
 import fit.kltn_cookinote_backend.services.CloudinaryService;
 import fit.kltn_cookinote_backend.services.CommentService;
 import fit.kltn_cookinote_backend.services.RecipeService;
+import fit.kltn_cookinote_backend.utils.CloudinaryUtils;
+import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
 import fit.kltn_cookinote_backend.utils.ShoppingListUtils;
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.PersistenceContext;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -32,7 +42,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -52,10 +65,204 @@ public class RecipeServiceImpl implements RecipeService {
     private final CookedHistoryRepository cookedHistoryRepository;
     private final RecipeRatingRepository ratingRepository;
     private final CommentService commentService;
+    private final ObjectMapper objectMapper;
+    private final Validator validator;
+    private final Cloudinary cloudinary;
+    private final RecipeStepImageRepository stepImageRepository;
+    private final RecipeCoverImageHistoryRepository coverImageHistoryRepository;
+
+    @Value("${app.cloudinary.recipe-folder}")
+    private String recipeFolder;
+
+    @PersistenceContext
+    private EntityManager em;
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 12; // mobile-friendly
     private static final int MAX_SIZE = 20;
+
+    @Override
+    @Transactional
+    public RecipeResponse createRecipeFull(Long actorUserId, String recipeJson,
+                                           MultipartFile coverImage,
+                                           Map<String, List<MultipartFile>> allStepImages) throws IOException {
+
+        // 1. Deserialize và Validate JSON
+        RecipeCreateRequest req;
+        try {
+            req = objectMapper.readValue(recipeJson, RecipeCreateRequest.class);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Dữ liệu JSON 'recipe' không hợp lệ: " + e.getMessage());
+        }
+        Set<ConstraintViolation<RecipeCreateRequest>> violations = validator.validate(req);
+        if (!violations.isEmpty()) {
+            // Ném lỗi validation để GlobalExceptionHandler bắt
+            throw new ConstraintViolationException(violations);
+        }
+
+        // 2. Tạo Recipe (logic cơ bản từ createByRecipe - Pha 1)
+        User user = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Privacy privacy = req.privacy() == null ? Privacy.PRIVATE : req.privacy();
+
+        if (user.getRole() != Role.ADMIN && req.privacy() == Privacy.PUBLIC) {
+            throw new AccessDeniedException("Chỉ ADMIN mới được tạo recipe công khai");
+        }
+        Category category = categoryRepository.findById(req.categoryId())
+                .orElseThrow(() -> new EntityNotFoundException("Category không tồn tại: " + req.categoryId()));
+
+        Recipe recipe = Recipe.builder()
+                .user(user)
+                .privacy(privacy)
+                .category(category)
+                .title(req.title())
+                .description(req.description())
+                .prepareTime(req.prepareTime())
+                .cookTime(req.cookTime())
+                .difficulty(req.difficulty())
+                .view(0L)
+                .averageRating(0.0)
+                .ratingCount(0)
+                .commentCount(0)
+                .createdAt(LocalDateTime.now(ZoneOffset.UTC))
+                .build();
+
+        // Ingredients
+        List<RecipeIngredient> ingredients = new ArrayList<>();
+        for (RecipeIngredientCreate i : req.ingredients()) {
+            RecipeIngredient ing = RecipeIngredient.builder()
+                    .recipe(recipe)
+                    .name(i.name())
+                    .quantity(i.quantity())
+                    .build();
+            ingredients.add(ing);
+        }
+        recipe.setIngredients(ingredients);
+
+        // Steps (CHUẨN HÓA stepNo)
+        if (req.steps() == null || req.steps().isEmpty()) {
+            throw new IllegalArgumentException("Danh sách bước nấu không được rỗng.");
+        }
+
+        List<RecipeStepCreate> sorted = new ArrayList<>(req.steps());
+        sorted.sort(Comparator.comparing(s -> s.stepNo() == null ? Integer.MAX_VALUE : s.stepNo()));
+
+        List<RecipeStep> steps = new ArrayList<>(sorted.size());
+        Set<Integer> used = new HashSet<>();
+        int autoIdx = 1;
+
+        for (RecipeStepCreate s : sorted) {
+            Integer desired = s.stepNo();
+            if (desired == null || desired <= 0 || used.contains(desired)) {
+                while (used.contains(autoIdx)) autoIdx++;
+                desired = autoIdx++;
+            }
+            used.add(desired);
+
+            steps.add(RecipeStep.builder()
+                    .recipe(recipe)
+                    .stepNo(desired) // Đây sẽ là stepNo 1, 2, 3...
+                    .suggestedTime(s.suggestedTime())
+                    .tips(s.tips())
+                    .content(s.content())
+                    .images(new ArrayList<>()) // Khởi tạo list
+                    .build());
+        }
+        recipe.setSteps(steps);
+
+
+        // 3. Lưu Recipe lần 1 (để lấy ID cho recipe và các steps)
+        Recipe savedRecipe = recipeRepository.saveAndFlush(recipe);
+        Long recipeId = savedRecipe.getId();
+
+        // Sắp xếp lại các bước đã lưu để truy cập bằng index
+        List<RecipeStep> savedSteps = new ArrayList<>(savedRecipe.getSteps());
+        savedSteps.sort(Comparator.comparing(RecipeStep::getStepNo));
+        int numSteps = savedSteps.size();
+
+        // 4. Xử lý Ảnh Steps (Pha 2b)
+        List<RecipeStepImage> allImagesToSave = new ArrayList<>();
+        if (allStepImages != null && !allStepImages.isEmpty()) {
+            for (Map.Entry<String, List<MultipartFile>> entry : allStepImages.entrySet()) {
+                String key = entry.getKey(); // "stepImages_1"
+                List<MultipartFile> files = entry.getValue();
+
+                if (files == null || files.isEmpty()) continue;
+
+                int stepIndex;
+                try {
+                    // Tách số 1 từ "stepImages_1"
+                    stepIndex = Integer.parseInt(key.substring("stepImages_".length()));
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("Key ảnh không hợp lệ (phải có dạng stepImages_N): " + key);
+                }
+
+                // KIỂM TRA RÀNG BUỘC (theo yêu cầu của bạn)
+                if (stepIndex <= 0) continue; // Bỏ qua key không hợp lệ (ví dụ stepImages_0)
+                if (stepIndex > numSteps) {
+                    throw new IllegalArgumentException("Dữ liệu ảnh '" + key + "' không hợp lệ vì công thức chỉ có " + numSteps + " bước.");
+                }
+
+                // KIỂM TRA SỐ LƯỢNG ẢNH/STEP
+                if (files.size() > 5) {
+                    throw new IllegalArgumentException("Bước " + stepIndex + " (" + key + ") có " + files.size() + " ảnh. Tối đa 5 ảnh/bước.");
+                }
+
+                // Lấy đúng step đã được lưu (ví dụ stepIndex=1 -> list 0-indexed lấy 0)
+                RecipeStep targetStep = savedSteps.get(stepIndex - 1);
+                int imgIdx = 1;
+
+                for (MultipartFile file : files) {
+                    ImageValidationUtils.validateImage(file);
+                    // Tạo publicId duy nhất
+                    String publicId = recipeFolder + "/r_" + recipeId + "/s_" + targetStep.getId() + "/img_" + Instant.now().getEpochSecond() + "_" + (imgIdx++);
+                    String url = CloudinaryUtils.uploadImage(cloudinary, file, recipeFolder, publicId);
+
+                    allImagesToSave.add(RecipeStepImage.builder()
+                            .step(targetStep)
+                            .imageUrl(url)
+                            .build());
+                }
+            }
+        }
+
+        // Lưu tất cả các ảnh step vào DB
+        if (!allImagesToSave.isEmpty()) {
+            stepImageRepository.saveAll(allImagesToSave);
+        }
+
+        // 5. Xử lý Ảnh Cover (Pha 2a)
+        if (coverImage != null && !coverImage.isEmpty()) {
+            ImageValidationUtils.validateImage(coverImage);
+            String publicId = recipeFolder + "/r_" + recipeId + "/cover_" + Instant.now().getEpochSecond();
+            String newUrl = CloudinaryUtils.uploadImage(cloudinary, coverImage, recipeFolder, publicId);
+
+            savedRecipe.setImageUrl(newUrl); // Cập nhật URL vào recipe
+
+            // Ghi lịch sử ảnh bìa
+            RecipeCoverImageHistory historyRecord = RecipeCoverImageHistory.builder()
+                    .recipe(savedRecipe)
+                    .imageUrl(newUrl)
+                    .active(true) // Ảnh mới luôn active
+                    .build();
+            coverImageHistoryRepository.save(historyRecord);
+
+            // Cập nhật lại Recipe (lưu URL ảnh bìa)
+            recipeRepository.save(savedRecipe);
+        }
+
+        // Đẩy tất cả thay đổi (ảnh steps, ảnh cover) xuống DB
+        em.flush();
+        // Xóa cache của Hibernate (L1 cache) để buộc tải lại từ DB
+        em.clear();
+
+        // 6. Tải lại đầy đủ (bao gồm cả ảnh) và Trả về
+        Recipe finalRecipe = recipeRepository.findDetailById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Lỗi khi tải lại recipe: " + recipeId));
+
+        return buildRecipeResponse(finalRecipe, actorUserId);
+    }
 
     @Override
     @Transactional
