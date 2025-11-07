@@ -16,6 +16,7 @@ import fit.kltn_cookinote_backend.dtos.response.GeminiResponse;
 import fit.kltn_cookinote_backend.dtos.response.AiScoreResponse;
 import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.entities.RecipeIngredient;
+import fit.kltn_cookinote_backend.utils.ShoppingListUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -84,7 +85,10 @@ public class GeminiApiClient {
      * Tạo prompt cho việc chấm điểm hàng loạt.
      */
     private String buildBatchPrompt(List<String> shoppingList, List<Recipe> candidates) {
-        String shoppingListStr = shoppingList.stream().map(String::trim).toList().toString();
+        String shoppingListStr = shoppingList.stream()
+                .map(ShoppingListUtils::normalize) // Chuẩn hóa
+                .filter(s -> !s.isEmpty())
+                .toList().toString();
 
         // Chuyển danh sách recipe thành một chuỗi JSON đơn giản cho prompt
         String candidatesStr = candidates.stream()
@@ -94,7 +98,8 @@ public class GeminiApiClient {
                         recipe.getTitle(),
                         recipe.getIngredients().stream()
                                 .map(RecipeIngredient::getName)
-                                .map(String::trim)
+                                .map(ShoppingListUtils::normalize) // Chuẩn hóa
+                                .filter(s -> !s.isEmpty())
                                 .toList()
                 ))
                 .toList().toString();

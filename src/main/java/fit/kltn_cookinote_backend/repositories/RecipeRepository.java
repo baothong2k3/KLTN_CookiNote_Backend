@@ -98,7 +98,7 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
                 JOIN r.ingredients i
                 WHERE r.deleted = false
                   AND r.privacy = 'PUBLIC'
-                  AND i.name IN :ingredientNames
+                  AND LOWER(i.name) IN :ingredientNames
                 GROUP BY r.id
                 ORDER BY COUNT(DISTINCT i.id) DESC
             """)

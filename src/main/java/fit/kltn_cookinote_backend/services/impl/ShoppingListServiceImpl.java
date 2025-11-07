@@ -488,11 +488,23 @@ public class ShoppingListServiceImpl implements ShoppingListService {
     public PageResult<RecipeSuggestionResponse> suggestRecipes(Long userId, List<String> ingredientNames, Pageable pageable) {
 
         // ----- BƯỚC 1: LẤY ỨNG VIÊN TỪ DATABASE -----
+        // TẠO BƯỚC 1A: CHUẨN HÓA INPUT
+        List<String> normalizedShoppingList = ingredientNames.stream()
+                .map(ShoppingListUtils::normalize) // Chuẩn hóa: lowercase, trim, gộp space
+                .filter(s -> !s.isEmpty())
+                .distinct()
+                .toList();
+
+        if (normalizedShoppingList.isEmpty()) {
+            // Nếu danh sách chuẩn hóa rỗng, trả về kết quả rỗng
+            return new PageResult<>(pageable.getPageNumber(), pageable.getPageSize(), 0, 0, false, Collections.emptyList());
+        }
+
         // Tạo yêu cầu phân trang chỉ lấy 5 ứng viên hàng đầu (trang 0, 5 phần tử)
         Pageable candidatesPageable = PageRequest.of(0, CANDIDATE_POOL_SIZE);
 
         // Truy vấn DB: Tìm 5 công thức PUBLIC có nhiều nguyên liệu khớp nhất
-        Page<Recipe> candidates = recipeRepository.findCandidateRecipesByIngredients(ingredientNames, candidatesPageable);
+        Page<Recipe> candidates = recipeRepository.findCandidateRecipesByIngredients(normalizedShoppingList, candidatesPageable);
 
         if (candidates.isEmpty()) {
             // Nếu không có ứng viên nào, trả về trang rỗng
@@ -506,7 +518,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
         // ----- BƯỚC 2: GỌI AI CHẤM ĐIỂM HÀNG LOẠT (BATCH CALL) -----
         // Gửi toàn bộ 5 ứng viên trong MỘT cuộc gọi API duy nhất
-        List<AiScoreResponse> scores = geminiApiClient.getSuggestionScoresBatch(ingredientNames, candidateList);
+        List<AiScoreResponse> scores = geminiApiClient.getSuggestionScoresBatch(normalizedShoppingList, candidateList);
 
         // ----- BƯỚC 3: ÁNH XẠ KẾT QUẢ -----
         // Chuyển danh sách điểm số (List) thành Map để tra cứu nhanh bằng ID công thức
