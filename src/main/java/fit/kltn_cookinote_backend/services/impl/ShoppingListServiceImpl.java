@@ -14,12 +14,15 @@ import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.entities.RecipeIngredient;
 import fit.kltn_cookinote_backend.entities.ShoppingList;
 import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.enums.IngredientType;
 import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.repositories.RecipeIngredientRepository;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.repositories.ShoppingListRepository;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.GeminiApiClient;
+import fit.kltn_cookinote_backend.services.IngredientClassificationService;
+import fit.kltn_cookinote_backend.services.IngredientSynonymService;
 import fit.kltn_cookinote_backend.services.ShoppingListService;
 import fit.kltn_cookinote_backend.utils.ShoppingListUtils;
 import jakarta.annotation.Nullable;
@@ -31,7 +34,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.hibernate.Hibernate;
 
 import java.util.*;
 import java.util.function.Function;
@@ -48,8 +50,10 @@ public class ShoppingListServiceImpl implements ShoppingListService {
     private final RecipeIngredientRepository ingredientRepository;
     private final ShoppingListRepository shoppingListRepository;
     private final GeminiApiClient geminiApiClient;
+    private final IngredientClassificationService ingredientClassificationService;
+    private final IngredientSynonymService synonymService;
 
-    private static final int CANDIDATE_POOL_SIZE = 5;
+    private static final int CANDIDATE_POOL_SIZE = 10;
 
     /**
      * Helper method to get existing shopping list items for a user and recipe,
@@ -483,86 +487,113 @@ public class ShoppingListServiceImpl implements ShoppingListService {
         return result;
     }
 
+    /**
+     * Gợi ý công thức dựa trên chấm điểm nội bộ.
+     * Đã nâng cấp để sử dụng TỪ ĐIỂN ĐỒNG NGHĨA.
+     */
     @Override
-    @Transactional(readOnly = true) // Thêm (readOnly = true) để tối ưu
+    @Transactional(readOnly = true)
     public PageResult<RecipeSuggestionResponse> suggestRecipes(Long userId, List<String> ingredientNames, Pageable pageable) {
 
-        // ----- BƯỚC 1: LẤY ỨNG VIÊN TỪ DATABASE -----
-        // TẠO BƯỚC 1A: CHUẨN HÓA INPUT
-        List<String> normalizedShoppingList = ingredientNames.stream()
-                .map(ShoppingListUtils::normalize) // Chuẩn hóa: lowercase, trim, gộp space
+        // BƯỚC 1: CHUẨN HÓA INPUT (Shopping List) BẰNG TỪ ĐIỂN ĐỒNG NGHĨA
+        Set<String> shoppingListKeys = ingredientNames.stream()
+                .map(synonymService::getStandardizedName) // <-- NÂNG CẤP
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toSet());
+
+        if (shoppingListKeys.isEmpty()) {
+            return new PageResult<>(pageable.getPageNumber(), pageable.getPageSize(), 0, 0, false, Collections.emptyList());
+        }
+
+        // BƯỚC 2: LẤY ỨNG VIÊN TỪ DATABASE
+        // Khi query DB, chúng ta vẫn dùng normalize CƠ BẢN, vì DB chứa tên thô.
+        List<String> originalNormalizedKeys = ingredientNames.stream()
+                .map(ShoppingListUtils::normalize) // Dùng normalize cơ bản
                 .filter(s -> !s.isEmpty())
                 .distinct()
                 .toList();
 
-        if (normalizedShoppingList.isEmpty()) {
-            // Nếu danh sách chuẩn hóa rỗng, trả về kết quả rỗng
-            return new PageResult<>(pageable.getPageNumber(), pageable.getPageSize(), 0, 0, false, Collections.emptyList());
-        }
-
-        // Tạo yêu cầu phân trang chỉ lấy 5 ứng viên hàng đầu (trang 0, 5 phần tử)
         Pageable candidatesPageable = PageRequest.of(0, CANDIDATE_POOL_SIZE);
 
-        // Truy vấn DB: Tìm 5 công thức PUBLIC có nhiều nguyên liệu khớp nhất
-        Page<Recipe> candidates = recipeRepository.findCandidateRecipesByIngredients(normalizedShoppingList, candidatesPageable);
+        Page<Recipe> candidates = recipeRepository.findCandidateRecipesByIngredients(
+                originalNormalizedKeys, // Dùng key normalize cơ bản để query DB
+                candidatesPageable
+        );
 
         if (candidates.isEmpty()) {
-            // Nếu không có ứng viên nào, trả về trang rỗng
             return new PageResult<>(pageable.getPageNumber(), pageable.getPageSize(), 0, 0, false, Collections.emptyList());
         }
 
-        // ----- BƯỚC 1.5: TẢI TRƯỚC DỮ LIỆU (EAGER LOADING) -----
-        // Buộc Hibernate tải collection 'ingredients' ngay lập tức
-        List<Recipe> candidateList = candidates.getContent();
-        candidateList.forEach(recipe -> Hibernate.initialize(recipe.getIngredients()));
+        // BƯỚC 3: CHẤM ĐIỂM (LOGIC MỚI, THAY THẾ GEMINI)
+        List<RecipeSuggestionResponse> scoredSuggestions = new ArrayList<>();
 
-        // ----- BƯỚC 2: GỌI AI CHẤM ĐIỂM HÀNG LOẠT (BATCH CALL) -----
-        // Gửi toàn bộ 5 ứng viên trong MỘT cuộc gọi API duy nhất
-        List<AiScoreResponse> scores = geminiApiClient.getSuggestionScoresBatch(normalizedShoppingList, candidateList);
+        for (Recipe recipe : candidates.getContent()) {
+            // 3.1. Lấy dữ liệu phân loại (ĐÃ ĐƯỢC CHUẨN HÓA ĐỒNG NGHĨA LÚC KHỞI ĐỘNG)
+            Map<String, IngredientType> classifications = ingredientClassificationService.getClassificationsForRecipe(recipe.getId());
 
-        // ----- BƯỚC 3: ÁNH XẠ KẾT QUẢ -----
-        // Chuyển danh sách điểm số (List) thành Map để tra cứu nhanh bằng ID công thức
-        Map<Long, AiScoreResponse> scoreMap = scores.stream()
-                .collect(Collectors.toMap(AiScoreResponse::getId, Function.identity(), (a, b) -> a));
+            if (classifications.isEmpty()) {
+                continue; // Bỏ qua nếu recipe này chưa được "train"
+            }
 
-        // Kết hợp công thức (Recipe) với điểm số (Score) của nó
-        // Sửa Warning: .toList()
-        List<RecipeSuggestionResponse> scoredSuggestions = candidateList.stream()
-                .map(recipe -> {
-                    // Lấy điểm từ map; nếu AI lỗi (không trả về ID), dùng fallback
-                    AiScoreResponse score = scoreMap.getOrDefault(recipe.getId(), geminiApiClient.createFallbackScore(recipe.getId()));
-                    RecipeCardResponse card = RecipeCardResponse.from(recipe);
+            long totalMainInRecipe = classifications.values().stream().filter(t -> t == IngredientType.MAIN).count();
+            long totalSecondaryInRecipe = classifications.size() - totalMainInRecipe;
 
-                    return new RecipeSuggestionResponse(
-                            card,
-                            score.getMainIngredientMatchScore(),
-                            score.getOverallMatchScore(),
-                            score.getJustification()
-                    );
-                })
-                .toList();
+            int mainMatchCount = 0;
+            int secondaryMatchCount = 0;
 
-        // ----- BƯỚC 4: SẮP XẾP (IN-MEMORY) -----
-        // Sắp xếp danh sách 5 kết quả dựa trên điểm số (ưu tiên mainIngredientMatchScore)
-        List<RecipeSuggestionResponse> sortedList = new ArrayList<>(scoredSuggestions);
-        sortedList.sort(
+            // 3.2. So khớp giỏ hàng (đã chuẩn hóa đồng nghĩa) với dữ liệu phân loại (đã chuẩn hóa đồng nghĩa)
+            for (String shoppingKey : shoppingListKeys) {
+                IngredientType type = classifications.get(shoppingKey);
+                if (type != null) {
+                    if (type == IngredientType.MAIN) {
+                        mainMatchCount++;
+                    } else {
+                        secondaryMatchCount++;
+                    }
+                }
+            }
+
+            // 3.3. Tính điểm (CHỈ LẤY CÔNG THỨC CÓ KHỚP NGUYÊN LIỆU CHÍNH)
+            if (mainMatchCount > 0) {
+                double mainScore = (totalMainInRecipe > 0)
+                        ? ((double) mainMatchCount / totalMainInRecipe) * 10.0
+                        : 0.0;
+
+                double overallScore = (!classifications.isEmpty())
+                        ? ((double) (mainMatchCount + secondaryMatchCount) / classifications.size()) * 10.0
+                        : 0.0;
+
+                String justification = String.format("Khớp %d/%d nguyên liệu chính và %d/%d nguyên liệu phụ.",
+                        mainMatchCount, totalMainInRecipe,
+                        secondaryMatchCount, totalSecondaryInRecipe);
+
+                scoredSuggestions.add(new RecipeSuggestionResponse(
+                        RecipeCardResponse.from(recipe),
+                        mainScore,
+                        overallScore,
+                        justification
+                ));
+            }
+        }
+
+        // BƯỚC 4: SẮP XẾP (IN-MEMORY)
+        scoredSuggestions.sort(
                 Comparator.comparing(RecipeSuggestionResponse::mainIngredientMatchScore)
                         .thenComparing(RecipeSuggestionResponse::overallMatchScore)
-                        .reversed() // Sắp xếp điểm cao nhất lên đầu
+                        .reversed()
         );
 
-        // ----- BƯỚC 5: PHÂN TRANG (IN-MEMORY) -----
-        // Áp dụng logic phân trang (page, size) cho danh sách 5 kết quả đã sắp xếp
+        // BƯỚC 5: PHÂN TRANG (IN-MEMORY)
         int pageSize = pageable.getPageSize();
         int currentPage = pageable.getPageNumber();
         int startItem = currentPage * pageSize;
+        int totalItems = scoredSuggestions.size();
 
         List<RecipeSuggestionResponse> paginatedList;
-        int totalItems = sortedList.size(); // Tổng số item (tối đa 5)
 
         if (startItem < totalItems) {
             int toIndex = Math.min(startItem + pageSize, totalItems);
-            paginatedList = sortedList.subList(startItem, toIndex);
+            paginatedList = scoredSuggestions.subList(startItem, toIndex);
         } else {
             paginatedList = Collections.emptyList();
         }
@@ -570,7 +601,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
         int totalPages = (int) Math.ceil((double) totalItems / (double) pageSize);
         boolean hasNext = (currentPage + 1) < totalPages;
 
-        // ----- BƯỚC 6: TRẢ VỀ KẾT QUẢ -----
+        // BƯỚC 6: TRẢ VỀ KẾT QUẢ
         return new PageResult<>(
                 currentPage,
                 pageSize,
