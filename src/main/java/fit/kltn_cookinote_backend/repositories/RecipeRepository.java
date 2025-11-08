@@ -111,6 +111,6 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
      * Tải tất cả công thức (không bị xóa) cùng với User và Category
      * (Ingredients và Steps sẽ được tải bằng SUBSELECT nhờ cấu hình entity)
      */
-    @Query("SELECT r FROM Recipe r LEFT JOIN FETCH r.user u LEFT JOIN FETCH r.category c WHERE r.deleted = false")
+    @Query("SELECT r FROM Recipe r LEFT JOIN FETCH r.user u LEFT JOIN FETCH r.category c WHERE r.deleted = false and r.privacy = 'PUBLIC' ORDER BY r.category.id ASC")
     List<Recipe> findAllWithUserAndCategory();
 }
