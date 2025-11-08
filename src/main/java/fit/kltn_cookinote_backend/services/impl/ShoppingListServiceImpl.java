@@ -20,7 +20,6 @@ import fit.kltn_cookinote_backend.repositories.RecipeIngredientRepository;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.repositories.ShoppingListRepository;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
-import fit.kltn_cookinote_backend.services.GeminiApiClient;
 import fit.kltn_cookinote_backend.services.IngredientClassificationService;
 import fit.kltn_cookinote_backend.services.IngredientSynonymService;
 import fit.kltn_cookinote_backend.services.ShoppingListService;
@@ -49,7 +48,6 @@ public class ShoppingListServiceImpl implements ShoppingListService {
     private final RecipeRepository recipeRepository;
     private final RecipeIngredientRepository ingredientRepository;
     private final ShoppingListRepository shoppingListRepository;
-    private final GeminiApiClient geminiApiClient;
     private final IngredientClassificationService ingredientClassificationService;
     private final IngredientSynonymService synonymService;
 
@@ -497,7 +495,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
         // BƯỚC 1: CHUẨN HÓA INPUT (Shopping List) BẰNG TỪ ĐIỂN ĐỒNG NGHĨA
         Set<String> shoppingListKeys = ingredientNames.stream()
-                .map(synonymService::getStandardizedName) // <-- NÂNG CẤP
+                .map(synonymService::getStandardizedName)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toSet());
 
