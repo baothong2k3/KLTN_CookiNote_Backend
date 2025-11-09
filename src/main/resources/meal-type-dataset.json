@@ -5,10 +5,17 @@
     "ăn sáng": "BREAKFAST",
     "món ăn nhẹ": "SNACK",
     "salad": "SNACK",
+    "các loại bánh": "SNACK",
+    "món tráng miệng, giải khát": "SNACK",
     "món canh": "LUNCH",
     "món súp": "LUNCH",
+    "món ngon hàng ngày": "LUNCH",
+    "món ngon ngày hè": "LUNCH",
+    "món chay": "LUNCH",
     "món kho": "DINNER",
-    "món nướng": "DINNER"
+    "món nướng": "DINNER",
+    "món ngon ngày lạnh": "DINNER",
+    "món tết": "DINNER"
   },
   "keywordRules": {
     "BREAKFAST": [
@@ -17,9 +24,9 @@
       "cháo",
       "phở",
       "bún",
-      "trứng",
       "sữa chua",
-      "ngũ cốc"
+      "ngũ cốc",
+      "miến"
     ],
     "LUNCH": [
       "cơm",
@@ -27,7 +34,8 @@
       "kho",
       "chiên",
       "ram",
-      "xào"
+      "xào",
+      "miến"
     ],
     "DINNER": [
       "nướng",
@@ -44,15 +52,18 @@
       "tráng miệng",
       "chè",
       "bánh",
-      "yaourt"
+      "yaourt",
+      "nước",
+      "giải khát",
+      "siro",
+      "trà",
+      "sữa"
     ]
   },
   "ingredientRules": {
     "BREAKFAST": [
       "yến mạch",
       "granola",
-      "sữa",
-      "trứng",
       "bơ đậu phộng"
     ],
     "SNACK": [

@@ -11,16 +11,20 @@ package fit.kltn_cookinote_backend.dtos.response;/*
 
 import fit.kltn_cookinote_backend.enums.MealType;
 
+import java.io.Serializable;
 import java.time.LocalDate;
 import java.util.List;
 
 public record DailyMenuResponse(
-        RecipeCardResponse anchorRecipe,
+        DailyMenuRecipeCardResponse anchorRecipe,
         MealType anchorMealType,
         String anchorSource,
         String favoriteCategoryName,
         int freshnessWindowDays,
         LocalDate generatedDate,
         List<DailyMenuSuggestionResponse> suggestions
-) {
+) implements Serializable {
+
+    @java.io.Serial
+    private static final long serialVersionUID = 1L;
 }

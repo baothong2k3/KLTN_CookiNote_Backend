@@ -9,9 +9,9 @@ package fit.kltn_cookinote_backend.services.impl;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.response.DailyMenuRecipeCardResponse;
 import fit.kltn_cookinote_backend.dtos.response.DailyMenuResponse;
 import fit.kltn_cookinote_backend.dtos.response.DailyMenuSuggestionResponse;
-import fit.kltn_cookinote_backend.dtos.response.RecipeCardResponse;
 import fit.kltn_cookinote_backend.entities.CookedHistory;
 import fit.kltn_cookinote_backend.entities.Favorite;
 import fit.kltn_cookinote_backend.entities.Recipe;
@@ -25,6 +25,7 @@ import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.services.DailyMenuService;
 import fit.kltn_cookinote_backend.services.MealTypeResolver;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,8 +53,12 @@ public class DailyMenuServiceImpl implements DailyMenuService {
 
     @Override
     @Transactional(readOnly = true)
+    // Thêm @Cacheable. Key = "Ngày_hiện_tại:UserID"
+    // Khi qua 0h, T(java.time.LocalDate).now().toString() sẽ thay đổi
+    // -> key thay đổi -> cache bị vô hiệu -> logic được chạy lại.
+    @Cacheable(value = "dailyMenu", key = "T(java.time.LocalDate).now().toString() + ':' + #userId")
     public DailyMenuResponse generateDailyMenu(Long userId, int size) {
-        int finalSize = size > 0 ? Math.min(size, 12) : DEFAULT_SIZE;
+        // Biến 'size' giờ đây sẽ bị bỏ qua để ưu tiên logic 4 bữa
 
         List<Recipe> allPublicRecipes = recipeRepository.findAllWithUserAndCategory();
         Map<Long, Recipe> recipeIndex = allPublicRecipes.stream()
@@ -91,19 +96,34 @@ public class DailyMenuServiceImpl implements DailyMenuService {
 
         enrichPersonalizationSignals(recentlyCookedIds, favoriteCategoryId, suggestionMap);
 
-        List<DailyMenuSuggestionResponse> suggestions = suggestionMap.values().stream()
-                .sorted(Comparator.comparingDouble(SuggestionAccumulator::score).reversed())
-                .limit(finalSize)
-                .map(acc -> new DailyMenuSuggestionResponse(
-                        RecipeCardResponse.from(acc.recipe),
-                        acc.mealType != null ? acc.mealType : mealTypeResolver.resolveMealType(acc.recipe),
-                        roundScore(acc.score),
-                        acc.strategiesView(),
-                        acc.justificationsView()
-                ))
-                .toList();
+        // 1. Nhóm tất cả các gợi ý đã tính điểm theo MealType
+        Map<MealType, List<SuggestionAccumulator>> groupedByMealType = suggestionMap.values().stream()
+                .filter(acc -> acc.mealType != null) // Đảm bảo đã gán MealType
+                .collect(Collectors.groupingBy(acc -> acc.mealType));
 
-        RecipeCardResponse anchorCard = anchorRecipe != null ? RecipeCardResponse.from(anchorRecipe) : null;
+        List<DailyMenuSuggestionResponse> suggestions = new ArrayList<>();
+
+        // 2. Lặp qua 4 loại bữa ăn và chọn món có điểm cao nhất từ mỗi nhóm
+        for (MealType mealType : MealType.values()) { // Lặp qua BREAKFAST, LUNCH, DINNER, SNACK
+
+            // Lấy danh sách món ăn cho bữa này, sắp xếp giảm dần theo điểm, và chọn món đầu tiên
+            Optional<SuggestionAccumulator> topSuggestion = groupedByMealType.getOrDefault(mealType, Collections.emptyList())
+                    .stream()
+                    .max(Comparator.comparingDouble(SuggestionAccumulator::score));
+
+            // 3. Nếu tìm thấy món, thêm vào danh sách kết quả
+            topSuggestion.ifPresent(acc -> suggestions.add(new DailyMenuSuggestionResponse(
+                    DailyMenuRecipeCardResponse.from(acc.recipe),
+                    acc.mealType,
+                    roundScore(acc.score),
+                    acc.strategiesView(),
+                    acc.justificationsView()
+            )));
+        }
+
+        suggestions.sort(Comparator.comparing(DailyMenuSuggestionResponse::mealType));
+
+        DailyMenuRecipeCardResponse anchorCard = anchorRecipe != null ? DailyMenuRecipeCardResponse.from(anchorRecipe) : null; // <-- Gọi DTO mới
         MealType anchorMealType = anchorRecipe != null ? mealTypeResolver.resolveMealType(anchorRecipe) : null;
 
         return new DailyMenuResponse(
@@ -234,6 +254,11 @@ public class DailyMenuServiceImpl implements DailyMenuService {
                                               Long favoriteCategoryId,
                                               Map<Long, SuggestionAccumulator> suggestionMap) {
         for (SuggestionAccumulator accumulator : suggestionMap.values()) {
+            // Gán MealType cho TẤT CẢ các ứng viên để chuẩn bị cho việc nhóm
+            if (accumulator.mealType == null) {
+                accumulator.mealType = mealTypeResolver.resolveMealType(accumulator.recipe);
+            }
+
             if (!recentlyCooked.contains(accumulator.recipe.getId())) {
                 accumulator.score += VARIETY_BONUS;
                 accumulator.strategies.add(DailyMenuStrategy.PERSONALIZED_VARIETY);
@@ -244,9 +269,6 @@ public class DailyMenuServiceImpl implements DailyMenuService {
                 accumulator.score += FAVORITE_CATEGORY_BONUS;
                 accumulator.strategies.add(DailyMenuStrategy.PERSONALIZED_FAVORITE);
                 accumulator.justifications.add("Thuộc nhóm món bạn thường yêu thích hoặc nấu");
-            }
-            if (accumulator.mealType == null) {
-                accumulator.mealType = mealTypeResolver.resolveMealType(accumulator.recipe);
             }
         }
     }
@@ -366,7 +388,7 @@ public class DailyMenuServiceImpl implements DailyMenuService {
     private static class SuggestionAccumulator {
         private final Recipe recipe;
         private double score;
-        private MealType mealType;
+        private MealType mealType; // Đã thêm mealType ở đây
         private final LinkedHashSet<DailyMenuStrategy> strategies = new LinkedHashSet<>();
         private final LinkedHashSet<String> justifications = new LinkedHashSet<>();
 

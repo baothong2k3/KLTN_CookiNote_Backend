@@ -12,13 +12,17 @@ package fit.kltn_cookinote_backend.dtos.response;/*
 import fit.kltn_cookinote_backend.enums.DailyMenuStrategy;
 import fit.kltn_cookinote_backend.enums.MealType;
 
+import java.io.Serializable;
 import java.util.List;
 
 public record DailyMenuSuggestionResponse(
-        RecipeCardResponse recipe,
+        DailyMenuRecipeCardResponse recipe,
         MealType mealType,
         double score,
         List<DailyMenuStrategy> strategies,
         List<String> justifications
-) {
+) implements Serializable {
+
+    @java.io.Serial
+    private static final long serialVersionUID = 1L;
 }
