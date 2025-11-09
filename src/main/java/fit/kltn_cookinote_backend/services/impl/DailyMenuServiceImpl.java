@@ -76,7 +76,8 @@ public class DailyMenuServiceImpl implements DailyMenuService {
                 .collect(Collectors.toMap(Recipe::getId, Function.identity()));
 
         if (recipeIndex.isEmpty()) {
-            return new DailyMenuResponse(null, null, "NO_DATA", null, FRESHNESS_WINDOW_DAYS, date, List.of());
+            // Trả về DTO đã được rút gọn
+            return new DailyMenuResponse(FRESHNESS_WINDOW_DAYS, date, List.of());
         }
 
         // --- CẬP NHẬT LOGIC "LÀM MỚI" ---
@@ -108,7 +109,6 @@ public class DailyMenuServiceImpl implements DailyMenuService {
         }
         applyPopularityStrategy(recipeIndex, suggestionMap);
         Long favoriteCategoryId = resolveFavoriteCategoryId(cookedHistories, favorites);
-        String favoriteCategoryName = resolveCategoryName(recipeIndex, favoriteCategoryId);
         enrichPersonalizationSignals(exclusionSet, favoriteCategoryId, suggestionMap);
 
         Map<MealType, List<SuggestionAccumulator>> groupedByMealType = suggestionMap.values().stream()
@@ -141,7 +141,7 @@ public class DailyMenuServiceImpl implements DailyMenuService {
                         .menuDate(date)
                         .mealType(acc.mealType)
                         .recipe(acc.recipe)
-                        .anchorSource(finalAnchorSource)
+                        .anchorSource(finalAnchorSource) // Vẫn lưu anchorSource vào DB
                         .strategy(acc.strategiesView().stream()
                                 .map(Enum::name)
                                 .collect(Collectors.joining(",")))
@@ -156,14 +156,9 @@ public class DailyMenuServiceImpl implements DailyMenuService {
         }
 
         suggestions.sort(Comparator.comparing(DailyMenuSuggestionResponse::mealType));
-        DailyMenuRecipeCardResponse anchorCard = anchorRecipe != null ? DailyMenuRecipeCardResponse.from(anchorRecipe) : null;
-        MealType anchorMealType = anchorRecipe != null ? mealTypeResolver.resolveMealType(anchorRecipe) : null;
 
+        // Trả về DTO
         return new DailyMenuResponse(
-                anchorCard,
-                anchorMealType,
-                anchorSource,
-                favoriteCategoryName,
                 FRESHNESS_WINDOW_DAYS,
                 date,
                 suggestions
@@ -175,16 +170,14 @@ public class DailyMenuServiceImpl implements DailyMenuService {
      */
     private DailyMenuResponse buildResponseFromSavedMenu(List<DailyMenu> savedMenus, LocalDate date) {
         if (savedMenus.isEmpty()) {
-            return new DailyMenuResponse(null, null, "NO_DATA", null, FRESHNESS_WINDOW_DAYS, date, List.of());
+            // Trả về DTO
+            return new DailyMenuResponse(FRESHNESS_WINDOW_DAYS, date, List.of());
         }
 
         List<DailyMenuSuggestionResponse> suggestions = new ArrayList<>();
-        String anchorSource = "UNKNOWN";
 
         for (DailyMenu dm : savedMenus) {
             if (dm.getRecipe() == null) continue;
-
-            anchorSource = dm.getAnchorSource();
 
             // Tái tạo lại danh sách chiến lược từ chuỗi đã lưu
             List<DailyMenuStrategy> strategies = (StringUtils.hasText(dm.getStrategy()))
@@ -221,11 +214,8 @@ public class DailyMenuServiceImpl implements DailyMenuService {
 
         suggestions.sort(Comparator.comparing(DailyMenuSuggestionResponse::mealType));
 
+        // Trả về DTO đã được rút gọn
         return new DailyMenuResponse(
-                null,
-                null,
-                anchorSource,
-                null,
                 FRESHNESS_WINDOW_DAYS,
                 date,
                 suggestions
@@ -346,7 +336,7 @@ public class DailyMenuServiceImpl implements DailyMenuService {
                 });
     }
 
-    private void enrichPersonalizationSignals(Set<Long> exclusionSet, // <-- Đổi tên biến
+    private void enrichPersonalizationSignals(Set<Long> exclusionSet,
                                               Long favoriteCategoryId,
                                               Map<Long, SuggestionAccumulator> suggestionMap) {
         for (SuggestionAccumulator accumulator : suggestionMap.values()) {
@@ -441,20 +431,6 @@ public class DailyMenuServiceImpl implements DailyMenuService {
                 .orElse(null);
     }
 
-    private String resolveCategoryName(Map<Long, Recipe> recipeIndex, Long categoryId) {
-        if (categoryId == null) {
-            return null;
-        }
-        return recipeIndex.values().stream()
-                .map(Recipe::getCategory)
-                .filter(Objects::nonNull)
-                .filter(category -> Objects.equals(categoryId, category.getId()))
-                .map(category -> category.getName() != null ? category.getName() : null)
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElse(null);
-    }
-
     private boolean isVisibleRecipe(Recipe recipe) {
         return recipe != null && !recipe.isDeleted() && recipe.getPrivacy() == Privacy.PUBLIC;
     }
@@ -485,7 +461,7 @@ public class DailyMenuServiceImpl implements DailyMenuService {
     private static class SuggestionAccumulator {
         private final Recipe recipe;
         private double score;
-        private MealType mealType; // Đã thêm mealType ở đây
+        private MealType mealType;
         private final LinkedHashSet<DailyMenuStrategy> strategies = new LinkedHashSet<>();
         private final LinkedHashSet<String> justifications = new LinkedHashSet<>();
 

@@ -9,17 +9,11 @@ package fit.kltn_cookinote_backend.dtos.response;/*
  * @version: 1.0
  */
 
-import fit.kltn_cookinote_backend.enums.MealType;
-
 import java.io.Serializable;
 import java.time.LocalDate;
 import java.util.List;
 
 public record DailyMenuResponse(
-        DailyMenuRecipeCardResponse anchorRecipe,
-        MealType anchorMealType,
-        String anchorSource,
-        String favoriteCategoryName,
         int freshnessWindowDays,
         LocalDate generatedDate,
         List<DailyMenuSuggestionResponse> suggestions
