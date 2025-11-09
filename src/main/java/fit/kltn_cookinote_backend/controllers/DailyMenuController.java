@@ -15,6 +15,7 @@ import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.services.DailyMenuService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,6 +23,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
 
 @RestController
 @RequiredArgsConstructor
@@ -34,10 +37,15 @@ public class DailyMenuController {
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
     public ResponseEntity<ApiResponse<DailyMenuResponse>> getDailyMenu(
             @AuthenticationPrincipal User authUser,
-            @RequestParam(name = "size", defaultValue = "6") int size,
+            @RequestParam(name = "date", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate date,
             HttpServletRequest request
     ) {
-        DailyMenuResponse response = dailyMenuService.generateDailyMenu(authUser.getUserId(), size);
+        // Nếu người dùng không cung cấp ngày, mặc định là hôm nay
+        LocalDate targetDate = (date != null) ? date : LocalDate.now();
+
+        DailyMenuResponse response = dailyMenuService.getOrGenerateDailyMenu(authUser.getUserId(), targetDate);
         return ResponseEntity.ok(ApiResponse.success("Gợi ý thực đơn hằng ngày", response, request.getRequestURI()));
     }
 }
