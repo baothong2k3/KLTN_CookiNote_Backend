@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -41,6 +42,8 @@ public class DailyMenuServiceImpl implements DailyMenuService {
     private static final int FRESHNESS_WINDOW_DAYS = 21;
     private static final double FAVORITE_CATEGORY_BONUS = 0.15;
     private static final double VARIETY_BONUS = 0.1;
+    private static final String JUSTIFICATION_DELIMITER = ";";
+
 
     private final RecipeRepository recipeRepository;
     private final FavoriteRepository favoriteRepository;
@@ -77,17 +80,12 @@ public class DailyMenuServiceImpl implements DailyMenuService {
         }
 
         // --- CẬP NHẬT LOGIC "LÀM MỚI" ---
-        // 1. Lấy lịch sử đã NẤU
         LocalDateTime freshnessCutoff = LocalDateTime.now().minusDays(FRESHNESS_WINDOW_DAYS);
         Set<Long> recentlyCookedIds = new HashSet<>(cookedHistoryRepository.findRecentRecipeIds(userId, freshnessCutoff));
-
-        // 2. Lấy lịch sử đã GỢI Ý (ngày hôm qua)
         List<DailyMenu> yesterdayMenu = dailyMenuRepository.findByUserIdAndMenuDate(userId, date.minusDays(1));
         Set<Long> yesterdaySuggestedIds = yesterdayMenu.stream()
                 .map(dm -> dm.getRecipe().getId())
                 .collect(Collectors.toSet());
-
-        // 3. Tạo danh sách loại trừ tổng hợp
         Set<Long> exclusionSet = Stream.concat(recentlyCookedIds.stream(), yesterdaySuggestedIds.stream())
                 .collect(Collectors.toSet());
 
@@ -105,17 +103,12 @@ public class DailyMenuServiceImpl implements DailyMenuService {
         Map<Long, SuggestionAccumulator> suggestionMap = new LinkedHashMap<>();
 
         if (anchorRecipe != null) {
-            // Truyền danh sách loại trừ (exclusionSet) vào các hàm chiến lược
             applyContentBasedStrategy(anchorRecipe, recipeIndex.values(), exclusionSet, suggestionMap);
             applyCollaborativeStrategy(userId, anchorRecipe, recipeIndex, exclusionSet, suggestionMap);
         }
-
         applyPopularityStrategy(recipeIndex, suggestionMap);
-
         Long favoriteCategoryId = resolveFavoriteCategoryId(cookedHistories, favorites);
         String favoriteCategoryName = resolveCategoryName(recipeIndex, favoriteCategoryId);
-
-        // Truyền danh sách loại trừ (exclusionSet) vào hàm cá nhân hóa
         enrichPersonalizationSignals(exclusionSet, favoriteCategoryId, suggestionMap);
 
         Map<MealType, List<SuggestionAccumulator>> groupedByMealType = suggestionMap.values().stream()
@@ -123,10 +116,7 @@ public class DailyMenuServiceImpl implements DailyMenuService {
                 .collect(Collectors.groupingBy(acc -> acc.mealType));
 
         List<DailyMenuSuggestionResponse> suggestions = new ArrayList<>();
-
         List<DailyMenu> menusToSave = new ArrayList<>();
-
-        // --- FIX: Tạo biến 'effectively final' ---
         final String finalAnchorSource = anchorSource;
 
         for (MealType mealType : MealType.values()) {
@@ -135,12 +125,15 @@ public class DailyMenuServiceImpl implements DailyMenuService {
                     .max(Comparator.comparingDouble(SuggestionAccumulator::score));
 
             topSuggestion.ifPresent(acc -> {
+                double roundedScore = roundScore(acc.score);
+                List<String> justifications = acc.justificationsView();
+
                 suggestions.add(new DailyMenuSuggestionResponse(
                         DailyMenuRecipeCardResponse.from(acc.recipe),
                         acc.mealType,
-                        roundScore(acc.score),
+                        roundedScore,
                         acc.strategiesView(),
-                        acc.justificationsView()
+                        justifications
                 ));
 
                 menusToSave.add(DailyMenu.builder()
@@ -148,10 +141,12 @@ public class DailyMenuServiceImpl implements DailyMenuService {
                         .menuDate(date)
                         .mealType(acc.mealType)
                         .recipe(acc.recipe)
-                        .anchorSource(finalAnchorSource) // <-- Sử dụng biến final
+                        .anchorSource(finalAnchorSource)
                         .strategy(acc.strategiesView().stream()
                                 .map(Enum::name)
                                 .collect(Collectors.joining(",")))
+                        .score(roundedScore)
+                        .justifications(String.join(JUSTIFICATION_DELIMITER, justifications))
                         .build());
             });
         }
@@ -161,7 +156,6 @@ public class DailyMenuServiceImpl implements DailyMenuService {
         }
 
         suggestions.sort(Comparator.comparing(DailyMenuSuggestionResponse::mealType));
-
         DailyMenuRecipeCardResponse anchorCard = anchorRecipe != null ? DailyMenuRecipeCardResponse.from(anchorRecipe) : null;
         MealType anchorMealType = anchorRecipe != null ? mealTypeResolver.resolveMealType(anchorRecipe) : null;
 
@@ -190,43 +184,55 @@ public class DailyMenuServiceImpl implements DailyMenuService {
         for (DailyMenu dm : savedMenus) {
             if (dm.getRecipe() == null) continue;
 
-            anchorSource = dm.getAnchorSource(); // Tất cả các món trong ngày có cùng 1 nguồn anchor
+            anchorSource = dm.getAnchorSource();
 
             // Tái tạo lại danh sách chiến lược từ chuỗi đã lưu
-            List<DailyMenuStrategy> strategies = (dm.getStrategy() != null)
+            List<DailyMenuStrategy> strategies = (StringUtils.hasText(dm.getStrategy()))
                     ? Arrays.stream(dm.getStrategy().split(","))
                     .map(s -> {
-                        try { return DailyMenuStrategy.valueOf(s); }
-                        catch (Exception e) { return null; } // Bỏ qua nếu tên strategy không hợp lệ
+                        try {
+                            return DailyMenuStrategy.valueOf(s);
+                        } catch (Exception e) {
+                            return null;
+                        }
                     })
                     .filter(Objects::nonNull)
                     .toList()
                     : List.of();
 
+            // --- ĐỌC DỮ LIỆU MỚI TỪ DB ---
+            // Tái tạo lại danh sách lý do
+            List<String> justifications = (StringUtils.hasText(dm.getJustifications()))
+                    ? Arrays.stream(dm.getJustifications().split(JUSTIFICATION_DELIMITER))
+                    .toList()
+                    : List.of();
+
+            // Lấy điểm số đã lưu
+            double score = (dm.getScore() != null) ? dm.getScore() : 0.0;
+
             suggestions.add(new DailyMenuSuggestionResponse(
                     DailyMenuRecipeCardResponse.from(dm.getRecipe()),
                     dm.getMealType(),
-                    0.0, // Điểm số không được lưu, không cần thiết khi xem lại
+                    score,
                     strategies,
-                    List.of() // Lý do không được lưu
+                    justifications
             ));
         }
 
         suggestions.sort(Comparator.comparing(DailyMenuSuggestionResponse::mealType));
 
-        // Khi tải từ lịch sử, chúng ta không cần hiển thị lại món "mỏ neo"
-        // hoặc danh mục yêu thích (vì chúng chỉ liên quan lúc tạo).
         return new DailyMenuResponse(
-                null, // Không có anchor
                 null,
-                anchorSource, // Chỉ giữ lại nguồn anchor
-                null, // Không có category
+                null,
+                anchorSource,
+                null,
                 FRESHNESS_WINDOW_DAYS,
                 date,
                 suggestions
         );
     }
 
+    // --- CHIẾN LƯỢC GỢI Ý ---
     private void applyContentBasedStrategy(Recipe anchor,
                                            Collection<Recipe> candidates,
                                            Set<Long> recentlyCooked,
