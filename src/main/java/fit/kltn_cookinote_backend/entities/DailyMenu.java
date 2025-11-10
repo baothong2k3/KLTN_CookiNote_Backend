@@ -12,25 +12,48 @@ package fit.kltn_cookinote_backend.entities;/*
 import fit.kltn_cookinote_backend.enums.MealType;
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalDateTime;
+
+import java.time.LocalDate;
 
 @Entity
-@Table(name = "daily_menu")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Table(name = "daily_menu", indexes = {
+        @Index(name = "idx_daily_menu_user_date", columnList = "user_id, menu_date")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class DailyMenu {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @Column(name = "menu_date", nullable = false)
+    private LocalDate menuDate;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "meal_type", length = 20)
     private MealType mealType;
 
-    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "recipe_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recipe_id", nullable = false)
     private Recipe recipe;
 
-    @Column(length = 4096)
-    private String note;
+
+    @Column(name = "anchor_source", length = 50)
+    private String anchorSource;
+
+    @Column(name = "strategy", length = 255)
+    private String strategy;
+
+    @Column(name = "score")
+    private Double score;
+
+    @Column(name = "justifications", length = 1024)
+    private String justifications;
 }

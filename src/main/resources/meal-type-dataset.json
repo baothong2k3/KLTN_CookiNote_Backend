@@ -1,0 +1,76 @@
+{
+  "defaultMealType": "DINNER",
+  "categoryRules": {
+    "bữa sáng": "BREAKFAST",
+    "ăn sáng": "BREAKFAST",
+    "món ăn nhẹ": "SNACK",
+    "salad": "SNACK",
+    "các loại bánh": "SNACK",
+    "món tráng miệng, giải khát": "SNACK",
+    "món canh": "LUNCH",
+    "món súp": "LUNCH",
+    "món ngon hàng ngày": "LUNCH",
+    "món ngon ngày hè": "LUNCH",
+    "món chay": "LUNCH",
+    "món kho": "DINNER",
+    "món nướng": "DINNER",
+    "món ngon ngày lạnh": "DINNER",
+    "món tết": "DINNER"
+  },
+  "keywordRules": {
+    "BREAKFAST": [
+      "bánh mì",
+      "xôi",
+      "cháo",
+      "phở",
+      "bún",
+      "sữa chua",
+      "ngũ cốc",
+      "miến"
+    ],
+    "LUNCH": [
+      "cơm",
+      "canh",
+      "kho",
+      "chiên",
+      "ram",
+      "xào",
+      "miến"
+    ],
+    "DINNER": [
+      "nướng",
+      "om",
+      "lẩu",
+      "kho",
+      "xào",
+      "rang"
+    ],
+    "SNACK": [
+      "salad",
+      "gỏi",
+      "nước ép",
+      "tráng miệng",
+      "chè",
+      "bánh",
+      "yaourt",
+      "nước",
+      "giải khát",
+      "siro",
+      "trà",
+      "sữa"
+    ]
+  },
+  "ingredientRules": {
+    "BREAKFAST": [
+      "yến mạch",
+      "granola",
+      "bơ đậu phộng"
+    ],
+    "SNACK": [
+      "trái cây",
+      "rau củ sống",
+      "yaourt",
+      "hạt dinh dưỡng"
+    ]
+  }
+}

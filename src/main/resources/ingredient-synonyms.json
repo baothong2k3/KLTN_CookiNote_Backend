@@ -1,0 +1,455 @@
+{
+  "bột mì": [
+    "bột mì đa dụng",
+    "bột mỳ",
+    "bột mì số 11",
+    "bột mì số 8",
+    "all-purpose flour",
+    "bread flour",
+    "cake flour"
+  ],
+  "bột nếp": [
+    "bột nếp chín",
+    "gạo nếp"
+  ],
+  "bột gạo": [
+    "bột gạo tẻ"
+  ],
+  "bột năng": [
+    "bột bắp",
+    "bột ngô",
+    "corn starch",
+    "tapioca starch"
+  ],
+  "bột chiên": [
+    "bột chiên giòn",
+    "bột chiên xù",
+    "panko"
+  ],
+  "đường": [
+    "đường cát",
+    "đường kính",
+    "đường phèn",
+    "đường nâu",
+    "đường vàng",
+    "nước đường",
+    "đường cát trắng",
+    "đường thốt nốt"
+  ],
+  "thịt lợn": [
+    "thịt heo",
+    "thịt ba chỉ",
+    "thịt ba rọi",
+    "thịt nạc vai",
+    "thịt chân giò",
+    "thịt vai sấn",
+    "móng giò",
+    "thịt lợn quay",
+    "sụn non",
+    "cuống họng",
+    "mỡ phần",
+    "lòng non",
+    "bì lợn",
+    "xương lợn",
+    "xương ống lợn",
+    "xương hom lợn",
+    "sườn non",
+    "sườn lợn",
+    "nạc thăn"
+  ],
+  "thịt bò": [
+    "bắp bò",
+    "nạm bò",
+    "gầu bò",
+    "thăn bò",
+    "dẻ sườn bò",
+    "thịt bò thăn",
+    "thịt dẻ sườn bò",
+    "bò viên",
+    "ba chỉ bò mỹ",
+    "xương bò",
+    "thịt bắp bò",
+    "thịt bò xay"
+  ],
+  "gà": [
+    "gà ta",
+    "gà mái ta",
+    "thịt gà",
+    "cánh gà",
+    "đùi gà",
+    "ức gà",
+    "chân gà",
+    "lòng gà",
+    "mề gà",
+    "xương gà",
+    "nước luộc gà"
+  ],
+  "vịt": [
+    "thịt vịt",
+    "vịt xiêm"
+  ],
+  "chim": [
+    "chim câu",
+    "chim bồ câu",
+    "chim cút"
+  ],
+  "cá": [
+    "cá chép",
+    "cá rô phi",
+    "cá diêu hồng",
+    "cá thu",
+    "cá quả",
+    "cá lóc",
+    "cá trắm",
+    "cá vược",
+    "phi lê cá basa",
+    "xương cá",
+    "cá hồi",
+    "cá ngừ",
+    "cá basa",
+    "cá trích"
+  ],
+  "tôm": [
+    "tôm sú",
+    "tôm tươi",
+    "tôm khô",
+    "tép đồng",
+    "tép đồng nhỏ",
+    "tôm hùm",
+    "tôm càng xanh"
+  ],
+  "mực": [
+    "mực",
+    "mực khô",
+    "mực trứng",
+    "mực ống",
+    "bạch tuộc"
+  ],
+  "hải sản khác": [
+    "cua",
+    "ghẹ",
+    "nghêu",
+    "ngao",
+    "sò",
+    "sò huyết",
+    "hàu",
+    "hến",
+    "sứa"
+  ],
+  "trứng": [
+    "trứng gà",
+    "trứng vịt",
+    "trứng cút",
+    "trứng muối",
+    "trứng vịt lộn",
+    "trứng non",
+    "lòng đỏ trứng",
+    "lòng trắng trứng"
+  ],
+  "cơm": [
+    "cơm nguội",
+    "cơm trắng",
+    "gạo tẻ"
+  ],
+  "gạo nếp": [
+    "nếp",
+    "gạo nếp cái hoa vàng",
+    "nếp ngon"
+  ],
+  "bún": [
+    "bún tươi",
+    "bún rối",
+    "bún gạo khô",
+    "bún sợi",
+    "bún sợi nhỏ"
+  ],
+  "phở": [
+    "bánh phở tươi",
+    "phở khô"
+  ],
+  "miến": [
+    "miến dong",
+    "miến khô",
+    "bún tàu"
+  ],
+  "mì": [
+    "mì sợi",
+    "mì trứng",
+    "mì gói",
+    "mì ý",
+    "spaghetti"
+  ],
+  "bánh mì": [
+    "bánh mì sandwich",
+    "bánh mì baguette"
+  ],
+  "đậu phụ": [
+    "đậu hũ",
+    "đậu hũ non",
+    "tàu hũ",
+    "đậu non",
+    "đậu phụ trứng"
+  ],
+  "đậu xanh": [
+    "đậu xanh đãi vỏ",
+    "đỗ xanh",
+    "đậu xanh cà vỏ"
+  ],
+  "đậu đen": [
+    "đậu đen xanh lòng"
+  ],
+  "đậu khác": [
+    "đậu đỏ",
+    "đậu nành",
+    "đậu tương",
+    "đậu ngự"
+  ],
+  "lạc": [
+    "lạc rang",
+    "bơ đậu phộng",
+    "đậu phộng",
+    "đậu phộng rang",
+    "muối lạc"
+  ],
+  "vừng": [
+    "mè",
+    "mè trắng",
+    "vừng đen",
+    "đậu mè"
+  ],
+  "hạt khác": [
+    "hạt sen",
+    "hạt điều",
+    "hạt bí",
+    "hạnh nhân",
+    "óc chó",
+    "macca"
+  ],
+  "dứa": [
+    "thơm",
+    "khóm"
+  ],
+  "củ đậu": [
+    "củ sắn"
+  ],
+  "hành khô": [
+    "hành tím",
+    "hành củ khô"
+  ],
+  "hành tây": [
+    "hành tây"
+  ],
+  "hành lá": [
+    "hành hoa"
+  ],
+  "hành boa-rô": [
+    "tỏi tây"
+  ],
+  "mắm": [
+    "nước mắm",
+    "nước mắm ngon",
+    "mắm cốt"
+  ],
+  "mắm tôm": [
+    "mắm tôm"
+  ],
+  "mắm ruốc": [
+    "mắm ruốc"
+  ],
+  "muối": [
+    "muối tinh",
+    "muối hạt",
+    "muối hồng",
+    "bột canh"
+  ],
+  "hạt tiêu": [
+    "tiêu",
+    "tiêu sọ",
+    "hạt tiêu xanh",
+    "tiêu đen",
+    "tiêu trắng"
+  ],
+  "mộc nhĩ": [
+    "nấm mèo"
+  ],
+  "nấm": [
+    "nấm hương",
+    "nấm đùi gà",
+    "nấm rơm",
+    "nấm mỡ",
+    "nấm kim châm",
+    "nấm đông cô",
+    "nấm hải sản",
+    "nấm bào ngư"
+  ],
+  "dừa": [
+    "dừa nạo",
+    "dừa tươi",
+    "cùi quả dừa",
+    "dừa bào sợi",
+    "dừa xay"
+  ],
+  "nước dừa": [
+    "nước dừa tươi"
+  ],
+  "nước cốt dừa": [
+    "nước cốt dừa (hộp)",
+    "cốt dừa"
+  ],
+  "giò": [
+    "giò sống",
+    "giò lụa",
+    "chả mỡ",
+    "chả quế",
+    "chả lụa",
+    "chả cá"
+  ],
+  "bánh tráng": [
+    "bánh tráng cuốn",
+    "bánh tráng bò bía",
+    "bánh đa nem",
+    "vỏ bánh tráng"
+  ],
+  "khoai": [
+    "khoai tây",
+    "khoai lang",
+    "khoai môn",
+    "khoai sọ"
+  ],
+  "rau thơm": [
+    "rau mùi",
+    "ngò rí",
+    "kinh giới",
+    "tía tô",
+    "húng láng",
+    "húng quế",
+    "rau răm",
+    "ngò gai",
+    "mùi tàu",
+    "lá chanh",
+    "lá nếp",
+    "lá dứa",
+    "lá é",
+    "lá sung",
+    "lá đinh lăng",
+    "lá lốt",
+    "rau ngổ",
+    "thì là"
+  ],
+  "rau sống": [
+    "xà lách",
+    "cải xanh",
+    "cải bẹ",
+    "giá đỗ",
+    "rau cần",
+    "dọc mùng",
+    "bạc hà",
+    "cải cúc",
+    "tần ô",
+    "ngải cứu",
+    "rau muống",
+    "rau rút",
+    "cải bẹ xanh",
+    "bắp chuối",
+    "hoa chuối"
+  ],
+  "rau củ khác": [
+    "cà rốt",
+    "củ cải",
+    "su hào",
+    "súp lơ",
+    "bông cải",
+    "bắp cải",
+    "bắp cải tím",
+    "măng",
+    "măng khô",
+    "măng tươi",
+    "cà chua",
+    "dưa chuột",
+    "dưa leo",
+    "bầu",
+    "bí",
+    "bí đỏ",
+    "bí đao",
+    "bí baby",
+    "mướp",
+    "mướp hương",
+    "mướp đắng",
+    "khổ qua",
+    "ớt chuông",
+    "cà tím",
+    "đậu cô ve",
+    "đậu đũa",
+    "su su"
+  ],
+  "gia vị ướt": [
+    "dầu hào",
+    "xì dầu",
+    "nước tương",
+    "tương ớt",
+    "tương cà",
+    "tương bần",
+    "mắm nêm",
+    "giấm",
+    "dấm",
+    "giấm bỗng",
+    "mẻ",
+    "sa tế",
+    "dầu màu điều"
+  ],
+  "gia vị khô": [
+    "bột ngọt",
+    "mì chính",
+    "hạt nêm",
+    "ngũ vị hương",
+    "bột cà ri",
+    "hoa hồi",
+    "quế",
+    "thảo quả",
+    "bột nở",
+    "baking powder",
+    "muối nở",
+    "baking soda"
+  ],
+  "gia vị thơm": [
+    "tỏi",
+    "hành",
+    "gừng",
+    "sả",
+    "riềng",
+    "ớt",
+    "chanh",
+    "quất",
+    "tắc"
+  ],
+  "sữa": [
+    "sữa tươi",
+    "sữa đặc",
+    "sữa bột",
+    "sữa chua",
+    "yogurt"
+  ],
+  "bơ - phô mai": [
+    "bơ",
+    "bơ lạt",
+    "bơ động vật",
+    "phô mai",
+    "cheese",
+    "cheddar"
+  ],
+  "dầu - mỡ": [
+    "dầu ăn",
+    "dầu ô liu",
+    "dầu mè",
+    "mỡ lợn",
+    "mỡ gà"
+  ],
+  "cốm": [
+    "cốm tươi",
+    "cốm khô"
+  ],
+  "chà bông": [
+    "ruốc",
+    "ruốc bông"
+  ]
+}
