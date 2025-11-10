@@ -9,6 +9,8 @@ package fit.kltn_cookinote_backend.services.impl;/*
  * @version: 1.0
  */
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import fit.kltn_cookinote_backend.dtos.request.ExportRequest;
 import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
@@ -21,15 +23,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.io.FileOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -38,36 +38,21 @@ import java.util.stream.Collectors;
 public class ExcelExportServiceImpl implements ExcelExportService {
 
     private final RecipeRepository recipeRepository;
+    private final Cloudinary cloudinary;
 
-    @Value("${file.storage.local.path}")
-    private String defaultSavePath;
+    @Value("${app.cloudinary.export-folder}")
+    private String exportFolder;
 
     @Override
     @Transactional(readOnly = true)
     public String exportAllRecipesMergedToExcelFile(ExportRequest request) throws IOException {
         List<Recipe> recipes = recipeRepository.findAllWithUserAndCategory();
 
-        // Xác định đường dẫn lưu file
-        String saveDirectoryPath;
-        if (request != null && StringUtils.hasText(request.customSavePath())) {
-            saveDirectoryPath = request.customSavePath();
-        } else {
-            saveDirectoryPath = defaultSavePath;
-        }
-
-        Path directory = Paths.get(saveDirectoryPath);
-        if (!Files.exists(directory)) {
-            Files.createDirectories(directory);
-        } else if (!Files.isDirectory(directory)) {
-            throw new IOException("Đường dẫn lưu file không phải là thư mục: " + saveDirectoryPath);
-        }
-
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        String fileName = "Recipes_Export_" + timestamp + ".xlsx"; // Tên file cho 1 sheet
-        Path filePath = directory.resolve(fileName);
+        String fileName = "Recipes_Export_" + timestamp; // Tên file (không có .xlsx)
 
         try (XSSFWorkbook workbook = new XSSFWorkbook();
-             FileOutputStream fileOut = new FileOutputStream(filePath.toFile())) {
+             ByteArrayOutputStream byteOut = new ByteArrayOutputStream()) {
 
             Font headerFont = workbook.createFont();
             headerFont.setBold(true);
@@ -110,6 +95,7 @@ public class ExcelExportServiceImpl implements ExcelExportService {
             int rowNum = 1; // Bắt đầu từ dòng thứ 2 sau header
 
             for (Recipe recipe : recipes) {
+                // ... (Giữ nguyên toàn bộ logic điền dữ liệu vào Row) ...
                 Row row = sheet.createRow(rowNum++);
 
                 // Ghi thông tin cơ bản của Recipe
@@ -152,7 +138,6 @@ public class ExcelExportServiceImpl implements ExcelExportService {
                 createCell(row, 13, stepsText, wrapStyle);
             }
 
-            // Tự động điều chỉnh độ rộng cột (có thể cần tinh chỉnh thêm)
             sheet.setColumnWidth(2, 80 * 256); // Cột Description rộng hơn
             sheet.setColumnWidth(12, 60 * 256); // Cột Ingredients rộng hơn
             sheet.setColumnWidth(13, 100 * 256); // Cột Steps rộng hơn
@@ -161,14 +146,35 @@ public class ExcelExportServiceImpl implements ExcelExportService {
                     sheet.autoSizeColumn(i);
                 }
             }
+            // Ghi workbook vào ByteArrayOutputStream thay vì file
+            workbook.write(byteOut);
 
+            // --- LOGIC UPLOAD LÊN CLOUDINARY ---
+            byte[] excelData = byteOut.toByteArray();
+            String publicId = exportFolder + "/" + fileName; // Public ID bao gồm cả thư mục
 
-            workbook.write(fileOut);
+            Map<?, ?> uploadResult = cloudinary.uploader().upload(
+                    excelData,
+                    ObjectUtils.asMap(
+                            "resource_type", "raw", // Quan trọng: dùng "raw" cho file không phải ảnh/video
+                            "public_id", publicId,
+                            "overwrite", true, // Cho phép ghi đè nếu trùng tên
+                            "unique_filename", false,
+                            "format", "xlsx" // Chỉ định định dạng file
+                    )
+            );
+
+            String url = (String) uploadResult.get("secure_url");
+            if (!StringUtils.hasText(url)) {
+                throw new IOException("Upload file Excel lên Cloudinary thất bại.");
+            }
+            // Trả về URL của Cloudinary
+            return url;
+
         }
-        return filePath.toAbsolutePath().toString();
     }
 
-    // Các helper createHeaderRow và createCell
+    // Tạo hàng header với style
     private void createHeaderRow(Sheet sheet, CellStyle style, String[] headers) {
         Row headerRow = sheet.createRow(0);
         for (int i = 0; i < headers.length; i++) {

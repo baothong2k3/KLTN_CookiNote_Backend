@@ -13,11 +13,27 @@ import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.entities.User;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
 public interface RecipeService {
+    /**
+     * Tạo công thức đầy đủ (gộp) từ JSON và các file ảnh.
+     *
+     * @param actorUserId   ID người dùng
+     * @param recipeJson    Chuỗi JSON của RecipeCreateRequest
+     * @param coverImage    File ảnh bìa (nullable)
+     * @param allStepImages Map chứa các ảnh steps (key: "stepImages_1", "stepImages_2", ...)
+     * @return RecipeResponse hoàn chỉnh
+     * @throws IOException
+     */
+    RecipeResponse createRecipeFull(Long actorUserId, String recipeJson,
+                                    MultipartFile coverImage,
+                                    Map<String, List<MultipartFile>> allStepImages) throws IOException;
+
     RecipeResponse createByRecipe(Long id, RecipeCreateRequest req);
 
     RecipeResponse getDetail(Long viewerUserIdOrNull, Long recipeId);

@@ -67,8 +67,8 @@ public class AdminController {
     }
 
     /**
-     * API xuất toàn bộ công thức ra file Excel và lưu trên server. Chỉ Admin.
-     * Nhận đường dẫn tùy chọn qua Request Body.
+     * API để xuất toàn bộ công thức nấu ăn thành một file Excel duy nhất.
+     * Chỉ dành cho Admin.
      */
     @PostMapping("/export/recipes")
     @PreAuthorize("hasRole('ADMIN')")
@@ -76,9 +76,12 @@ public class AdminController {
             @RequestBody(required = false) ExportRequest request,
             HttpServletRequest httpReq) throws IOException {
 
-        String savedFilePath = excelExportService.exportAllRecipesMergedToExcelFile(request);
-        String message = "Xuất file Excel thành công. Đã lưu tại: " + savedFilePath;
-        return ResponseEntity.ok(ApiResponse.success(message, savedFilePath, httpReq.getRequestURI()));
+        String cloudinaryUrl = excelExportService.exportAllRecipesMergedToExcelFile(request);
+
+        String message = "Xuất file Excel thành công. Link tải về: " + cloudinaryUrl;
+
+        // Trả về URL trong data
+        return ResponseEntity.ok(ApiResponse.success(message, cloudinaryUrl, httpReq.getRequestURI()));
     }
 
     /**

@@ -46,6 +46,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/recipes/search").permitAll()
                         .requestMatchers(HttpMethod.GET, "/recipes/popular").permitAll()
                         .requestMatchers(HttpMethod.GET, "/recipes/easy-to-cook").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/posts").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/posts/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 ).exceptionHandling(ex -> ex
