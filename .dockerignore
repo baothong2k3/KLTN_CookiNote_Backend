@@ -1,0 +1,17 @@
+# Git
+.git
+.gitignore
+
+# Các file của IDE
+.idea/
+.vscode/
+*.iml
+
+# File build của Maven (chúng ta sẽ build trong container)
+target/
+
+# Log
+*.log
+
+# Môi trường
+.env
