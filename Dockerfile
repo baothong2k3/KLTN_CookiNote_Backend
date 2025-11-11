@@ -9,11 +9,14 @@ WORKDIR /workspace
 COPY .mvn .mvn
 COPY mvnw pom.xml ./
 
+# ----- THÊM DÒNG NÀY -----
+# Cấp quyền thực thi (execute) cho file mvnw
+RUN chmod +x ./mvnw
+
 # Copy toàn bộ mã nguồn
 COPY src src
 
-# Chạy lệnh build của Maven (giống như bạn làm ở local)
-# Chúng ta dùng 'package' thay vì 'install' và bỏ qua test
+# Chạy lệnh build của Maven (bây giờ đã có quyền)
 RUN ./mvnw clean package -DskipTests
 
 # ----- Giai đoạn 2: Build image chạy -----
