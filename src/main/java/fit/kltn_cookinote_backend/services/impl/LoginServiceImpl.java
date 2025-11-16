@@ -16,10 +16,7 @@ import fit.kltn_cookinote_backend.dtos.response.LoginResponse;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.AuthProvider;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
-import fit.kltn_cookinote_backend.services.JwtService;
-import fit.kltn_cookinote_backend.services.LoginService;
-import fit.kltn_cookinote_backend.services.RefreshTokenService;
-import fit.kltn_cookinote_backend.services.SessionAllowlistService;
+import fit.kltn_cookinote_backend.services.*;
 import org.springframework.lang.Nullable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,26 +32,44 @@ public class LoginServiceImpl implements LoginService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshService;
     private final SessionAllowlistService sessionService;
+    private final LoginAttemptRateLimiter loginLimiter;
 
     @Override
     public LoginResponse login(LoginRequest req) {
+
+        // BƯỚC 1: Kiểm tra xem có bị chặn không (TRƯỚC KHI VÀO DB)
+        loginLimiter.checkAndThrowIfBlocked(req.username());
+
         User user = userRepo.findByUsername(req.username())
                 .or(() -> userRepo.findByEmail(req.username()))
-                .orElseThrow(() -> new IllegalArgumentException("Tài khoản hoặc mật khẩu không đúng."));
+                .orElseThrow(() -> {
+                    // BƯỚC 2a: Ghi lại lỗi (nhưng không tiết lộ user có tồn tại hay không)
+                    loginLimiter.recordFailedLogin(req.username());
+                    return new IllegalArgumentException("Tài khoản hoặc mật khẩu không đúng.");
+                });
 
-        if (!user.isEmailVerified()) { // Kiểm tra email verified
+        if (!user.isEmailVerified()) {
             throw new IllegalStateException("Tài khoản chưa xác thực email. Vui lòng kiểm tra email để xác thực.");
         }
 
-        if (!user.isEnabled()) { // Kiểm tra enabled
+        if (!user.isEnabled()) {
             throw new IllegalStateException("Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.");
         }
+
         if (!encoder.matches(req.password(), user.getPassword())) {
+            // BƯỚC 2b: Ghi lại lỗi khi sai mật khẩu
+            loginLimiter.recordFailedLogin(req.username());
             throw new IllegalArgumentException("Tài khoản hoặc mật khẩu không đúng.");
         }
+
         if (user.getAuthProvider() != AuthProvider.LOCAL || user.getPassword() == null) {
+            // BƯỚC 2c: Ghi lại lỗi (trường hợp đăng nhập Google/Facebook bằng form local)
+            loginLimiter.recordFailedLogin(req.username());
             throw new IllegalArgumentException("Tài khoản hoặc mật khẩu không đúng.");
         }
+
+        // BƯỚC 3: Đăng nhập thành công -> Xóa bộ đếm
+        loginLimiter.recordSuccessfulLogin(req.username());
 
         var issue = jwtService.generateAccessToken(user);
         sessionService.allow(user.getUserId(), issue.jti(), issue.expiresInSeconds());
