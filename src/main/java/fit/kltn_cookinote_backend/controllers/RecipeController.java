@@ -39,7 +39,7 @@ public class RecipeController {
     private final RecipeStepImageService stepImageService;
     private final FavoriteService favoriteService;
     private final ShareService shareService;
-    private final FavoriteRepository favoriteRepository;
+    private final RecipeImportService recipeImportService;
 
     @PostMapping(value = "/create-with-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
@@ -518,5 +518,27 @@ public class RecipeController {
         String message = String.format("Đã xóa thành công %d bước. Các bước còn lại đã được sắp xếp lại.", deletedCount);
 
         return ResponseEntity.ok(ApiResponse.success(message, result, httpReq.getRequestURI()));
+    }
+
+    /**
+     * API để "cào" (scrape) dữ liệu công thức từ một URL.
+     * Đây là tính năng thử nghiệm (best-effort).
+     * POST /recipes/import-from-url
+     */
+    @PostMapping("/import-from-url")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<GeneratedRecipeResponse>> importRecipeFromUrl(
+            @AuthenticationPrincipal User authUser,
+            @Valid @RequestBody ImportRecipeRequest req,
+            HttpServletRequest httpReq
+    ) throws IOException {
+
+        GeneratedRecipeResponse data = recipeImportService.importRecipeFromUrl(req.url());
+
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã cào dữ liệu công thức (thử nghiệm). Vui lòng kiểm tra và chỉnh sửa trước khi lưu.",
+                data,
+                httpReq.getRequestURI()
+        ));
     }
 }
