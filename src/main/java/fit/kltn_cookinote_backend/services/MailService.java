@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 public class MailService {
     private final JavaMailSender mailSender;
 
-    @Value("${spring.mail.username}")
+    @Value("${mail.from.address}")
     private String fromEmail;
 
     public void sendOtp(String to, String username, String otp) {
