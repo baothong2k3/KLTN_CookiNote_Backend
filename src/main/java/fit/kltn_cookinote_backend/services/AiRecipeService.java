@@ -25,4 +25,12 @@ public interface AiRecipeService {
      * @throws RuntimeException nếu AI trả về lỗi hoặc JSON không hợp lệ.
      */
     GeneratedRecipeResponse generateRecipe(GenerateRecipeRequest request);
+
+    /**
+     * API TÙY CHỌN: Yêu cầu AI bổ sung thông tin còn thiếu cho dữ liệu thô.
+     *
+     * @param rawData Dữ liệu công thức thô (có thể chứa null).
+     * @return Dữ liệu công thức đã được AI điền đầy đủ.
+     */
+    GeneratedRecipeResponse enrichRecipe(GeneratedRecipeResponse rawData);
 }

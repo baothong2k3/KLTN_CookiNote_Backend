@@ -52,4 +52,21 @@ public class AiController {
                 httpReq.getRequestURI()
         ));
     }
+
+    /**
+     * API Tùy chọn: Làm giàu (Enrich) dữ liệu công thức thô.
+     * Dùng khi user đã import từ URL nhưng muốn AI điền thêm các thông tin còn thiếu.
+     * <p>
+     * Endpoint: POST /ai/enrich-recipe
+     */
+    @PostMapping("/enrich-recipe")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<GeneratedRecipeResponse>> enrichRecipe(
+            @RequestBody GeneratedRecipeResponse rawData,
+            HttpServletRequest httpReq
+    ) {
+        GeneratedRecipeResponse data = aiRecipeService.enrichRecipe(rawData);
+        return ResponseEntity.ok(ApiResponse.success(
+                "AI đã bổ sung và chuẩn hóa thông tin công thức.", data, httpReq.getRequestURI()));
+    }
 }

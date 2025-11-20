@@ -70,7 +70,6 @@ public class AiRecipeServiceImpl implements AiRecipeService {
 
     /**
      * Xây dựng prompt để yêu cầu Gemini trả về JSON theo đúng định dạng.
-     * (ĐÃ CẬP NHẬT)
      */
     private String buildGenerationPrompt(String userInput) {
 
@@ -103,5 +102,67 @@ public class AiRecipeServiceImpl implements AiRecipeService {
                   ]
                 }
                 """, userInput);
+    }
+
+    @Override
+    public GeneratedRecipeResponse enrichRecipe(GeneratedRecipeResponse rawData) {
+        try {
+            // Chuyển đổi dữ liệu thô sang JSON string để gửi cho AI
+            String rawJson = objectMapper.writeValueAsString(rawData);
+            String title = rawData.getTitle() != null ? rawData.getTitle() : "Món ăn";
+
+            String prompt = buildEnrichmentPrompt(rawJson);
+
+            log.info("Gửi yêu cầu đến AI để làm giàu dữ liệu cho: {}", title);
+            return callAiAndParse(prompt, title);
+
+        } catch (Exception e) {
+            log.error("Lỗi khi enrich recipe: {}", e.getMessage());
+            throw new RuntimeException("Không thể xử lý dữ liệu với AI. Vui lòng thử lại.");
+        }
+    }
+
+    private GeneratedRecipeResponse callAiAndParse(String prompt, String contextInfo) {
+        String jsonResponse = geminiApiClient.getGeneratedJson(prompt);
+        try {
+            GeneratedRecipeResponse response = objectMapper.readValue(jsonResponse, GeneratedRecipeResponse.class);
+
+            // Đảm bảo các list không bị null
+            if (response.getIngredients() == null) response.setIngredients(List.of());
+            if (response.getSteps() == null) response.setSteps(List.of());
+            if (response.getTitle() == null) response.setTitle(contextInfo);
+
+            return response;
+        } catch (Exception e) {
+            log.error("Không thể deserialize JSON từ Gemini cho '{}'. Lỗi: {}. JSON: {}", contextInfo, e.getMessage(), jsonResponse);
+            throw new RuntimeException("AI trả về dữ liệu không hợp lệ.");
+        }
+    }
+
+    private String buildEnrichmentPrompt(String rawJsonData) {
+        return String.format("""
+                Bạn là biên tập viên ẩm thực. Tôi có dữ liệu công thức thô (JSON) nhưng thiếu thông tin (null).
+                
+                DỮ LIỆU ĐẦU VÀO:
+                %s
+                
+                NHIỆM VỤ: Phân tích nội dung có sẵn để điền vào các trường null hoặc chỉnh sửa cho hợp lý.
+                
+                QUY TẮC QUAN TRỌNG:
+                1. **Description**: Nếu null, viết mô tả ngắn (2-3 câu) hấp dẫn dựa trên Title.
+                2. **Time (prepareTime, cookTime)**: Nếu null, hãy tổng hợp từ các bước bên dưới.
+                3. **Ingredients**:
+                   - Tách `quantity` nếu bị gộp trong `name`.
+                   - Chuẩn hóa tên nguyên liệu.
+                4. **Steps (QUAN TRỌNG)**:
+                   - `content`: Giữ nguyên hoặc sửa lỗi chính tả.
+                   - `suggestedTime`:
+                        + Ưu tiên 1: Trích xuất số phút từ content (vd: "hầm 30 phút" -> 30).
+                        + Ưu tiên 2: Nếu không có số cụ thể, hãy **ƯỚC LƯỢNG** thời gian hợp lý dựa trên hành động (ví dụ: "chiên gà chín vàng" -> khoảng 15, "sơ chế rau" -> khoảng 5, "trình bày" -> 1).
+                        + Chỉ để null nếu bước đó không tốn thời gian đáng kể.
+                   - `tips`: Trích xuất mẹo/lưu ý từ content. Nếu content quá ngắn, hãy tự bổ sung mẹo nhỏ phù hợp với bước đó (ví dụ bước chiên thì nhắc canh lửa).
+                
+                OUTPUT: Trả về duy nhất JSON chuẩn, không Markdown. Giữ nguyên cấu trúc JSON.
+                """, rawJsonData);
     }
 }
