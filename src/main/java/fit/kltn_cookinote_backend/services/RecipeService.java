@@ -13,6 +13,7 @@ import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.enums.Privacy;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -111,4 +112,15 @@ public interface RecipeService {
      */
     RecipeResponse buildRecipeResponse(Recipe recipe, Long viewerUserId);
 
+    /**
+     * Lấy danh sách công thức với bộ lọc linh hoạt.
+     *
+     * @param actor        Người đang thực hiện yêu cầu (để kiểm tra quyền)
+     * @param filterUserId Lọc theo chủ sở hữu (có thể null)
+     * @param privacy      Lọc theo quyền riêng tư (có thể null)
+     * @param deleted      Lọc theo trạng thái xóa (có thể null)
+     * @param page         Số trang
+     * @param size         Kích thước trang
+     */
+    PageResult<RecipeCardResponse> filterRecipes(User actor, Long filterUserId, Privacy privacy, Boolean deleted, int page, int size);
 }
