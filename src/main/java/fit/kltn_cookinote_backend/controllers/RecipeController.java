@@ -38,6 +38,17 @@ public class RecipeController {
     private final RecipeStepImageService stepImageService;
     private final FavoriteService favoriteService;
     private final ShareService shareService;
+    private final RecipeImportService recipeImportService;
+
+    @PostMapping("/import-from-url")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<GeneratedRecipeResponse>> importRecipeFromUrl(
+            @Valid @RequestBody ImportRecipeRequest req,
+            HttpServletRequest httpReq
+    ) {
+        GeneratedRecipeResponse data = recipeImportService.importFromUrl(req);
+        return ResponseEntity.ok(ApiResponse.success("Phân tích công thức thành công", data, httpReq.getRequestURI()));
+    }
 
     @PostMapping(value = "/create-with-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('USER','ADMIN')")

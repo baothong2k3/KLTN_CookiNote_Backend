@@ -10,14 +10,14 @@ package fit.kltn_cookinote_backend.dtos.request;/*
  */
 
 import jakarta.validation.constraints.NotBlank;
-import org.hibernate.validator.constraints.URL;
+import jakarta.validation.constraints.Size;
 
 /**
  * DTO để nhận yêu cầu nhập công thức từ URL.
  */
 public record ImportRecipeRequest(
         @NotBlank(message = "URL không được để trống")
-        @URL(message = "URL không hợp lệ")
+        @Size(max = 2048, message = "URL quá dài")
         String url
 ) {
 }
