@@ -9,8 +9,10 @@ package fit.kltn_cookinote_backend.controllers;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.request.ChatRequest;
 import fit.kltn_cookinote_backend.dtos.request.GenerateRecipeRequest;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
+import fit.kltn_cookinote_backend.dtos.response.ChatResponse;
 import fit.kltn_cookinote_backend.dtos.response.GeneratedRecipeResponse;
 import fit.kltn_cookinote_backend.services.AiRecipeService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -68,5 +70,23 @@ public class AiController {
         GeneratedRecipeResponse data = aiRecipeService.enrichRecipe(rawData);
         return ResponseEntity.ok(ApiResponse.success(
                 "AI đã bổ sung và chuẩn hóa thông tin công thức.", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * API Chatbot nấu ăn.
+     * Endpoint: POST /ai/chat
+     */
+    @PostMapping("/chat")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ChatResponse>> chatWithAi(
+            @Valid @RequestBody ChatRequest request,
+            HttpServletRequest httpReq
+    ) {
+        ChatResponse data = aiRecipeService.chatWithAi(request);
+        return ResponseEntity.ok(ApiResponse.success(
+                "Trả lời thành công.",
+                data,
+                httpReq.getRequestURI()
+        ));
     }
 }

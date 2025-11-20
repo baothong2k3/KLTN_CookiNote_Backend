@@ -10,7 +10,9 @@ package fit.kltn_cookinote_backend.services.impl;/*
  */
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fit.kltn_cookinote_backend.dtos.request.ChatRequest;
 import fit.kltn_cookinote_backend.dtos.request.GenerateRecipeRequest;
+import fit.kltn_cookinote_backend.dtos.response.ChatResponse;
 import fit.kltn_cookinote_backend.dtos.response.GeneratedRecipeResponse;
 import fit.kltn_cookinote_backend.services.AiRecipeService;
 import fit.kltn_cookinote_backend.services.GeminiApiClient;
@@ -164,5 +166,40 @@ public class AiRecipeServiceImpl implements AiRecipeService {
                 
                 OUTPUT: Trả về duy nhất JSON chuẩn, không Markdown. Giữ nguyên cấu trúc JSON.
                 """, rawJsonData);
+    }
+
+    // Implement chatWithAi
+    @Override
+    public ChatResponse chatWithAi(ChatRequest request) {
+        String userMessage = request.message();
+        String prompt = buildChatPrompt(userMessage);
+
+        log.info("Gửi câu hỏi chat đến AI: {}", userMessage);
+
+        // Gọi hàm getGeneratedText mới thêm ở ApiClient
+        String aiAnswer = geminiApiClient.getGeneratedText(prompt);
+
+        return new ChatResponse(aiAnswer);
+    }
+
+    // Xây dựng prompt định hướng tính cách cho AI
+    private String buildChatPrompt(String userMessage) {
+        return String.format("""
+                Bạn là 'CookiNote AI' - một trợ lý ảo chuyên gia về ẩm thực và nấu ăn.
+                
+                NHIỆM VỤ CỦA BẠN:
+                - Trả lời các câu hỏi liên quan đến nấu ăn, sơ chế nguyên liệu, mẹo vặt nhà bếp, dinh dưỡng, và xử lý các sự cố khi nấu ăn (ví dụ: món quá mặn, quá ngọt...).
+                - Giọng văn: Thân thiện, nhiệt tình, ngắn gọn và dễ hiểu.
+                - Ngôn ngữ: Tiếng Việt.
+                
+                QUY TẮC QUAN TRỌNG:
+                - Nếu người dùng hỏi về vấn đề KHÔNG liên quan đến ẩm thực/nấu ăn (ví dụ: code, chính trị, toán học...), hãy từ chối khéo léo.
+                Ví dụ: "Xin lỗi, tôi chỉ là trợ lý nấu ăn nên không thể giúp bạn việc này. Nhưng nếu bạn hỏi về cách luộc gà ngon thì tôi sẵn sàng!"
+                
+                CÂU HỎI CỦA NGƯỜI DÙNG:
+                "%s"
+                
+                TRẢ LỜI CỦA BẠN:
+                """, userMessage);
     }
 }

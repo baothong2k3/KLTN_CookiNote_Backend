@@ -10,6 +10,7 @@ package fit.kltn_cookinote_backend.dtos.request;/*
  */
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -17,6 +18,7 @@ import java.util.List;
 
 @Data
 @AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class GeminiRequest {
     private List<Content> contents;
     @JsonProperty("generationConfig") // Yêu cầu Gemini trả về JSON
@@ -51,5 +53,12 @@ public class GeminiRequest {
         Content content = new Content(List.of(part));
         GenerationConfig config = new GenerationConfig(ResponseMimeType.APPLICATION_JSON);
         return new GeminiRequest(List.of(content), config);
+    }
+
+    public static GeminiRequest fromTextPrompt(String prompt) {
+        Part part = new Part(prompt);
+        Content content = new Content(List.of(part));
+        // Không set generationConfig để Gemini trả về text mặc định
+        return new GeminiRequest(List.of(content), null);
     }
 }
