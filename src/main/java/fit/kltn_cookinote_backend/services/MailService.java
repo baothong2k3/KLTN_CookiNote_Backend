@@ -10,6 +10,7 @@ package fit.kltn_cookinote_backend.services;/*
  */
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -19,8 +20,12 @@ import org.springframework.stereotype.Service;
 public class MailService {
     private final JavaMailSender mailSender;
 
+    @Value("${mail.from.address}")
+    private String fromEmail;
+
     public void sendOtp(String to, String username, String otp) {
         var message = new SimpleMailMessage();
+        message.setFrom(fromEmail);
         message.setTo(to);
         message.setSubject("[CookiNote] Xác thực email");
         message.setText("""
@@ -36,6 +41,7 @@ public class MailService {
 
     public void sendWelcome(String to, String username) {
         var message = new SimpleMailMessage();
+        message.setFrom(fromEmail);
         message.setTo(to);
         message.setSubject("[CookiNote] Chào mừng bạn đến với CookiNote");
         message.setText("""
