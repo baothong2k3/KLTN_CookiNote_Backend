@@ -9,7 +9,6 @@ WORKDIR /workspace
 COPY .mvn .mvn
 COPY mvnw pom.xml ./
 
-# ----- THÊM DÒNG NÀY -----
 # Cấp quyền thực thi (execute) cho file mvnw
 RUN chmod +x ./mvnw
 
