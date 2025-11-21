@@ -82,6 +82,7 @@ public class RecipeServiceImpl implements RecipeService {
     private static final int MAX_SIZE = 20;
 
     // --- HELPER 1: TÁCH TỪ PHẦN DUPLICATE TẠO RECIPE ---
+
     /**
      * Xây dựng entity Recipe (chưa lưu) từ Request và User.
      * Đã bao gồm kiểm tra quyền Privacy và xử lý Ingredients.
@@ -128,10 +129,12 @@ public class RecipeServiceImpl implements RecipeService {
     // --- HẾT HELPER 1 ---
 
     // --- HELPER 2: TÁCH TỪ PHẦN DUPLICATE XỬ LÝ STEPS ---
+
     /**
      * Chuẩn hóa (sort, gán stepNo) và xây dựng danh sách RecipeStep cho Recipe.
-     * @param recipe Recipe (chưa lưu) để gán liên kết.
-     * @param stepReqs Danh sách step DTO từ request.
+     *
+     * @param recipe        Recipe (chưa lưu) để gán liên kết.
+     * @param stepReqs      Danh sách step DTO từ request.
      * @param stepsRequired Nếu true, ném lỗi nếu stepReqs rỗng.
      */
     private void normalizeAndBuildSteps(Recipe recipe, List<RecipeStepCreate> stepReqs, boolean stepsRequired) {
@@ -905,5 +908,38 @@ public class RecipeServiceImpl implements RecipeService {
         List<CommentResponse> comments = commentService.getCommentsByRecipe(recipe.getId(), viewerUserId);
 
         return RecipeResponse.from(recipe, isFavorited, myRating, comments);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<RecipeCardResponse> filterRecipes(User actor, Long filterUserId, Privacy privacy, Boolean deleted, int page, int size) {
+        // 1. Cấu hình phân trang: Sắp xếp mặc định là mới nhất trước (createdAt DESC)
+        int p = Math.max(0, page);
+        int s = Math.min((size > 0 ? size : DEFAULT_SIZE), MAX_SIZE);
+        Pageable pageable = PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        // 2. Logic phân quyền (Security Check)
+        boolean isAdmin = (actor != null && actor.getRole() == Role.ADMIN);
+
+        boolean isSelf = (actor != null && Objects.equals(actor.getUserId(), filterUserId));
+
+        // Các biến filter thực tế
+        Privacy finalPrivacy = privacy;
+        Boolean finalDeleted = deleted;
+
+        // Nếu không phải Admin VÀ không phải xem chính mình (tức là Khách hoặc User xem người khác)
+        if (!isAdmin && !isSelf) {
+            // Bắt buộc chỉ được xem PUBLIC
+            finalPrivacy = Privacy.PUBLIC;
+            // Bắt buộc không được xem công thức đã xóa
+            finalDeleted = false;
+        }
+
+        // 3. Gọi Repository
+        // Fix warning: Local variable 'finalUserId' is redundant -> Dùng trực tiếp filterUserId
+        Page<Recipe> pageData = recipeRepository.findRecipesWithFilter(filterUserId, finalPrivacy, finalDeleted, pageable);
+
+        // 4. Map sang DTO
+        return PageResult.of(pageData.map(RecipeCardResponse::from));
     }
 }
