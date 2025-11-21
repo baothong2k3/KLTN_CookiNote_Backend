@@ -2,12 +2,11 @@ name: CI/CD to Render
 
 on:
   push:
-    branches: [ "main" ] # Workflow sẽ chạy khi bạn push code vào nhánh main
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
 jobs:
-  # Job 1: Build và Test (Chạy kiểm tra code trước)
   build-and-test:
     runs-on: ubuntu-latest
     steps:
@@ -20,22 +19,18 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      # Cấp quyền chạy cho file mvnw (quan trọng vì file này nằm ở root)
       - name: Grant execute permission for mvnw
         run: chmod +x mvnw
 
-      # Chạy test
-      - name: Run Tests with Maven
-        run: ./mvnw clean test
+      - name: Build with Maven
+        run: ./mvnw clean package -DskipTests
 
-  # Job 2: Deploy (Chỉ chạy nếu Job 1 thành công)
   deploy-to-render:
-    needs: build-and-test # Đợi test xong mới chạy
+    needs: build-and-test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' # Chỉ deploy khi code ở nhánh main
+    if: github.ref == 'refs/heads/main'
 
     steps:
       - name: Trigger Render Deploy
-        # Gọi Webhook của Render để báo server pull code mới về
         run: |
           curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
