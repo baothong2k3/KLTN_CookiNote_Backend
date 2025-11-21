@@ -9,7 +9,9 @@ package fit.kltn_cookinote_backend.services;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.request.ChatRequest;
 import fit.kltn_cookinote_backend.dtos.request.GenerateRecipeRequest;
+import fit.kltn_cookinote_backend.dtos.response.ChatResponse;
 import fit.kltn_cookinote_backend.dtos.response.GeneratedRecipeResponse;
 
 /**
@@ -25,4 +27,14 @@ public interface AiRecipeService {
      * @throws RuntimeException nếu AI trả về lỗi hoặc JSON không hợp lệ.
      */
     GeneratedRecipeResponse generateRecipe(GenerateRecipeRequest request);
+
+    /**
+     * API TÙY CHỌN: Yêu cầu AI bổ sung thông tin còn thiếu cho dữ liệu thô.
+     *
+     * @param rawData Dữ liệu công thức thô (có thể chứa null).
+     * @return Dữ liệu công thức đã được AI điền đầy đủ.
+     */
+    GeneratedRecipeResponse enrichRecipe(GeneratedRecipeResponse rawData);
+
+    ChatResponse chatWithAi(ChatRequest request);
 }

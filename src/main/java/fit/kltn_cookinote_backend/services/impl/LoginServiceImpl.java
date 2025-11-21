@@ -33,6 +33,7 @@ public class LoginServiceImpl implements LoginService {
     private final RefreshTokenService refreshService;
     private final SessionAllowlistService sessionService;
     private final LoginAttemptRateLimiter loginLimiter;
+    private final LoginHistoryService loginHistoryService;
 
     @Override
     public LoginResponse login(LoginRequest req) {
@@ -70,6 +71,8 @@ public class LoginServiceImpl implements LoginService {
 
         // BƯỚC 3: Đăng nhập thành công -> Xóa bộ đếm
         loginLimiter.recordSuccessfulLogin(req.username());
+
+        loginHistoryService.save(user);
 
         var issue = jwtService.generateAccessToken(user);
         sessionService.allow(user.getUserId(), issue.jti(), issue.expiresInSeconds());

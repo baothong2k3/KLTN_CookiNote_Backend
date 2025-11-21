@@ -71,4 +71,34 @@ public class GeminiApiClient {
             throw new RuntimeException("Lỗi khi kết nối với AI: " + e.getMessage(), e);
         }
     }
+
+    // Phương thức lấy phản hồi dạng Text (cho Chatbot)
+    public String getGeneratedText(String prompt) {
+        // Sử dụng fromTextPrompt thay vì fromPrompt
+        GeminiRequest requestBody = GeminiRequest.fromTextPrompt(prompt);
+        String uri = String.format("/v1beta/models/%s:generateContent", geminiModel);
+
+        try {
+            GeminiResponse response = webClient.post()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(uri)
+                            .queryParam("key", apiKey)
+                            .build())
+                    .body(Mono.just(requestBody), GeminiRequest.class)
+                    .retrieve()
+                    .bodyToMono(GeminiResponse.class)
+                    .block();
+
+            if (response == null || response.getFirstCandidateText() == null) {
+                log.warn("Gemini API (chat) trả về null hoặc không có text.");
+                throw new RuntimeException("AI không phản hồi, vui lòng thử lại.");
+            }
+
+            return response.getFirstCandidateText();
+
+        } catch (Exception e) {
+            log.error("Lỗi khi gọi Gemini API (chat): {}", e.getMessage(), e);
+            throw new RuntimeException("Lỗi khi kết nối với trợ lý AI: " + e.getMessage(), e);
+        }
+    }
 }

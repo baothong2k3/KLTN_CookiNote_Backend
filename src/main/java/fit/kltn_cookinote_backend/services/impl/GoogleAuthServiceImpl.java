@@ -34,6 +34,7 @@ public class GoogleAuthServiceImpl implements GoogleAuthService {
     private final RefreshTokenService refreshTokenService;
     private final SessionAllowlistService sessionAllowlistService;
     private final MailService mailService;
+    private final LoginHistoryService loginHistoryService;
 
     // Pattern để loại bỏ dấu tiếng Việt
     private static final Pattern DIACRITICS_PATTERN = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
@@ -126,6 +127,8 @@ public class GoogleAuthServiceImpl implements GoogleAuthService {
                 .accessExpiresInSeconds(access.expiresInSeconds())
                 .refreshExpiresInSeconds(refreshTokenService.refreshTtlSeconds())
                 .build();
+
+        loginHistoryService.save(user);
 
         return LoginResponse.builder()
                 .userId(user.getUserId())

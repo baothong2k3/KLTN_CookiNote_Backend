@@ -12,6 +12,7 @@ package fit.kltn_cookinote_backend.controllers;/*
 import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.User;
+import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.services.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -527,5 +528,34 @@ public class RecipeController {
         String message = String.format("Đã xóa thành công %d bước. Các bước còn lại đã được sắp xếp lại.", deletedCount);
 
         return ResponseEntity.ok(ApiResponse.success(message, result, httpReq.getRequestURI()));
+    }
+
+    /**
+     * API Lọc và Tìm kiếm công thức tổng hợp.
+     * Thay thế cho các API rời rạc (public, deleted, mine...).
+     * * Endpoint: GET /recipes
+     * * Các kịch bản sử dụng:
+     * 1. Lấy tất cả công thức công khai (Mới nhất trước): GET /recipes
+     * 2. Admin lấy tất cả công thức đã xóa: GET /recipes?deleted=true
+     * 3. Lấy công thức Private của User 1: GET /recipes?userId=1&privacy=PRIVATE (Cần auth là User 1 hoặc Admin)
+     * 4. Lấy công thức đã xóa của User 1: GET /recipes?userId=1&deleted=true
+     */
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResult<RecipeCardResponse>>> getAllRecipes(
+            @AuthenticationPrincipal User authUser, // Có thể null nếu chưa đăng nhập
+            @RequestParam(value = "userId", required = false) Long userId,
+            @RequestParam(value = "privacy", required = false) Privacy privacy,
+            @RequestParam(value = "deleted", required = false) Boolean deleted,
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "size", required = false, defaultValue = "12") int size,
+            HttpServletRequest httpReq
+    ) {
+        // Nếu không truyền deleted, mặc định là false (chỉ lấy active) trừ khi là Admin muốn xem tất cả
+        // Tuy nhiên để linh hoạt, Service đã xử lý logic mặc định.
+        // Ở đây ta truyền nguyên bản null nếu client không gửi.
+
+        PageResult<RecipeCardResponse> data = recipeService.filterRecipes(authUser, userId, privacy, deleted, page, size);
+
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức thành công", data, httpReq.getRequestURI()));
     }
 }

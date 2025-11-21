@@ -113,4 +113,19 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
      */
     @Query("SELECT r FROM Recipe r LEFT JOIN FETCH r.user u LEFT JOIN FETCH r.category c WHERE r.deleted = false and r.privacy = 'PUBLIC' ORDER BY r.category.id ASC")
     List<Recipe> findAllWithUserAndCategory();
+
+    /**
+     * Truy vấn lọc tổng hợp.
+     * Các tham số là optional (nếu null sẽ bỏ qua điều kiện đó).
+     */
+    @Query("SELECT r FROM Recipe r WHERE " +
+            "(:userId IS NULL OR r.user.userId = :userId) AND " +
+            "(:privacy IS NULL OR r.privacy = :privacy) AND " +
+            "(:deleted IS NULL OR r.deleted = :deleted)")
+    Page<Recipe> findRecipesWithFilter(
+            @Param("userId") Long userId,
+            @Param("privacy") Privacy privacy,
+            @Param("deleted") Boolean deleted,
+            Pageable pageable
+    );
 }
