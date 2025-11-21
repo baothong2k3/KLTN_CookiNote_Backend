@@ -19,6 +19,8 @@ import java.time.LocalDateTime;
 @Builder
 public record UserLoginHistoryResponse(
         Long id,
+        Long userId,
+        String username,
         LocalDateTime loginTime,
         String ipAddress,
         String userAgent,
@@ -61,6 +63,8 @@ public record UserLoginHistoryResponse(
         return UserLoginHistoryResponse.builder()
                 .id(history.getId())
                 .loginTime(history.getLoginTime())
+                .userId(history.getUser().getUserId())
+                .username(history.getUser().getUsername())
                 .ipAddress(history.getIpAddress())
                 .userAgent(rawUserAgent)
                 .browser(browserName) // Đã được phân tích
