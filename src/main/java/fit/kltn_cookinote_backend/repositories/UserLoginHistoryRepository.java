@@ -10,10 +10,18 @@ package fit.kltn_cookinote_backend.repositories;/*
  */
 
 import fit.kltn_cookinote_backend.entities.UserLoginHistory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.List;
+import java.time.LocalDateTime;
 
 public interface UserLoginHistoryRepository extends JpaRepository<UserLoginHistory, Long> {
-    List<UserLoginHistory> findByUser_UserIdOrderByLoginTimeDesc(Long userId);
+    Page<UserLoginHistory> findByUser_UserId(Long userId, Pageable pageable);
+
+    // Lấy toàn bộ lịch sử trong khoảng thời gian (Dành cho Admin lọc ngày)
+    Page<UserLoginHistory> findByLoginTimeBetween(LocalDateTime start, LocalDateTime end, Pageable pageable);
+
+    // Lấy lịch sử của 1 user trong khoảng thời gian (Dành cho Admin/User lọc ngày)
+    Page<UserLoginHistory> findByUser_UserIdAndLoginTimeBetween(Long userId, LocalDateTime start, LocalDateTime end, Pageable pageable);
 }
