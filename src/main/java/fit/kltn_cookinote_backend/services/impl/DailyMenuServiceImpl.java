@@ -40,8 +40,8 @@ public class DailyMenuServiceImpl implements DailyMenuService {
     private static final int DEFAULT_SIZE = 6;
     private static final int MAX_POPULARITY_PAGE_SIZE = 20;
     private static final int FRESHNESS_WINDOW_DAYS = 21;
-    private static final double FAVORITE_CATEGORY_BONUS = 0.15;
-    private static final double VARIETY_BONUS = 0.1;
+    private static final double FAVORITE_CATEGORY_BONUS = 1.0;
+    private static final double VARIETY_BONUS = 1.0;
     private static final String JUSTIFICATION_DELIMITER = ";";
 
 
@@ -247,12 +247,12 @@ public class DailyMenuServiceImpl implements DailyMenuService {
 
             Long candidateCategoryId = candidate.getCategory() != null ? candidate.getCategory().getId() : null;
             if (anchorCategoryId != null && Objects.equals(anchorCategoryId, candidateCategoryId)) {
-                score += 0.4;
+                score += 1.5;
                 reasons.add("Cùng danh mục với món vừa xem/nấu");
             }
 
             if (anchor.getDifficulty() != null && anchor.getDifficulty().equals(candidate.getDifficulty())) {
-                score += 0.2;
+                score += 0.5;
                 reasons.add("Độ khó tương tự");
             }
 
@@ -269,7 +269,7 @@ public class DailyMenuServiceImpl implements DailyMenuService {
                     intersection.retainAll(candidateIngredients);
                     double ingredientScore = (double) intersection.size() / (double) anchorIngredients.size();
                     if (ingredientScore > 0) {
-                        score += Math.min(ingredientScore, 1.0) * 0.4;
+                        score += Math.min(ingredientScore, 1.0) * 2.0;
                         reasons.add("Chia sẻ " + intersection.size() + " nguyên liệu với món bạn quan tâm");
                     }
                 }
@@ -316,7 +316,7 @@ public class DailyMenuServiceImpl implements DailyMenuService {
                 continue;
             }
             long count = entry.getValue();
-            double score = 0.5 + Math.min(count, 5) * 0.1;
+            double score = 1.5 + Math.min(count, 5) * 0.3;
             String reason = String.format("%d người cũng thích món này sau khi lưu \"%s\"", count, anchor.getTitle());
             mergeSuggestion(recipe, score, DailyMenuStrategy.COLLABORATIVE, List.of(reason), suggestionMap);
         }
@@ -329,7 +329,7 @@ public class DailyMenuServiceImpl implements DailyMenuService {
                 .forEach(recipe -> {
                     Recipe indexed = recipeIndex.get(recipe.getId());
                     if (indexed != null) {
-                        double rankScore = 0.3;
+                        double rankScore = 1.0;
                         mergeSuggestion(indexed, rankScore, DailyMenuStrategy.POPULARITY,
                                 List.of("Đang được nhiều người xem và đánh giá cao"), suggestionMap);
                     }
