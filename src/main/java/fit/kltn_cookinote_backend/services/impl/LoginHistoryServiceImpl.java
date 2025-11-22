@@ -28,6 +28,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -79,31 +83,53 @@ public class LoginHistoryServiceImpl implements LoginHistoryService {
         return remoteAddr;
     }
 
+    // Admin xem toàn bộ
     @Override
     @Transactional(readOnly = true)
-    public PageResult<UserLoginHistoryResponse> getAllLoginHistory(Pageable pageable) {
-        Page<UserLoginHistory> page = loginHistoryRepo.findAll(pageable);
-        // Map entity sang DTO
+    public PageResult<UserLoginHistoryResponse> getAllLoginHistory(LocalDate date, Pageable pageable) {
+        Page<UserLoginHistory> page;
+
+        if (date != null) {
+            // Tạo khoảng thời gian từ 00:00:00 đến 23:59:59.999999999 của ngày đó
+            LocalDateTime start = date.atStartOfDay();
+            LocalDateTime end = date.atTime(LocalTime.MAX);
+            page = loginHistoryRepo.findByLoginTimeBetween(start, end, pageable);
+        } else {
+            page = loginHistoryRepo.findAll(pageable);
+        }
+
         return PageResult.of(page.map(UserLoginHistoryResponse::from));
     }
 
+    // Admin xem chi tiết User
     @Override
     @Transactional(readOnly = true)
-    public PageResult<UserLoginHistoryResponse> getUserLoginHistory(Long userId, Pageable pageable) {
-        // Kiểm tra user có tồn tại không
+    public PageResult<UserLoginHistoryResponse> getUserLoginHistory(Long userId, LocalDate date, Pageable pageable) {
         if (!userRepo.existsById(userId)) {
             throw new EntityNotFoundException("User không tồn tại với id: " + userId);
         }
-
-        Page<UserLoginHistory> page = loginHistoryRepo.findByUser_UserId(userId, pageable);
-        return PageResult.of(page.map(UserLoginHistoryResponse::from));
+        return getHistoryInternal(userId, date, pageable);
     }
 
+    // User tự xem của mình
     @Override
     @Transactional(readOnly = true)
-    public PageResult<UserLoginHistoryResponse> getMyLoginHistory(Long userId, Pageable pageable) {
-        // Không cần kiểm tra user tồn tại vì userId lấy từ AuthenticationPrincipal (đã xác thực)
-        Page<UserLoginHistory> page = loginHistoryRepo.findByUser_UserId(userId, pageable);
+    public PageResult<UserLoginHistoryResponse> getMyLoginHistory(Long userId, LocalDate date, Pageable pageable) {
+        return getHistoryInternal(userId, date, pageable);
+    }
+
+    // Helper function để tránh lặp code giữa Admin xem User và User tự xem
+    private PageResult<UserLoginHistoryResponse> getHistoryInternal(Long userId, LocalDate date, Pageable pageable) {
+        Page<UserLoginHistory> page;
+
+        if (date != null) {
+            LocalDateTime start = date.atStartOfDay();
+            LocalDateTime end = date.atTime(LocalTime.MAX);
+            page = loginHistoryRepo.findByUser_UserIdAndLoginTimeBetween(userId, start, end, pageable);
+        } else {
+            page = loginHistoryRepo.findByUser_UserId(userId, pageable);
+        }
+
         return PageResult.of(page.map(UserLoginHistoryResponse::from));
     }
 }

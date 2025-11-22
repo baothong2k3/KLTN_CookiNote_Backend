@@ -14,6 +14,8 @@ import fit.kltn_cookinote_backend.dtos.response.UserLoginHistoryResponse;
 import fit.kltn_cookinote_backend.entities.User;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
+
 public interface LoginHistoryService {
     /**
      * Lưu lịch sử đăng nhập của user.
@@ -23,9 +25,9 @@ public interface LoginHistoryService {
      */
     void save(User user);
 
-    PageResult<UserLoginHistoryResponse> getAllLoginHistory(Pageable pageable);
+    PageResult<UserLoginHistoryResponse> getAllLoginHistory(LocalDate date, Pageable pageable);
 
-    PageResult<UserLoginHistoryResponse> getUserLoginHistory(Long userId, Pageable pageable);
+    PageResult<UserLoginHistoryResponse> getUserLoginHistory(Long userId, LocalDate date, Pageable pageable);
 
-    PageResult<UserLoginHistoryResponse> getMyLoginHistory(Long userId, Pageable pageable);
+    PageResult<UserLoginHistoryResponse> getMyLoginHistory(Long userId, LocalDate date, Pageable pageable);
 }

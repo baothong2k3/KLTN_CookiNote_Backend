@@ -27,6 +27,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.time.LocalDate;
 
 
 @RestController
@@ -122,36 +123,41 @@ public class AdminController {
     }
 
     /**
-     * API Admin: Xem toàn bộ lịch sử đăng nhập của hệ thống
+     * API Admin: Xem toàn bộ lịch sử đăng nhập của hệ thống (Có lọc ngày)
+     * GET /admin/login-history?date=2025-11-22&page=0&size=20
      */
     @GetMapping("/login-history")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PageResult<UserLoginHistoryResponse>>> getAllLoginHistory(
+            @RequestParam(value = "date", required = false) LocalDate date, // [MỚI]
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size,
             HttpServletRequest httpReq) {
 
-        // Sắp xếp mặc định: Mới nhất lên đầu
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "loginTime"));
 
-        PageResult<UserLoginHistoryResponse> data = loginHistoryService.getAllLoginHistory(pageable);
+        // Truyền date vào service
+        PageResult<UserLoginHistoryResponse> data = loginHistoryService.getAllLoginHistory(date, pageable);
         return ResponseEntity.ok(ApiResponse.success("Lấy toàn bộ lịch sử đăng nhập thành công", data, httpReq.getRequestURI()));
     }
 
     /**
-     * API Admin: Xem lịch sử đăng nhập của một user cụ thể
+     * API Admin: Xem lịch sử đăng nhập của một user cụ thể (Có lọc ngày)
+     * GET /admin/users/{userId}/login-history?date=2025-11-22
      */
     @GetMapping("/users/{userId}/login-history")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PageResult<UserLoginHistoryResponse>>> getUserLoginHistory(
             @PathVariable Long userId,
+            @RequestParam(value = "date", required = false) LocalDate date,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size,
             HttpServletRequest httpReq) {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "loginTime"));
 
-        PageResult<UserLoginHistoryResponse> data = loginHistoryService.getUserLoginHistory(userId, pageable);
+        // Truyền date vào service
+        PageResult<UserLoginHistoryResponse> data = loginHistoryService.getUserLoginHistory(userId, date, pageable);
         return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử đăng nhập của user thành công", data, httpReq.getRequestURI()));
     }
 }

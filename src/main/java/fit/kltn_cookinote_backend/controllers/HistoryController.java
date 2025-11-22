@@ -13,7 +13,6 @@ import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
 import fit.kltn_cookinote_backend.dtos.response.PageResult;
 import fit.kltn_cookinote_backend.dtos.response.UserLoginHistoryResponse;
 import fit.kltn_cookinote_backend.entities.User;
-import fit.kltn_cookinote_backend.repositories.UserLoginHistoryRepository;
 import fit.kltn_cookinote_backend.services.LoginHistoryService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -28,8 +27,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/history")
@@ -37,19 +35,23 @@ import java.util.stream.Collectors;
 public class HistoryController {
     private final LoginHistoryService loginHistoryService;
 
+    /**
+     * API User: Xem lịch sử đăng nhập của chính mình (Có lọc ngày)
+     * GET /history/login?date=2025-11-22
+     */
     @GetMapping("/login")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<PageResult<UserLoginHistoryResponse>>> getMyLoginHistory(
-                                                                                                @AuthenticationPrincipal User user,
-                                                                                                @RequestParam(value = "page", defaultValue = "0") int page, // [Thêm] Param page
-                                                                                                @RequestParam(value = "size", defaultValue = "10") int size, // [Thêm] Param size
-                                                                                                HttpServletRequest httpReq
+            @AuthenticationPrincipal User user,
+            @RequestParam(value = "date", required = false) LocalDate date,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size,
+            HttpServletRequest httpReq
     ) {
-        // Tạo Pageable với sắp xếp mặc định là mới nhất trước
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "loginTime"));
 
-        // Gọi Service
-        PageResult<UserLoginHistoryResponse> data = loginHistoryService.getMyLoginHistory(user.getUserId(), pageable);
+        // Truyền date vào service
+        PageResult<UserLoginHistoryResponse> data = loginHistoryService.getMyLoginHistory(user.getUserId(), date, pageable);
 
         return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử đăng nhập thành công", data, httpReq.getRequestURI()));
     }
