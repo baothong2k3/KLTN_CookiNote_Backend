@@ -12,10 +12,9 @@ package fit.kltn_cookinote_backend.controllers;/*
 import fit.kltn_cookinote_backend.dtos.UserDto;
 import fit.kltn_cookinote_backend.dtos.request.ExportRequest;
 import fit.kltn_cookinote_backend.dtos.request.UserDetailDto;
-import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
-import fit.kltn_cookinote_backend.dtos.response.PagedUserResponse;
-import fit.kltn_cookinote_backend.dtos.response.UserStatsResponse;
+import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.services.ExcelExportService;
+import fit.kltn_cookinote_backend.services.LoginHistoryService;
 import fit.kltn_cookinote_backend.services.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +35,7 @@ import java.io.IOException;
 public class AdminController {
     private final UserService userService;
     private final ExcelExportService excelExportService;
+    private final LoginHistoryService loginHistoryService;
 
     @GetMapping("/users")
     @PreAuthorize("hasRole('ADMIN')")
@@ -119,5 +119,39 @@ public class AdminController {
     public ResponseEntity<ApiResponse<UserStatsResponse>> getUserStats(HttpServletRequest httpReq) {
         UserStatsResponse stats = userService.getUserStats();
         return ResponseEntity.ok(ApiResponse.success("Lấy thống kê người dùng thành công", stats, httpReq.getRequestURI()));
+    }
+
+    /**
+     * API Admin: Xem toàn bộ lịch sử đăng nhập của hệ thống
+     */
+    @GetMapping("/login-history")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PageResult<UserLoginHistoryResponse>>> getAllLoginHistory(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            HttpServletRequest httpReq) {
+
+        // Sắp xếp mặc định: Mới nhất lên đầu
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "loginTime"));
+
+        PageResult<UserLoginHistoryResponse> data = loginHistoryService.getAllLoginHistory(pageable);
+        return ResponseEntity.ok(ApiResponse.success("Lấy toàn bộ lịch sử đăng nhập thành công", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * API Admin: Xem lịch sử đăng nhập của một user cụ thể
+     */
+    @GetMapping("/users/{userId}/login-history")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PageResult<UserLoginHistoryResponse>>> getUserLoginHistory(
+            @PathVariable Long userId,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            HttpServletRequest httpReq) {
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "loginTime"));
+
+        PageResult<UserLoginHistoryResponse> data = loginHistoryService.getUserLoginHistory(userId, pageable);
+        return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử đăng nhập của user thành công", data, httpReq.getRequestURI()));
     }
 }

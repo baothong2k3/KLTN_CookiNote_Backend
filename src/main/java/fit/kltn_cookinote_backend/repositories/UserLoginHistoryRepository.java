@@ -10,10 +10,14 @@ package fit.kltn_cookinote_backend.repositories;/*
  */
 
 import fit.kltn_cookinote_backend.entities.UserLoginHistory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
 public interface UserLoginHistoryRepository extends JpaRepository<UserLoginHistory, Long> {
     List<UserLoginHistory> findByUser_UserIdOrderByLoginTimeDesc(Long userId);
+
+    Page<UserLoginHistory> findByUser_UserId(Long userId, Pageable pageable);
 }
