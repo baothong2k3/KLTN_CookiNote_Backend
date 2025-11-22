@@ -10,40 +10,48 @@ package fit.kltn_cookinote_backend.controllers;/*
  */
 
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
+import fit.kltn_cookinote_backend.dtos.response.PageResult;
 import fit.kltn_cookinote_backend.dtos.response.UserLoginHistoryResponse;
 import fit.kltn_cookinote_backend.entities.User;
-import fit.kltn_cookinote_backend.repositories.UserLoginHistoryRepository;
+import fit.kltn_cookinote_backend.services.LoginHistoryService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/history")
 @RequiredArgsConstructor
 public class HistoryController {
-    private final UserLoginHistoryRepository loginRepo;
+    private final LoginHistoryService loginHistoryService;
 
+    /**
+     * API User: Xem lịch sử đăng nhập của chính mình (Có lọc ngày)
+     * GET /history/login?date=2025-11-22
+     */
     @GetMapping("/login")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<List<UserLoginHistoryResponse>>> getMyLoginHistory(
+    public ResponseEntity<ApiResponse<PageResult<UserLoginHistoryResponse>>> getMyLoginHistory(
             @AuthenticationPrincipal User user,
+            @RequestParam(value = "date", required = false) LocalDate date,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size,
             HttpServletRequest httpReq
     ) {
-        // 1. Lấy danh sách Entity từ DB
-        var entities = loginRepo.findByUser_UserIdOrderByLoginTimeDesc(user.getUserId());
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "loginTime"));
 
-        // 2. Chuyển đổi sang DTO để cắt bỏ thông tin User thừa và tránh lỗi vòng lặp
-        List<UserLoginHistoryResponse> data = entities.stream()
-                .map(UserLoginHistoryResponse::from)
-                .collect(Collectors.toList());
+        // Truyền date vào service
+        PageResult<UserLoginHistoryResponse> data = loginHistoryService.getMyLoginHistory(user.getUserId(), date, pageable);
 
         return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử đăng nhập thành công", data, httpReq.getRequestURI()));
     }

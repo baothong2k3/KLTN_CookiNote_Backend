@@ -9,7 +9,12 @@ package fit.kltn_cookinote_backend.services;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.response.PageResult;
+import fit.kltn_cookinote_backend.dtos.response.UserLoginHistoryResponse;
 import fit.kltn_cookinote_backend.entities.User;
+import org.springframework.data.domain.Pageable;
+
+import java.time.LocalDate;
 
 public interface LoginHistoryService {
     /**
@@ -19,4 +24,10 @@ public interface LoginHistoryService {
      * @param user Người dùng vừa đăng nhập thành công.
      */
     void save(User user);
+
+    PageResult<UserLoginHistoryResponse> getAllLoginHistory(LocalDate date, Pageable pageable);
+
+    PageResult<UserLoginHistoryResponse> getUserLoginHistory(Long userId, LocalDate date, Pageable pageable);
+
+    PageResult<UserLoginHistoryResponse> getMyLoginHistory(Long userId, LocalDate date, Pageable pageable);
 }
