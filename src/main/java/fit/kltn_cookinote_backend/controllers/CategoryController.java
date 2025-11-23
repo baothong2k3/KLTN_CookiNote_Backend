@@ -80,4 +80,22 @@ public class CategoryController {
         String message = String.format("Đã chuyển %d công thức thành công.", result.get("movedCount"));
         return ResponseEntity.ok(ApiResponse.success(message, result, httpReq.getRequestURI()));
     }
+
+    /**
+     * API Xóa danh mục (Chỉ dành cho Admin).
+     * Endpoint: DELETE /categories/{id}
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteCategory(
+            @PathVariable Long id,
+            HttpServletRequest req) {
+
+        categoryService.deleteCategory(id);
+
+        return ResponseEntity.ok(ApiResponse.success(
+                "Xóa danh mục và ảnh liên quan thành công.",
+                req.getRequestURI()
+        ));
+    }
 }
