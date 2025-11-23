@@ -123,4 +123,13 @@ public interface RecipeService {
      * @param size         Kích thước trang
      */
     PageResult<RecipeCardResponse> filterRecipes(User actor, Long filterUserId, Privacy privacy, Boolean deleted, int page, int size);
+
+    /**
+     * Khôi phục công thức đã xóa mềm.
+     * Chỉ chủ sở hữu hoặc ADMIN mới có quyền.
+     *
+     * @param actorUserId ID người thực hiện
+     * @param recipeId    ID công thức
+     */
+    void restoreRecipe(Long actorUserId, Long recipeId);
 }

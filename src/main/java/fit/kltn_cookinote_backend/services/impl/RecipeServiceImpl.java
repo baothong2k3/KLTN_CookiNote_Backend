@@ -942,4 +942,44 @@ public class RecipeServiceImpl implements RecipeService {
         // 4. Map sang DTO
         return PageResult.of(pageData.map(RecipeCardResponse::from));
     }
+
+    @Override
+    @Transactional
+    public void restoreRecipe(Long actorUserId, Long recipeId) {
+        // 1. Tìm công thức trong danh sách đã xóa mềm
+        Recipe recipe = recipeRepository.findDeletedById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy công thức đã xóa với id: " + recipeId));
+
+        // 2. Kiểm tra quyền: Chủ sở hữu hoặc Admin
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Long ownerId = recipe.getUser().getUserId();
+        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        // 3. Khôi phục trạng thái Recipe
+        recipe.setDeleted(false);
+        recipe.setDeletedAt(null);
+        recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+
+        // 4. Kích hoạt lại ảnh của các bước (Re-activate images)
+        // Lưu ý: Logic này giả định rằng lúc xóa mềm chúng ta đã set active=false cho tất cả ảnh.
+        if (recipe.getSteps() != null) {
+            for (RecipeStep step : recipe.getSteps()) {
+                if (step.getImages() != null) {
+                    for (RecipeStepImage image : step.getImages()) {
+                        image.setActive(true);
+                    }
+                }
+            }
+        }
+
+        // 5. Lưu Recipe
+        recipeRepository.save(recipe);
+
+        // 6. Khôi phục trạng thái 'isRecipeDeleted' trong các bảng liên quan
+        shoppingListRepository.restoreByRecipeId(recipeId);
+        favoriteRepository.restoreByRecipeId(recipeId);
+        cookedHistoryRepository.restoreByRecipeId(recipeId);
+    }
 }

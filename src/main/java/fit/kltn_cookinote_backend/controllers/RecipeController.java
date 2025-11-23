@@ -558,4 +558,19 @@ public class RecipeController {
 
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức thành công", data, httpReq.getRequestURI()));
     }
+
+    /**
+     * Khôi phục công thức đã xóa mềm (Chỉ chủ sở hữu hoặc ADMIN).
+     * Endpoint: PUT /recipes/{recipeId}/restore
+     */
+    @PutMapping("/{recipeId}/restore")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> restoreRecipe(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        recipeService.restoreRecipe(authUser.getUserId(), recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Khôi phục công thức thành công.", httpReq.getRequestURI()));
+    }
 }

@@ -70,4 +70,8 @@ public interface ShoppingListRepository extends JpaRepository<ShoppingList, Long
     @Modifying
     @Query("DELETE FROM ShoppingList sl WHERE sl.user.userId = :userId")
     int deleteAllItems(@Param("userId") Long userId);
+
+    @Modifying
+    @Query("UPDATE ShoppingList sl SET sl.isRecipeDeleted = false WHERE sl.recipe.id = :recipeId")
+    void restoreByRecipeId(@Param("recipeId") Long recipeId);
 }
