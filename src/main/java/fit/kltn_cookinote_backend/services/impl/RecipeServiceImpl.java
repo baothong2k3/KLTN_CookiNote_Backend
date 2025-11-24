@@ -313,21 +313,40 @@ public class RecipeServiceImpl implements RecipeService {
     @Override
     @Transactional
     public RecipeResponse getDetail(Long viewerUserId, Long recipeId) {
+        // 1. Tìm Recipe
         Recipe recipe = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
+        // 2. Xác định Owner và Viewer
         Long ownerId = (recipe.getUser() != null) ? recipe.getUser().getUserId() : null;
-        boolean isOwner = viewerUserId.equals(ownerId);
+        boolean isOwner = (viewerUserId != null && viewerUserId.equals(ownerId));
 
-        if (!canView(recipe.getPrivacy(), ownerId, viewerUserId)) {
+        // 3. Kiểm tra quyền Admin
+        boolean isAdmin = false;
+        if (viewerUserId != null) {
+            // Tải thông tin người xem để check Role
+            User viewer = userRepository.findById(viewerUserId).orElse(null);
+            if (viewer != null && viewer.getRole() == Role.ADMIN) {
+                isAdmin = true;
+            }
+        }
+
+        // 4. Logic kiểm tra quyền truy cập:
+        // Cho phép xem nếu:
+        // - Công thức là PUBLIC/SHARED (check bởi canView)
+        // - HOẶC người xem là Chủ sở hữu
+        // - HOẶC người xem là ADMIN
+        if (!isAdmin && !canView(recipe.getPrivacy(), ownerId, viewerUserId)) {
             throw new AccessDeniedException("Bạn không có quyền xem công thức này.");
         }
 
+        // 5. Tăng lượt xem (chỉ tăng nếu người xem KHÔNG phải là chủ sở hữu)
         if (!isOwner) {
             recipeRepository.incrementViewById(recipeId);
             recipe.setView((recipe.getView() == null ? 0 : recipe.getView()) + 1);
         }
 
+        // 6. Trả về response
         return buildRecipeResponse(recipe, viewerUserId);
     }
 
