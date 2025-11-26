@@ -35,10 +35,10 @@ public interface RecipeStepImageService {
      * @param suggestedTime Thời gian gợi ý (optional)
      * @param tips          Mẹo (optional)
      * @param addFiles      Danh sách ảnh (optional)
-     * @return RecipeResponse đã được cập nhật
+     * @return Danh sách tất cả các bước của recipe sau khi thêm mới (sắp xếp theo thứ tự)
      * @throws IOException
      */
-    RecipeResponse addStep(Long actorUserId, Long recipeId, String content, Integer suggestedTime, String tips, List<MultipartFile> addFiles) throws IOException;
+    List<RecipeStepItem> addStep(Long actorUserId, Long recipeId, String content, Integer suggestedTime, String tips, List<MultipartFile> addFiles) throws IOException;
 
     /**
      * Sắp xếp lại thứ tự (stepNo) của các bước trong một công thức.

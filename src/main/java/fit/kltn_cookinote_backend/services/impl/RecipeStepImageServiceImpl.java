@@ -238,14 +238,14 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
 
     @Override
     @Transactional
-    public RecipeResponse addStep(Long actorUserId, Long recipeId, String content, Integer suggestedTime, String tips, List<MultipartFile> addFiles) throws IOException {
+    public List<RecipeStepItem> addStep(Long actorUserId, Long recipeId, String content, Integer suggestedTime, String tips, List<MultipartFile> addFiles) throws IOException {
         // 1) Tải công thức và kiểm tra quyền
         Recipe recipe = loadAndCheckRecipe(actorUserId, recipeId);
 
         // 2) Cập nhật thời gian cho Recipe
         recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
 
-        // 3) Tính stepNo tiếp theo (thêm vào cuối)
+        // 3) Tính stepNo tiếp theo
         int newStepNo = recipe.getSteps().stream()
                 .mapToInt(RecipeStep::getStepNo)
                 .max()
@@ -284,17 +284,25 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
             }
         }
 
-        // 6) Thêm bước mới vào danh sách của recipe (để response trả về)
-        recipe.getSteps().add(newStep);
-        recipeRepository.save(recipe); // Lưu recipe (để cập nhật updatedAt)
+        // 6) Lưu recipe (để cập nhật updatedAt)
+        // Không cần add vào list recipe.getSteps() thủ công vì query bên dưới sẽ lấy lại từ DB
+        recipeRepository.save(recipe);
 
         em.flush();
+        em.clear(); // Clear cache để đảm bảo query lấy dữ liệu mới nhất
 
-        // 7) Tải lại toàn bộ và trả về
-        Recipe reloaded = recipeRepository.findDetailById(recipeId)
-                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+        // 7) Lấy danh sách steps mới nhất đã sắp xếp và trả về
+        List<RecipeStep> allSteps = stepRepository.findByRecipe_IdOrderByStepNoAsc(recipeId);
 
-        return recipeService.buildRecipeResponse(reloaded, actorUserId);
+        // Map entity sang DTO (nhớ tải lazy collection nếu cần thiết, nhưng findBy... thường lấy đủ nếu config fetch mode hoặc batch size,
+        // hoặc RecipeStepItem.from sẽ kích hoạt proxy nếu còn trong session)
+        return allSteps.stream()
+                .map(step -> {
+                    // Đảm bảo images được load nếu đang lazy (mặc dù trong transaction thì hibernate tự xử lý)
+                    Hibernate.initialize(step.getImages());
+                    return RecipeStepItem.from(step);
+                })
+                .toList();
     }
 
     @Override

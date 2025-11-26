@@ -232,16 +232,16 @@ public class RecipeController {
     @PutMapping(value = "/{recipeId}/steps/{stepId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
     public ResponseEntity<ApiResponse<RecipeStepItem>> updateStep(
-                                                                   @AuthenticationPrincipal User authUser,
-                                                                   @PathVariable Long recipeId,
-                                                                   @PathVariable Long stepId,
-                                                                   @RequestParam(value = "content", required = false) String content,
-                                                                   @RequestParam(value = "stepNo", required = false) Integer stepNo,
-                                                                   @RequestParam(value = "suggestedTime", required = false) Integer suggestedTime,
-                                                                   @RequestParam(value = "tips", required = false) String tips,
-                                                                   @RequestParam(value = "keepUrls", required = false) List<String> keepUrls,
-                                                                   @RequestPart(value = "addFiles", required = false) List<MultipartFile> addFiles,
-                                                                   HttpServletRequest httpReq
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @PathVariable Long stepId,
+            @RequestParam(value = "content", required = false) String content,
+            @RequestParam(value = "stepNo", required = false) Integer stepNo,
+            @RequestParam(value = "suggestedTime", required = false) Integer suggestedTime,
+            @RequestParam(value = "tips", required = false) String tips,
+            @RequestParam(value = "keepUrls", required = false) List<String> keepUrls,
+            @RequestPart(value = "addFiles", required = false) List<MultipartFile> addFiles,
+            HttpServletRequest httpReq
     ) throws IOException {
         // Map các param vào DTO request
         RecipeStepUpdateRequest req = new RecipeStepUpdateRequest(content, stepNo, suggestedTime, tips, keepUrls, addFiles);
@@ -416,7 +416,7 @@ public class RecipeController {
      */
     @PostMapping(value = "/{recipeId}/steps", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
-    public ResponseEntity<ApiResponse<RecipeResponse>> addStep(
+    public ResponseEntity<ApiResponse<List<RecipeStepItem>>> addStep(
             @AuthenticationPrincipal User authUser,
             @PathVariable Long recipeId,
             @RequestParam(value = "content") String content,
@@ -426,7 +426,7 @@ public class RecipeController {
             HttpServletRequest httpReq
     ) throws IOException {
 
-        RecipeResponse data = stepImageService.addStep(
+        List<RecipeStepItem> data = stepImageService.addStep(
                 authUser.getUserId(), recipeId, content, suggestedTime, tips, addFiles
         );
         return ResponseEntity.ok(ApiResponse.success("Thêm bước mới thành công", data, httpReq.getRequestURI()));
