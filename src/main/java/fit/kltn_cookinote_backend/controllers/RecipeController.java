@@ -420,8 +420,8 @@ public class RecipeController {
             @AuthenticationPrincipal User authUser,
             @PathVariable Long recipeId,
             @RequestParam(value = "content") String content,
-            @RequestParam(value = "suggestedTime") Integer suggestedTime,
-            @RequestParam(value = "tips") String tips,
+            @RequestParam(value = "suggestedTime", required = false) Integer suggestedTime,
+            @RequestParam(value = "tips", required = false) String tips,
             @RequestPart(value = "addFiles", required = false) List<MultipartFile> addFiles,
             HttpServletRequest httpReq
     ) throws IOException {
