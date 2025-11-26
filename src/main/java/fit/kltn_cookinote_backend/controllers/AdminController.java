@@ -14,6 +14,7 @@ import fit.kltn_cookinote_backend.dtos.request.ExportRequest;
 import fit.kltn_cookinote_backend.dtos.request.UserDetailDto;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.services.ExcelExportService;
+import fit.kltn_cookinote_backend.services.LogStreamService;
 import fit.kltn_cookinote_backend.services.LoginHistoryService;
 import fit.kltn_cookinote_backend.services.UserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,9 +23,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -37,6 +40,7 @@ public class AdminController {
     private final UserService userService;
     private final ExcelExportService excelExportService;
     private final LoginHistoryService loginHistoryService;
+    private final LogStreamService logStreamService;
 
     @GetMapping("/users")
     @PreAuthorize("hasRole('ADMIN')")
@@ -159,5 +163,12 @@ public class AdminController {
         // Truyền date vào service
         PageResult<UserLoginHistoryResponse> data = loginHistoryService.getUserLoginHistory(userId, date, pageable);
         return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử đăng nhập của user thành công", data, httpReq.getRequestURI()));
+    }
+
+    // Endpoint này trả về stream, connection sẽ giữ open
+    @GetMapping(path = "/logs/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public SseEmitter streamLogs() {
+        return logStreamService.createEmitter();
     }
 }
