@@ -13,6 +13,7 @@ import fit.kltn_cookinote_backend.entities.Favorite;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.Modifying;
 
 import java.util.Collection;
 import java.util.List;
@@ -35,4 +36,8 @@ public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
               AND f.recipe.privacy = 'PUBLIC'
             """)
     List<Long> findActiveRecipeIdsByUserIds(@Param("userIds") Collection<Long> userIds);
+
+    @Modifying
+    @Query("UPDATE Favorite f SET f.isRecipeDeleted = false WHERE f.recipe.id = :recipeId")
+    void restoreByRecipeId(@Param("recipeId") Long recipeId);
 }

@@ -41,4 +41,8 @@ public interface CookedHistoryRepository extends JpaRepository<CookedHistory, Lo
               AND ch.cookedAt >= :cutoff
             """)
     List<Long> findRecentRecipeIds(@Param("userId") Long userId, @Param("cutoff") LocalDateTime cutoff);
+
+    @Modifying
+    @Query("UPDATE CookedHistory ch SET ch.isRecipeDeleted = false WHERE ch.recipe.id = :recipeId")
+    void restoreByRecipeId(@Param("recipeId") Long recipeId);
 }

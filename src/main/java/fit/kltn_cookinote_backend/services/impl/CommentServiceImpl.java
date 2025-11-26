@@ -19,6 +19,7 @@ import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.RecipeCommentRepository;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
+import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.CommentService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,7 @@ public class CommentServiceImpl implements CommentService {
 
     private final RecipeRepository recipeRepository;
     private final RecipeCommentRepository commentRepository;
+    private final UserRepository userRepository;
 
     // Helper kiểm tra quyền xem công thức
     private boolean canView(Privacy privacy, Long ownerId, Long viewerId) {
@@ -58,8 +60,18 @@ public class CommentServiceImpl implements CommentService {
             throw new EntityNotFoundException("Công thức đã bị xóa: " + recipeId);
         }
 
+        boolean isAdmin = false;
+        if (viewerId != null) {
+            User viewer = userRepository.findById(viewerId).orElse(null);
+            if (viewer != null && viewer.getRole() == Role.ADMIN) {
+                isAdmin = true;
+            }
+        }
+
         Long ownerId = recipe.getUser() != null ? recipe.getUser().getUserId() : null;
-        if (!canView(recipe.getPrivacy(), ownerId, viewerId)) {
+
+        // Thêm !isAdmin vào điều kiện
+        if (!isAdmin && !canView(recipe.getPrivacy(), ownerId, viewerId)) {
             throw new AccessDeniedException("Bạn không có quyền xem công thức này.");
         }
         return recipe;

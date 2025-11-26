@@ -12,7 +12,7 @@ package fit.kltn_cookinote_backend.services;/*
 import fit.kltn_cookinote_backend.dtos.request.DeleteRecipeStepsRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepReorderRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepUpdateRequest;
-import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
+import fit.kltn_cookinote_backend.dtos.response.RecipeStepItem;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -22,7 +22,7 @@ import java.util.Map;
 public interface RecipeStepImageService {
     List<String> addImagesToStep(Long actorUserId, Long recipeId, Long stepId, List<MultipartFile> files) throws IOException;
 
-    RecipeResponse updateStep(Long actorUserId, Long recipeId, Long stepId, RecipeStepUpdateRequest req) throws IOException;
+    RecipeStepItem updateStep(Long actorUserId, Long recipeId, Long stepId, RecipeStepUpdateRequest req) throws IOException;
 
     /**
      * Thêm một bước mới (step) vào cuối một công thức (recipe) đã tồn tại.
@@ -34,10 +34,10 @@ public interface RecipeStepImageService {
      * @param suggestedTime Thời gian gợi ý (optional)
      * @param tips          Mẹo (optional)
      * @param addFiles      Danh sách ảnh (optional)
-     * @return RecipeResponse đã được cập nhật
+     * @return Danh sách tất cả các bước của recipe sau khi thêm mới (sắp xếp theo thứ tự)
      * @throws IOException
      */
-    RecipeResponse addStep(Long actorUserId, Long recipeId, String content, Integer suggestedTime, String tips, List<MultipartFile> addFiles) throws IOException;
+    List<RecipeStepItem> addStep(Long actorUserId, Long recipeId, String content, Integer suggestedTime, String tips, List<MultipartFile> addFiles) throws IOException;
 
     /**
      * Sắp xếp lại thứ tự (stepNo) của các bước trong một công thức.
@@ -47,9 +47,9 @@ public interface RecipeStepImageService {
      * @param actorUserId ID người thực hiện
      * @param recipeId    ID công thức
      * @param req         Đối tượng chứa danh sách thứ tự mới
-     * @return RecipeResponse đã được cập nhật
+     * @return Danh sách các bước sau khi đã sắp xếp lại
      */
-    RecipeResponse reorderSteps(Long actorUserId, Long recipeId, RecipeStepReorderRequest req);
+    List<RecipeStepItem> reorderSteps(Long actorUserId, Long recipeId, RecipeStepReorderRequest req);
 
     /**
      * Xóa một hoặc nhiều bước (step) khỏi một công thức.

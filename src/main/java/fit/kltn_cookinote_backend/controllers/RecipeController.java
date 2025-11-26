@@ -231,20 +231,24 @@ public class RecipeController {
 
     @PutMapping(value = "/{recipeId}/steps/{stepId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
-    public ResponseEntity<ApiResponse<RecipeResponse>> updateStep(
+    public ResponseEntity<ApiResponse<RecipeStepItem>> updateStep(
             @AuthenticationPrincipal User authUser,
             @PathVariable Long recipeId,
             @PathVariable Long stepId,
             @RequestParam(value = "content", required = false) String content,
             @RequestParam(value = "stepNo", required = false) Integer stepNo,
-            @RequestParam(value = "suggestTime", required = false) Integer suggestedTime,
+            @RequestParam(value = "suggestedTime", required = false) Integer suggestedTime,
             @RequestParam(value = "tips", required = false) String tips,
             @RequestParam(value = "keepUrls", required = false) List<String> keepUrls,
             @RequestPart(value = "addFiles", required = false) List<MultipartFile> addFiles,
             HttpServletRequest httpReq
     ) throws IOException {
+        // Map các param vào DTO request
         RecipeStepUpdateRequest req = new RecipeStepUpdateRequest(content, stepNo, suggestedTime, tips, keepUrls, addFiles);
-        RecipeResponse data = stepImageService.updateStep(authUser.getUserId(), recipeId, stepId, req);
+
+        // Gọi service (giờ trả về RecipeStepItem)
+        RecipeStepItem data = stepImageService.updateStep(authUser.getUserId(), recipeId, stepId, req);
+
         return ResponseEntity.ok(ApiResponse.success("Cập nhật bước công thức thành công", data, httpReq.getRequestURI()));
     }
 
@@ -412,7 +416,7 @@ public class RecipeController {
      */
     @PostMapping(value = "/{recipeId}/steps", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
-    public ResponseEntity<ApiResponse<RecipeResponse>> addStep(
+    public ResponseEntity<ApiResponse<List<RecipeStepItem>>> addStep(
             @AuthenticationPrincipal User authUser,
             @PathVariable Long recipeId,
             @RequestParam(value = "content") String content,
@@ -422,7 +426,7 @@ public class RecipeController {
             HttpServletRequest httpReq
     ) throws IOException {
 
-        RecipeResponse data = stepImageService.addStep(
+        List<RecipeStepItem> data = stepImageService.addStep(
                 authUser.getUserId(), recipeId, content, suggestedTime, tips, addFiles
         );
         return ResponseEntity.ok(ApiResponse.success("Thêm bước mới thành công", data, httpReq.getRequestURI()));
@@ -434,13 +438,14 @@ public class RecipeController {
      */
     @PutMapping("/{recipeId}/steps/reorder")
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
-    public ResponseEntity<ApiResponse<RecipeResponse>> reorderSteps(
+    public ResponseEntity<ApiResponse<List<RecipeStepItem>>> reorderSteps(
             @AuthenticationPrincipal User authUser,
             @PathVariable Long recipeId,
             @Valid @RequestBody RecipeStepReorderRequest req,
             HttpServletRequest httpReq
     ) {
-        RecipeResponse data = stepImageService.reorderSteps(authUser.getUserId(), recipeId, req);
+        List<RecipeStepItem> data = stepImageService.reorderSteps(authUser.getUserId(), recipeId, req);
+
         return ResponseEntity.ok(ApiResponse.success("Sắp xếp lại các bước thành công", data, httpReq.getRequestURI()));
     }
 
@@ -450,13 +455,14 @@ public class RecipeController {
      */
     @PostMapping("/{recipeId}/ingredients")
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
-    public ResponseEntity<ApiResponse<RecipeResponse>> addIngredients(
+    public ResponseEntity<ApiResponse<List<RecipeIngredientItem>>> addIngredients(
             @AuthenticationPrincipal User authUser,
             @PathVariable Long recipeId,
             @Valid @RequestBody AddIngredientsRequest req,
             HttpServletRequest httpReq
     ) {
-        RecipeResponse data = recipeService.addIngredients(authUser.getUserId(), recipeId, req);
+        List<RecipeIngredientItem> data = recipeService.addIngredients(authUser.getUserId(), recipeId, req);
+
         return ResponseEntity.ok(ApiResponse.success("Thêm nguyên liệu thành công", data, httpReq.getRequestURI()));
     }
 
@@ -557,5 +563,20 @@ public class RecipeController {
         PageResult<RecipeCardResponse> data = recipeService.filterRecipes(authUser, userId, privacy, deleted, page, size);
 
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức thành công", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * Khôi phục công thức đã xóa mềm (Chỉ chủ sở hữu hoặc ADMIN).
+     * Endpoint: PUT /recipes/{recipeId}/restore
+     */
+    @PutMapping("/{recipeId}/restore")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> restoreRecipe(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            HttpServletRequest httpReq
+    ) {
+        recipeService.restoreRecipe(authUser.getUserId(), recipeId);
+        return ResponseEntity.ok(ApiResponse.success("Khôi phục công thức thành công.", httpReq.getRequestURI()));
     }
 }
