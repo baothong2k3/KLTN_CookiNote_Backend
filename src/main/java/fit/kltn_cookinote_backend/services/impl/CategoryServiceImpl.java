@@ -13,6 +13,7 @@ import com.cloudinary.Cloudinary;
 import fit.kltn_cookinote_backend.dtos.request.MoveRecipesRequest;
 import fit.kltn_cookinote_backend.dtos.response.CategoryResponse;
 import fit.kltn_cookinote_backend.entities.Category;
+import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.repositories.CategoryRepository;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.services.CategoryService;
@@ -20,6 +21,7 @@ import fit.kltn_cookinote_backend.services.CloudinaryService;
 import fit.kltn_cookinote_backend.utils.CloudinaryUtils;
 import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
 import jakarta.annotation.Nullable;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
@@ -64,10 +66,7 @@ public class CategoryServiceImpl implements CategoryService {
 
         // 2) nếu có ảnh → upload và lưu URL
         if (image != null && !image.isEmpty()) {
-            ImageValidationUtils.validateImage(image);
-            String publicId = "c_" + cat.getId() + "_" + Instant.now().getEpochSecond();
-            String imageUrl = CloudinaryUtils.uploadImage(cloudinary, image, categoryFolder, publicId);
-            cat.setImageUrl(imageUrl);
+            uploadAndSetImage(cat, image);
             categoryRepository.save(cat);
         }
         return toResponse(cat);
@@ -90,23 +89,11 @@ public class CategoryServiceImpl implements CategoryService {
         final String oldUrl = cat.getImageUrl();
 
         if (image != null && !image.isEmpty()) {
-            ImageValidationUtils.validateImage(image);
-            String publicId = "c_" + id + "_" + Instant.now().getEpochSecond();
-            String imageUrl = CloudinaryUtils.uploadImage(cloudinary, image, categoryFolder, publicId);
-            cat.setImageUrl(imageUrl);
+            // Upload ảnh mới
+            uploadAndSetImage(cat, image);
 
-            // xóa ảnh cũ SAU COMMIT
-            if (StringUtils.hasText(oldUrl)) {
-                String oldPublicId = cloudinaryService.extractPublicIdFromUrl(oldUrl);
-                if (StringUtils.hasText(oldPublicId)) {
-                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                        @Override
-                        public void afterCommit() {
-                            cloudinaryService.safeDeleteByPublicId(oldPublicId);
-                        }
-                    });
-                }
-            }
+            // Xóa ảnh cũ sau khi commit thành công (Sử dụng Helper Method)
+            deleteImageAfterCommit(oldUrl);
         }
 
         Category saved = categoryRepository.save(cat);
@@ -159,6 +146,38 @@ public class CategoryServiceImpl implements CategoryService {
         return Map.of("movedCount", movedCount);
     }
 
+    @Override
+    @Transactional
+    public void deleteCategory(Long id) {
+        // 1. Tìm Category
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Danh mục không tồn tại: " + id));
+
+        // 2. Kiểm tra ràng buộc và đếm chi tiết
+        List<Recipe> recipes = category.getRecipes();
+        if (recipes != null && !recipes.isEmpty()) {
+            // Đếm số lượng công thức theo trạng thái
+            long activeCount = recipes.stream().filter(r -> !r.isDeleted()).count();
+            long softDeletedCount = recipes.stream().filter(Recipe::isDeleted).count();
+
+            // Tạo thông báo chi tiết
+            throw new IllegalStateException(String.format(
+                    "Không thể xóa danh mục này vì còn chứa %d công thức (%d đang hoạt động, %d đã xóa mềm). " +
+                            "Vui lòng chuyển các công thức này sang danh mục khác trước khi xóa.",
+                    recipes.size(), activeCount, softDeletedCount
+            ));
+        }
+
+        // 3. Lấy URL ảnh để chuẩn bị xóa (nếu có)
+        final String imageUrl = category.getImageUrl();
+
+        // 4. Xóa Category khỏi DB
+        categoryRepository.delete(category);
+
+        // 5. Xóa ảnh sau khi commit thành công (Sử dụng Helper Method)
+        deleteImageAfterCommit(imageUrl);
+    }
+
     private CategoryResponse toResponse(Category c) {
         return CategoryResponse.builder()
                 .id(c.getId())
@@ -175,5 +194,33 @@ public class CategoryServiceImpl implements CategoryService {
         String name = raw.trim();
         if (name.length() > 100) throw new IllegalArgumentException("Tên danh mục tối đa 100 ký tự");
         return name;
+    }
+
+    /**
+     * Helper: Validate ảnh, tạo publicId, upload lên Cloudinary và set URL cho Category.
+     */
+    private void uploadAndSetImage(Category cat, MultipartFile image) throws IOException {
+        ImageValidationUtils.validateImage(image);
+        String publicId = "c_" + cat.getId() + "_" + Instant.now().getEpochSecond();
+        String imageUrl = CloudinaryUtils.uploadImage(cloudinary, image, categoryFolder, publicId);
+        cat.setImageUrl(imageUrl);
+    }
+
+    /**
+     * Helper: Đăng ký transaction synchronization để xóa ảnh trên Cloudinary
+     * chỉ sau khi transaction DB commit thành công.
+     */
+    private void deleteImageAfterCommit(String imageUrl) {
+        if (StringUtils.hasText(imageUrl)) {
+            String publicId = cloudinaryService.extractPublicIdFromUrl(imageUrl);
+            if (StringUtils.hasText(publicId)) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        cloudinaryService.safeDeleteByPublicId(publicId);
+                    }
+                });
+            }
+        }
     }
 }

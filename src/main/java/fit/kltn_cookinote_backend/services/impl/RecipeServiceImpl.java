@@ -49,6 +49,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -313,21 +314,40 @@ public class RecipeServiceImpl implements RecipeService {
     @Override
     @Transactional
     public RecipeResponse getDetail(Long viewerUserId, Long recipeId) {
+        // 1. Tìm Recipe
         Recipe recipe = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
 
+        // 2. Xác định Owner và Viewer
         Long ownerId = (recipe.getUser() != null) ? recipe.getUser().getUserId() : null;
-        boolean isOwner = viewerUserId.equals(ownerId);
+        boolean isOwner = (viewerUserId != null && viewerUserId.equals(ownerId));
 
-        if (!canView(recipe.getPrivacy(), ownerId, viewerUserId)) {
+        // 3. Kiểm tra quyền Admin
+        boolean isAdmin = false;
+        if (viewerUserId != null) {
+            // Tải thông tin người xem để check Role
+            User viewer = userRepository.findById(viewerUserId).orElse(null);
+            if (viewer != null && viewer.getRole() == Role.ADMIN) {
+                isAdmin = true;
+            }
+        }
+
+        // 4. Logic kiểm tra quyền truy cập:
+        // Cho phép xem nếu:
+        // - Công thức là PUBLIC/SHARED (check bởi canView)
+        // - HOẶC người xem là Chủ sở hữu
+        // - HOẶC người xem là ADMIN
+        if (!isAdmin && !canView(recipe.getPrivacy(), ownerId, viewerUserId)) {
             throw new AccessDeniedException("Bạn không có quyền xem công thức này.");
         }
 
+        // 5. Tăng lượt xem (chỉ tăng nếu người xem KHÔNG phải là chủ sở hữu)
         if (!isOwner) {
             recipeRepository.incrementViewById(recipeId);
             recipe.setView((recipe.getView() == null ? 0 : recipe.getView()) + 1);
         }
 
+        // 6. Trả về response
         return buildRecipeResponse(recipe, viewerUserId);
     }
 
@@ -742,7 +762,7 @@ public class RecipeServiceImpl implements RecipeService {
 
     @Override
     @Transactional
-    public RecipeResponse addIngredients(Long actorUserId, Long recipeId, AddIngredientsRequest req) {
+    public List<RecipeIngredientItem> addIngredients(Long actorUserId, Long recipeId, AddIngredientsRequest req) {
         // 1) Tải User (actor) và Recipe, kiểm tra quyền
         User actor = userRepository.findById(actorUserId)
                 .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
@@ -758,63 +778,78 @@ public class RecipeServiceImpl implements RecipeService {
         Long ownerId = recipe.getUser().getUserId();
         ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
 
-        // 2) Lấy danh sách nguyên liệu hiện có (dùng Set để kiểm tra trùng lặp hiệu quả)
-        // Sử dụng tên đã chuẩn hóa làm key để tránh trùng lặp không phân biệt chữ hoa/thường, khoảng trắng
-        Set<String> existingNormalizedNames = recipe.getIngredients().stream()
-                .map(RecipeIngredient::getName)
-                .filter(Objects::nonNull)
-                .map(ShoppingListUtils::normalize) // Chuẩn hóa tên (toLowerCase, trim, gộp khoảng trắng)
-                .collect(Collectors.toSet());
+        // 2) Tạo Map các nguyên liệu hiện có: Key = Tên chuẩn hóa, Value = Entity
+        Map<String, RecipeIngredient> existingIngredientsMap = recipe.getIngredients().stream()
+                .collect(Collectors.toMap(
+                        ing -> ShoppingListUtils.normalize(ing.getName()), // Key: tên đã chuẩn hóa
+                        Function.identity(),                               // Value: chính object đó
+                        (existing, replacement) -> existing                // Nếu DB lỡ có trùng, giữ cái đầu tiên
+                ));
 
-        // 3) Xử lý thêm nguyên liệu mới
+        // 3) Xử lý danh sách gửi lên (Upsert logic)
+        boolean isChanged = false;
         List<RecipeIngredient> ingredientsToAdd = new ArrayList<>();
-        int addedCount = 0;
-        for (RecipeIngredientCreate newIngDto : req.ingredients()) {
-            String normalizedNewName = ShoppingListUtils.normalize(newIngDto.name());
 
-            // Bỏ qua nếu tên trống hoặc đã tồn tại (sau chuẩn hóa)
-            if (normalizedNewName.isEmpty() || existingNormalizedNames.contains(normalizedNewName)) {
-                continue; // Bỏ qua nguyên liệu này
+        for (RecipeIngredientCreate newIngDto : req.ingredients()) {
+            String rawName = newIngDto.name();
+            if (rawName == null || rawName.isBlank()) continue;
+
+            String normalizedKey = ShoppingListUtils.normalize(rawName);
+            String canonicalName = ShoppingListUtils.canonicalize(rawName);
+            String canonicalQty = ShoppingListUtils.canonicalize(newIngDto.quantity());
+
+            if (existingIngredientsMap.containsKey(normalizedKey)) {
+                // --- TRƯỜNG HỢP ĐÃ TỒN TẠI: CẬP NHẬT ---
+                RecipeIngredient existingItem = existingIngredientsMap.get(normalizedKey);
+
+                // Kiểm tra xem có thay đổi gì không (số lượng hoặc cách viết tên)
+                boolean qtyChanged = !Objects.equals(existingItem.getQuantity(), canonicalQty);
+
+                // (Tùy chọn) Cập nhật lại tên theo cách viết mới nhất của user (ví dụ: "đường" -> "Đường")
+                // Nếu muốn giữ tên cũ trong DB thì bỏ dòng setName này đi.
+                boolean nameChanged = !existingItem.getName().equals(canonicalName);
+
+                if (qtyChanged || nameChanged) {
+                    existingItem.setQuantity(canonicalQty);
+                    existingItem.setName(canonicalName);
+                    isChanged = true;
+                }
+            } else {
+                // --- TRƯỜNG HỢP CHƯA CÓ: THÊM MỚI ---
+
+                // Kiểm tra xem trong danh sách chờ thêm (ingredientsToAdd) đã có món này chưa
+                // (tránh trường hợp request gửi lên 2 dòng "đường" mới cùng lúc)
+                boolean alreadyInQueue = ingredientsToAdd.stream()
+                        .anyMatch(i -> ShoppingListUtils.normalize(i.getName()).equals(normalizedKey));
+
+                if (!alreadyInQueue) {
+                    RecipeIngredient newIngredient = RecipeIngredient.builder()
+                            .recipe(recipe)
+                            .name(canonicalName)
+                            .quantity(canonicalQty)
+                            .build();
+                    ingredientsToAdd.add(newIngredient);
+                    isChanged = true;
+                }
+            }
+        }
+
+        // 4) Lưu thay đổi nếu có bất kỳ cập nhật hoặc thêm mới nào
+        if (isChanged) {
+            // Thêm các món mới vào danh sách quản lý của entity
+            if (!ingredientsToAdd.isEmpty()) {
+                recipe.getIngredients().addAll(ingredientsToAdd);
             }
 
-            // Tạo entity mới và liên kết với Recipe
-            RecipeIngredient newIngredient = RecipeIngredient.builder()
-                    .recipe(recipe) // Liên kết với recipe hiện tại
-                    .name(ShoppingListUtils.canonicalize(newIngDto.name())) // Lưu tên đã chuẩn hóa (trim, gộp khoảng trắng)
-                    .quantity(ShoppingListUtils.canonicalize(newIngDto.quantity())) // Chuẩn hóa quantity
-                    .build();
-
-            ingredientsToAdd.add(newIngredient);
-            existingNormalizedNames.add(normalizedNewName); // Thêm vào set để kiểm tra các mục tiếp theo trong request
-            addedCount++;
-        }
-
-        // 4) Chỉ cập nhật nếu thực sự có nguyên liệu mới được thêm
-        if (addedCount > 0) {
-            // Thêm các nguyên liệu hợp lệ vào collection của Recipe
-            recipe.getIngredients().addAll(ingredientsToAdd);
-
-            // Cập nhật thời gian
             recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
-
-            // Lưu Recipe (CascadeType.ALL sẽ tự động lưu các ingredientsToAdd)
-            recipeRepository.saveAndFlush(recipe);
-        } else {
-            // Nếu không có gì để thêm (do trùng lặp hoặc rỗng), không cần save lại recipe
-            // Chỉ cần trả về trạng thái hiện tại
-            // Tải lại để đảm bảo dữ liệu mới nhất (phòng trường hợp có thay đổi khác)
-            recipe = recipeRepository.findDetailById(recipeId)
-                    .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
-
-            return buildRecipeResponse(recipe, actorUserId);
+            // Lưu Recipe (CascadeType.ALL sẽ tự động lưu các ingredients mới và update ingredients cũ)
+            recipe = recipeRepository.saveAndFlush(recipe);
         }
 
-
-        // 5) Tải lại Recipe chi tiết để trả về (đã bao gồm các nguyên liệu mới)
-        Recipe reloaded = recipeRepository.findDetailById(recipeId)
-                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại sau khi cập nhật: " + recipeId)); // Nên có
-
-        return buildRecipeResponse(reloaded, actorUserId);
+        // 5) Trả về danh sách DTO (bao gồm cả cái mới thêm và cái vừa cập nhật)
+        return recipe.getIngredients().stream()
+                .map(RecipeIngredientItem::from)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -941,5 +976,45 @@ public class RecipeServiceImpl implements RecipeService {
 
         // 4. Map sang DTO
         return PageResult.of(pageData.map(RecipeCardResponse::from));
+    }
+
+    @Override
+    @Transactional
+    public void restoreRecipe(Long actorUserId, Long recipeId) {
+        // 1. Tìm công thức trong danh sách đã xóa mềm
+        Recipe recipe = recipeRepository.findDeletedById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy công thức đã xóa với id: " + recipeId));
+
+        // 2. Kiểm tra quyền: Chủ sở hữu hoặc Admin
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Long ownerId = recipe.getUser().getUserId();
+        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        // 3. Khôi phục trạng thái Recipe
+        recipe.setDeleted(false);
+        recipe.setDeletedAt(null);
+        recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+
+        // 4. Kích hoạt lại ảnh của các bước (Re-activate images)
+        // Lưu ý: Logic này giả định rằng lúc xóa mềm chúng ta đã set active=false cho tất cả ảnh.
+        if (recipe.getSteps() != null) {
+            for (RecipeStep step : recipe.getSteps()) {
+                if (step.getImages() != null) {
+                    for (RecipeStepImage image : step.getImages()) {
+                        image.setActive(true);
+                    }
+                }
+            }
+        }
+
+        // 5. Lưu Recipe
+        recipeRepository.save(recipe);
+
+        // 6. Khôi phục trạng thái 'isRecipeDeleted' trong các bảng liên quan
+        shoppingListRepository.restoreByRecipeId(recipeId);
+        favoriteRepository.restoreByRecipeId(recipeId);
+        cookedHistoryRepository.restoreByRecipeId(recipeId);
     }
 }

@@ -29,4 +29,11 @@ public interface CategoryService {
     CategoryResponse updateWithOptionalImage(Long id, String name, String description, @Nullable MultipartFile image) throws IOException;
 
     Map<String, Integer> moveRecipes(MoveRecipesRequest req);
+
+    /**
+     * Xóa danh mục theo ID.
+     * Yêu cầu danh mục không chứa công thức nào.
+     * Nếu có ảnh, sẽ xóa ảnh trên Cloudinary sau khi commit thành công.
+     */
+    void deleteCategory(Long id);
 }
