@@ -450,13 +450,14 @@ public class RecipeController {
      */
     @PostMapping("/{recipeId}/ingredients")
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
-    public ResponseEntity<ApiResponse<RecipeResponse>> addIngredients(
+    public ResponseEntity<ApiResponse<List<RecipeIngredientItem>>> addIngredients(
             @AuthenticationPrincipal User authUser,
             @PathVariable Long recipeId,
             @Valid @RequestBody AddIngredientsRequest req,
             HttpServletRequest httpReq
     ) {
-        RecipeResponse data = recipeService.addIngredients(authUser.getUserId(), recipeId, req);
+        List<RecipeIngredientItem> data = recipeService.addIngredients(authUser.getUserId(), recipeId, req);
+
         return ResponseEntity.ok(ApiResponse.success("Thêm nguyên liệu thành công", data, httpReq.getRequestURI()));
     }
 

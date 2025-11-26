@@ -87,9 +87,9 @@ public interface RecipeService {
      * @param actorUserId ID người thực hiện
      * @param recipeId    ID công thức
      * @param req         Đối tượng chứa danh sách nguyên liệu cần thêm
-     * @return RecipeResponse đã được cập nhật
+     * @return Danh sách toàn bộ nguyên liệu của recipe
      */
-    RecipeResponse addIngredients(Long actorUserId, Long recipeId, AddIngredientsRequest req);
+    List<RecipeIngredientItem> addIngredients(Long actorUserId, Long recipeId, AddIngredientsRequest req);
 
     /**
      * Xóa một hoặc nhiều nguyên liệu khỏi một công thức đã tồn tại.
