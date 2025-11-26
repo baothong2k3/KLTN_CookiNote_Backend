@@ -12,7 +12,6 @@ package fit.kltn_cookinote_backend.services;/*
 import fit.kltn_cookinote_backend.dtos.request.DeleteRecipeStepsRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepReorderRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepUpdateRequest;
-import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
 import fit.kltn_cookinote_backend.dtos.response.RecipeStepItem;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -48,9 +47,9 @@ public interface RecipeStepImageService {
      * @param actorUserId ID người thực hiện
      * @param recipeId    ID công thức
      * @param req         Đối tượng chứa danh sách thứ tự mới
-     * @return RecipeResponse đã được cập nhật
+     * @return Danh sách các bước sau khi đã sắp xếp lại
      */
-    RecipeResponse reorderSteps(Long actorUserId, Long recipeId, RecipeStepReorderRequest req);
+    List<RecipeStepItem> reorderSteps(Long actorUserId, Long recipeId, RecipeStepReorderRequest req);
 
     /**
      * Xóa một hoặc nhiều bước (step) khỏi một công thức.

@@ -438,13 +438,14 @@ public class RecipeController {
      */
     @PutMapping("/{recipeId}/steps/reorder")
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
-    public ResponseEntity<ApiResponse<RecipeResponse>> reorderSteps(
+    public ResponseEntity<ApiResponse<List<RecipeStepItem>>> reorderSteps(
             @AuthenticationPrincipal User authUser,
             @PathVariable Long recipeId,
             @Valid @RequestBody RecipeStepReorderRequest req,
             HttpServletRequest httpReq
     ) {
-        RecipeResponse data = stepImageService.reorderSteps(authUser.getUserId(), recipeId, req);
+        List<RecipeStepItem> data = stepImageService.reorderSteps(authUser.getUserId(), recipeId, req);
+
         return ResponseEntity.ok(ApiResponse.success("Sắp xếp lại các bước thành công", data, httpReq.getRequestURI()));
     }
 
