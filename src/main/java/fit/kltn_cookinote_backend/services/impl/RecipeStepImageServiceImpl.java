@@ -13,6 +13,7 @@ import fit.kltn_cookinote_backend.dtos.request.DeleteRecipeStepsRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepReorderRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
+import fit.kltn_cookinote_backend.dtos.response.RecipeStepItem;
 import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.enums.Role;
@@ -148,7 +149,7 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
 
     @Override
     @Transactional
-    public RecipeResponse updateStep(Long actorUserId, Long recipeId, Long stepId, RecipeStepUpdateRequest req) throws IOException {
+    public RecipeStepItem updateStep(Long actorUserId, Long recipeId, Long stepId, RecipeStepUpdateRequest req) throws IOException {
         // 0) Load & kiểm quyền
         RecipeStep step = loadAndCheckStep(actorUserId, recipeId, stepId);
 
@@ -157,54 +158,40 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
         recipeRepository.save(recipe);
 
         // 1) Cập nhật nội dung, thời gian và tips
-        if (req.content() != null) {
-            step.setContent(req.content());
-        }
-        if (req.suggestedTime() != null) {
-            step.setSuggestedTime(req.suggestedTime());
-        }
-        if (req.tips() != null) {
-            step.setTips(req.tips());
-        }
+        if (req.content() != null) step.setContent(req.content());
+        if (req.suggestedTime() != null) step.setSuggestedTime(req.suggestedTime());
+        if (req.tips() != null) step.setTips(req.tips());
 
-        // 2) Đảm bảo không trùng stepNo (swap nếu cần)
+        // 2) Đảm bảo không trùng stepNo
         if (req.stepNo() != null) {
             Integer newNo = req.stepNo();
             Integer oldNo = step.getStepNo();
             if (!Objects.equals(newNo, oldNo)) {
                 Optional<RecipeStep> conflictOpt = stepRepository.findByRecipe_IdAndStepNo(recipeId, newNo);
                 if (conflictOpt.isPresent() && !Objects.equals(conflictOpt.get().getId(), stepId)) {
-                    // Có xung đột: dùng "đệm" để tránh vi phạm unique tại thời điểm update
                     RecipeStep other = conflictOpt.get();
-
-                    // (A) đẩy other sang số đệm tạm thời
-                    final int TEMP_NO = -1; // cột step_no nên NOT NULL, -1 vẫn hợp lệ và không đụng unique
+                    final int TEMP_NO = -1;
                     other.setStepNo(TEMP_NO);
-                    stepRepository.saveAndFlush(other); // flush để ghi ngay, tránh đụng unique khi set 'step' sang newNo
-
-                    // (B) gán step sang newNo
+                    stepRepository.saveAndFlush(other);
                     step.setStepNo(newNo);
                     stepRepository.saveAndFlush(step);
-
-                    // (C) gán other về oldNo
                     other.setStepNo(oldNo);
                     stepRepository.save(other);
                 } else {
-                    // Không xung đột, set trực tiếp
                     step.setStepNo(newNo);
                     stepRepository.save(step);
                 }
             } else {
-                // stepNo không đổi → vẫn lưu nếu có content thay đổi
                 stepRepository.save(step);
             }
         } else {
-            // Không đổi stepNo → vẫn lưu nếu có content thay đổi
             stepRepository.save(step);
         }
 
         // 3) Xử lý ảnh
         List<RecipeStepImage> existingImages = stepImageRepository.findByStep_Id(stepId);
+        // Nếu req.keepUrls() là null hoặc rỗng -> nghĩa là xóa hết ảnh cũ (hoặc client không gửi gì)
+        // Lưu ý: Nếu client muốn giữ ảnh, bắt buộc phải gửi list này.
         Set<String> keepUrlsSet = new HashSet<>(Optional.ofNullable(req.keepUrls()).orElse(List.of()));
 
         // 3.1) Vô hiệu hóa (soft-delete) các ảnh không được giữ lại
@@ -226,7 +213,7 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
             throw new IllegalArgumentException("Mỗi step tối đa 5 ảnh (hiện có " + activeImageCount + ", thêm " + addCount + ").");
         }
 
-        // 3.3) Thêm ảnh mới (các ảnh này sẽ có active=true mặc định)
+        // 3.3) Thêm ảnh mới
         if (req.addFiles() != null && !req.addFiles().isEmpty()) {
             for (MultipartFile f : req.addFiles()) ImageValidationUtils.validateImage(f);
             List<String> newUrls = recipeImageService.uploadStepImages(recipeId, stepId, req.addFiles());
@@ -236,17 +223,17 @@ public class RecipeStepImageServiceImpl implements RecipeStepImageService {
                     toSave.add(RecipeStepImage.builder().step(step).imageUrl(url).build());
                 }
                 stepImageRepository.saveAll(toSave);
+                // Cập nhật list ảnh trong memory object để trả về đúng ngay lập tức
+                if (step.getImages() == null) step.setImages(new ArrayList<>());
+                step.getImages().addAll(toSave);
             }
         }
 
         em.flush();
-        em.clear();
+        em.refresh(step); // Làm mới entity từ DB để đảm bảo có dữ liệu mới nhất (ảnh, thứ tự)
 
-        // 4) Tải lại và trả về
-        Recipe reloaded = recipeRepository.findDetailById(recipeId)
-                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
-
-        return recipeService.buildRecipeResponse(reloaded, actorUserId);
+        // 4) Trả về StepItem thay vì RecipeResponse
+        return RecipeStepItem.from(step);
     }
 
     @Override

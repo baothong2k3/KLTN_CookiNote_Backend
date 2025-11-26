@@ -13,6 +13,7 @@ import fit.kltn_cookinote_backend.dtos.request.DeleteRecipeStepsRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepReorderRequest;
 import fit.kltn_cookinote_backend.dtos.request.RecipeStepUpdateRequest;
 import fit.kltn_cookinote_backend.dtos.response.RecipeResponse;
+import fit.kltn_cookinote_backend.dtos.response.RecipeStepItem;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -22,7 +23,7 @@ import java.util.Map;
 public interface RecipeStepImageService {
     List<String> addImagesToStep(Long actorUserId, Long recipeId, Long stepId, List<MultipartFile> files) throws IOException;
 
-    RecipeResponse updateStep(Long actorUserId, Long recipeId, Long stepId, RecipeStepUpdateRequest req) throws IOException;
+    RecipeStepItem updateStep(Long actorUserId, Long recipeId, Long stepId, RecipeStepUpdateRequest req) throws IOException;
 
     /**
      * Thêm một bước mới (step) vào cuối một công thức (recipe) đã tồn tại.
