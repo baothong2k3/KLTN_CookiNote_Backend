@@ -67,7 +67,7 @@ public class IngredientSynonymService {
                     if (!processedMap.containsKey(normalizedVariant)) {
                         processedMap.put(normalizedVariant, standardName);
                     } else {
-                        log.warn("Từ đồng nghĩa '{}' (chuẩn hóa: '{}') được định nghĩa cho nhiều hơn 1 từ chuẩn. Giữ lại giá trị cũ.",
+                        log.debug("Từ đồng nghĩa '{}' (chuẩn hóa: '{}') được định nghĩa cho nhiều hơn 1 từ chuẩn. Giữ lại giá trị cũ.",
                                 variant, normalizedVariant);
                     }
                 }
