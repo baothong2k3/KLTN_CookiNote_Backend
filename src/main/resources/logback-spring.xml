@@ -1,43 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <!-- Import cấu hình mặc định của Spring Boot -->
     <include resource="org/springframework/boot/logging/logback/defaults.xml" />
-    <include resource="org/springframework/boot/logging/logback/console-appender.xml" />
 
-    <!-- 1. Appender THỰC TẾ (Xử lý logic gửi log đi) -->
-    <!-- Đặt tên là INTERNAL để phân biệt, không dùng trực tiếp ở root -->
+    <appender name="CONSOLE_SYNC" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <charset>utf8</charset>
+            <pattern>%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} : %m%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="CONSOLE_ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="CONSOLE_SYNC" />
+
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold> <includeCallerData>false</includeCallerData> </appender>
+
     <appender name="STREAM_INTERNAL" class="fit.kltn_cookinote_backend.configs.StreamLogAppender">
         <layout class="ch.qos.logback.classic.PatternLayout">
-            <!--
-                %-20.20logger{19}:
-                - Cố định độ rộng đúng 20 ký tự.
-                - Tự động rút gọn tên package nếu dài quá (ví dụ: f.k.c.s.impl.UserServiceImpl)
-            -->
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p ${PID:- } --- [%15.15t] %-20.20logger{19} : %m%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p ${PID:- } --- [%15.15t] %-40.40logger{39} : %m%n</pattern>
         </layout>
     </appender>
 
-    <!-- 2. Appender BẤT ĐỒNG BỘ (Lớp vỏ bọc để tăng hiệu năng) -->
     <appender name="STREAM_ASYNC" class="ch.qos.logback.classic.AsyncAppender">
-        <!-- Trỏ vào appender thực tế ở trên -->
         <appender-ref ref="STREAM_INTERNAL" />
-
-        <!-- Cấu hình hiệu năng -->
-        <queueSize>512</queueSize> <!-- Độ lớn hàng đợi, 512 là an toàn -->
-        <discardingThreshold>0</discardingThreshold> <!-- Quan trọng: Không bao giờ vứt bỏ log INFO kể cả khi hàng đợi đầy -->
-        <includeCallerData>false</includeCallerData> <!-- Quan trọng: Tắt lấy số dòng code để chạy nhanh nhất -->
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
     </appender>
 
-    <!-- 3. Cấu hình Root Logger -->
-    <root level="INFO">
-        <appender-ref ref="CONSOLE" />
-        <!-- Trỏ vào cái ASYNC, luồng chính sẽ ném log vào đây rồi đi tiếp ngay -->
-        <appender-ref ref="STREAM_ASYNC" />
-    </root>
+    <logger name="fit.kltn_cookinote_backend" level="DEBUG" />
 
-    <!-- Cấu hình riêng cho Hibernate (để hiện SQL đẹp ở console server, nhưng sẽ không hiện trong Stream vì là INFO) -->
-    <!-- Nếu muốn hiện cả SQL trong Stream Admin thì đổi INFO thành DEBUG -->
     <logger name="org.hibernate.SQL" level="INFO" />
     <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="INFO" />
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE_ASYNC" />
+        <appender-ref ref="STREAM_ASYNC" />
+    </root>
 
 </configuration>
