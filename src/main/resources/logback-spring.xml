@@ -5,13 +5,12 @@
     <appender name="CONSOLE_SYNC" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <charset>utf8</charset>
-            <pattern>%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-30.30logger{29}){cyan} : %msg%n</pattern>
+            <pattern>%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%-15.15t]){faint} %clr(%-30.30logger{29}){cyan} : %msg%n</pattern>
         </encoder>
     </appender>
 
     <appender name="CONSOLE_ASYNC" class="ch.qos.logback.classic.AsyncAppender">
         <appender-ref ref="CONSOLE_SYNC" />
-
         <queueSize>1024</queueSize>
         <discardingThreshold>0</discardingThreshold>
         <includeCallerData>false</includeCallerData>
@@ -31,11 +30,7 @@
         <includeCallerData>false</includeCallerData>
     </appender>
 
-    <logger name="fit.kltn_cookinote_backend" level="DEBUG" />
-
-    <logger name="org.hibernate.SQL" level="DEBUG" />
-
-    <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE" />
+    <logger name="fit.kltn_cookinote_backend" level="INFO" />
 
     <root level="INFO">
         <appender-ref ref="CONSOLE_ASYNC" />

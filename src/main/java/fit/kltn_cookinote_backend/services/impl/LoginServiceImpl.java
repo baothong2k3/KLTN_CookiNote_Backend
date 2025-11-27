@@ -17,6 +17,7 @@ import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.AuthProvider;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class LoginServiceImpl implements LoginService {
     private final UserRepository userRepo;
     private final PasswordEncoder encoder;
@@ -46,6 +48,8 @@ public class LoginServiceImpl implements LoginService {
                 .orElseThrow(() -> {
                     // BƯỚC 2a: Ghi lại lỗi (nhưng không tiết lộ user có tồn tại hay không)
                     loginLimiter.recordFailedLogin(req.username());
+                    // LOG WARN: Đăng nhập sai username
+                    log.warn("Login Failed: Username '{}' not found or invalid.", req.username());
                     return new IllegalArgumentException("Tài khoản hoặc mật khẩu không đúng.");
                 });
 
@@ -60,6 +64,8 @@ public class LoginServiceImpl implements LoginService {
         if (!encoder.matches(req.password(), user.getPassword())) {
             // BƯỚC 2b: Ghi lại lỗi khi sai mật khẩu
             loginLimiter.recordFailedLogin(req.username());
+            // LOG WARN: Sai mật khẩu (Rất quan trọng)
+            log.warn("Login Failed: User '{}' entered wrong password.", req.username());
             throw new IllegalArgumentException("Tài khoản hoặc mật khẩu không đúng.");
         }
 
@@ -72,6 +78,9 @@ public class LoginServiceImpl implements LoginService {
         // BƯỚC 3: Đăng nhập thành công -> Xóa bộ đếm
         loginLimiter.recordSuccessfulLogin(req.username());
 
+        // LOG INFO: Đăng nhập thành công
+        log.info("User Login Success: ID={}, Username='{}', Role={}",
+                user.getUserId(), user.getUsername(), user.getRole());
         loginHistoryService.save(user);
 
         var issue = jwtService.generateAccessToken(user);
