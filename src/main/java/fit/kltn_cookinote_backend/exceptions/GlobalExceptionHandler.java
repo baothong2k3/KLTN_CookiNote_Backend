@@ -6,6 +6,7 @@ import fit.kltn_cookinote_backend.limiters.TooManyRequestsException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import lombok.extern.slf4j.Slf4j;
 import org.hibernate.PropertyValueException;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -23,6 +24,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
     // 1) Lỗi ràng buộc DB (NOT NULL, Unique, Data truncated...)
@@ -67,6 +69,8 @@ public class GlobalExceptionHandler {
     // 4) Cuối cùng: fallback chung (ít dùng hơn sau khi đã có các handler trên)
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleOther(Exception ex, HttpServletRequest req) {
+        // Log ERROR kèm stack trace
+        log.error("[500] Uncaught Exception at {}: {}", req.getRequestURI(), ex.getMessage(), ex);
         String raw = mostSpecificMessage(ex);
         String message = normalizeSqlMessage(raw);
         return ResponseEntity.status(500)
@@ -77,10 +81,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleConstraintViolation(
             ConstraintViolationException ex, HttpServletRequest req) {
-
+        log.warn("[400] Bad Request at {}: {}", req.getRequestURI(), ex.getMessage());
         String message = joinViolationMessages(ex.getConstraintViolations());
         return ResponseEntity.status(400)
                 .body(ApiResponse.error(400, message, req.getRequestURI()));
+    }
+
+    // Thêm log cho Access Denied (403) - Quan trọng để phát hiện user tò mò hoặc tấn công
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(Exception ex, HttpServletRequest req) {
+        log.warn("[403] Access Denied at {}: {}", req.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(403)
+                .body(ApiResponse.error(403, "Bạn không có quyền truy cập", req.getRequestURI()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

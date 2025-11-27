@@ -19,6 +19,7 @@ import fit.kltn_cookinote_backend.services.LoginHistoryService;
 import fit.kltn_cookinote_backend.services.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -36,6 +37,7 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/admin")
 @RequiredArgsConstructor
+@Slf4j
 public class AdminController {
     private final UserService userService;
     private final ExcelExportService excelExportService;
@@ -99,6 +101,8 @@ public class AdminController {
             @PathVariable Long id,
             HttpServletRequest httpReq) {
 
+        log.warn("ADMIN ACTION: Disabling User ID={}", id);
+
         UserDetailDto updatedUserDetails = userService.disableUser(id);
         String message = String.format("Đã vô hiệu hóa thành công tài khoản người dùng ID: %d", id);
         return ResponseEntity.ok(ApiResponse.success(message, updatedUserDetails, httpReq.getRequestURI()));
@@ -113,6 +117,8 @@ public class AdminController {
     public ResponseEntity<ApiResponse<UserDetailDto>> enableUser(
             @PathVariable Long id,
             HttpServletRequest httpReq) {
+
+        log.warn("ADMIN ACTION: enabling User ID={}", id);
 
         UserDetailDto updatedUserDetails = userService.enableUser(id);
         String message = String.format("Đã kích hoạt lại thành công tài khoản người dùng ID: %d", id);

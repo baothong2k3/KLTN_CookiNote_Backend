@@ -30,6 +30,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -54,6 +55,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RecipeServiceImpl implements RecipeService {
     private final RecipeRepository recipeRepository;
     private final CategoryRepository categoryRepository;
@@ -211,6 +213,10 @@ public class RecipeServiceImpl implements RecipeService {
 
         // 4. Lưu Recipe lần 1 (để lấy ID cho recipe và các steps)
         Recipe savedRecipe = recipeRepository.saveAndFlush(recipe);
+        // LOG INFO: Tạo mới
+        log.info("Recipe Created: ID={}, Title='{}', UserID={}",
+                savedRecipe.getId(), savedRecipe.getTitle(), actorUserId);
+
         Long recipeId = savedRecipe.getId();
 
         // Sắp xếp lại các bước đã lưu để truy cập bằng index
@@ -511,6 +517,8 @@ public class RecipeServiceImpl implements RecipeService {
         ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
 
         // Soft delete the recipe
+        // LOG INFO: Xóa mềm
+        log.info("Recipe Soft-Deleted: ID={} by UserID={}", recipeId, actorUserId);
         recipe.setDeleted(true);
         recipe.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
 
@@ -993,6 +1001,8 @@ public class RecipeServiceImpl implements RecipeService {
         ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
 
         // 3. Khôi phục trạng thái Recipe
+        // LOG INFO: Khôi phục
+        log.info("Recipe Restored: ID={} by UserID={}", recipeId, actorUserId);
         recipe.setDeleted(false);
         recipe.setDeletedAt(null);
         recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));

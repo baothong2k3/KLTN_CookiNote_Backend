@@ -11,12 +11,14 @@ package fit.kltn_cookinote_backend.utils;/*
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.Map;
 
+@Slf4j
 public class CloudinaryUtils {
 
     public static String uploadImage(Cloudinary cloudinary, MultipartFile file, String folder, String publicId) throws IOException {
@@ -33,6 +35,7 @@ public class CloudinaryUtils {
 
         String url = (String) result.get("secure_url");
         if (!StringUtils.hasText(url)) {
+            log.error("Cloudinary Upload Failed: {}", url);
             throw new IllegalStateException("Upload Cloudinary thất bại.");
         }
         return url;

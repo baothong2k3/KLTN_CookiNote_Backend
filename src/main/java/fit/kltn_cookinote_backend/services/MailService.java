@@ -10,6 +10,7 @@ package fit.kltn_cookinote_backend.services;/*
  */
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class MailService {
     private final JavaMailSender mailSender;
 
@@ -36,6 +38,7 @@ public class MailService {
                 
                 Cảm ơn bạn!
                 """.formatted(username, otp));
+        log.info("Email sent OTP to: {}", to);
         mailSender.send(message);
     }
 
@@ -51,6 +54,7 @@ public class MailService {
                 
                 Hãy bắt đầu hành trình ẩm thực của bạn với CookiNote ngay hôm nay!
                 """.formatted(username));
+        log.info("Email sent Welcome to: {}", to);
         mailSender.send(message);
     }
 }

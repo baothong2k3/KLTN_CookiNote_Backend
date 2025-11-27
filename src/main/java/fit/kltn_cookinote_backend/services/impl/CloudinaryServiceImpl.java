@@ -18,6 +18,7 @@ import fit.kltn_cookinote_backend.utils.CloudinaryUtils;
 import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,6 +35,7 @@ import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CloudinaryServiceImpl implements CloudinaryService {
     private final Cloudinary cloudinary;
     private final UserRepository userRepo;
@@ -85,8 +87,8 @@ public class CloudinaryServiceImpl implements CloudinaryService {
                     "invalidate", true,
                     "resource_type", "image"
             ));
-        } catch (Exception ignore) {
-            // log.warn("Không thể xóa ảnh cũ trên Cloudinary: {}", publicId, ignore);
+        } catch (Exception ex) {
+            log.warn("Không thể xóa ảnh cũ trên Cloudinary: {}", publicId, ex);
         }
     }
 
@@ -119,6 +121,8 @@ public class CloudinaryServiceImpl implements CloudinaryService {
 
             return rest.isBlank() ? null : rest;
         } catch (MalformedURLException e) {
+            // Log lỗi nhẹ nhàng (debug/warn) vì nó không làm sập app nhưng cần biết
+            log.warn("Cloudinary: Failed to extract publicId from URL: {}", url);
             return null;
         }
     }
