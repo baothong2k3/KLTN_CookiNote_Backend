@@ -49,7 +49,7 @@ public class LoginServiceImpl implements LoginService {
                     // BƯỚC 2a: Ghi lại lỗi (nhưng không tiết lộ user có tồn tại hay không)
                     loginLimiter.recordFailedLogin(req.username());
                     // LOG WARN: Đăng nhập sai username
-                    log.warn("Login Failed: Username '{}' not found or invalid.", req.username());
+                    log.warn("Login Failed: User '{}' entered wrong username or password.", req.username());
                     return new IllegalArgumentException("Tài khoản hoặc mật khẩu không đúng.");
                 });
 
@@ -65,7 +65,7 @@ public class LoginServiceImpl implements LoginService {
             // BƯỚC 2b: Ghi lại lỗi khi sai mật khẩu
             loginLimiter.recordFailedLogin(req.username());
             // LOG WARN: Sai mật khẩu (Rất quan trọng)
-            log.warn("Login Failed: User '{}' entered wrong password.", req.username());
+            log.warn("Login Failed: User '{}' entered wrong username or password.", req.username());
             throw new IllegalArgumentException("Tài khoản hoặc mật khẩu không đúng.");
         }
 
@@ -79,8 +79,7 @@ public class LoginServiceImpl implements LoginService {
         loginLimiter.recordSuccessfulLogin(req.username());
 
         // LOG INFO: Đăng nhập thành công
-        log.info("User Login Success: ID={}, Username='{}', Role={}",
-                user.getUserId(), user.getUsername(), user.getRole());
+        log.info("User Login Success: ID={}, Role={}", user.getUserId(), user.getRole());
         loginHistoryService.save(user);
 
         var issue = jwtService.generateAccessToken(user);
