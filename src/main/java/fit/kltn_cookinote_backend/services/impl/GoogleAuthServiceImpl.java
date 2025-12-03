@@ -18,6 +18,7 @@ import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
 import fit.kltn_cookinote_backend.services.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.text.Normalizer;
@@ -26,6 +27,7 @@ import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class GoogleAuthServiceImpl implements GoogleAuthService {
 
     private final GoogleTokenVerifier verifier;
@@ -128,6 +130,7 @@ public class GoogleAuthServiceImpl implements GoogleAuthService {
                 .refreshExpiresInSeconds(refreshTokenService.refreshTtlSeconds())
                 .build();
 
+        log.info("User Login Success: ID={}, Role={}", user.getUserId(), user.getRole());
         loginHistoryService.save(user);
 
         return LoginResponse.builder()
