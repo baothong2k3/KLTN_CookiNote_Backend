@@ -101,6 +101,12 @@ public class Recipe {
     @Builder.Default
     private Integer commentCount = 0;
 
+    @Column(name = "calories")
+    private Integer calories;
+
+    @Column(name = "servings")
+    private Integer servings;
+
     // children
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

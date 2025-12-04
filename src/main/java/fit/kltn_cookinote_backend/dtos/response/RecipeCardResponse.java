@@ -19,6 +19,8 @@ public record RecipeCardResponse(
         Integer commentCount,
         Integer prepareTime,
         Integer cookTime,
+        Integer calories,
+        Integer servings,
         boolean deleted
 ) {
     public static RecipeCardResponse from(Recipe r) {
@@ -36,6 +38,8 @@ public record RecipeCardResponse(
                 .commentCount(r.getCommentCount())
                 .prepareTime(r.getPrepareTime())
                 .cookTime(r.getCookTime())
+                .calories(r.getCalories())
+                .servings(r.getServings())
                 .deleted(r.isDeleted())
                 .build();
     }

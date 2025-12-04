@@ -1027,4 +1027,45 @@ public class RecipeServiceImpl implements RecipeService {
         favoriteRepository.restoreByRecipeId(recipeId);
         cookedHistoryRepository.restoreByRecipeId(recipeId);
     }
+
+    @Override
+    @Transactional
+    public RecipeResponse updateNutrition(Long actorUserId, Long recipeId, UpdateNutritionRequest req) {
+        // 1. Tìm User và Recipe
+        User actor = userRepository.findById(actorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Tài khoản không tồn tại: " + actorUserId));
+
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Recipe không tồn tại: " + recipeId));
+
+        // 2. Kiểm tra đã xóa chưa
+        if (recipe.isDeleted()) {
+            throw new EntityNotFoundException("Không thể cập nhật công thức đã bị xóa: " + recipeId);
+        }
+
+        // 3. Kiểm tra quyền (Chủ sở hữu hoặc Admin)
+        Long ownerId = recipe.getUser().getUserId();
+        ensureOwnerOrAdmin(actorUserId, ownerId, actor.getRole());
+
+        // 4. Cập nhật dữ liệu (Chỉ cập nhật nếu field không null)
+        boolean isChanged = false;
+
+        if (req.calories() != null) {
+            recipe.setCalories(req.calories());
+            isChanged = true;
+        }
+
+        if (req.servings() != null) {
+            recipe.setServings(req.servings());
+            isChanged = true;
+        }
+
+        // 5. Lưu và trả về
+        if (isChanged) {
+            recipe.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+            recipe = recipeRepository.saveAndFlush(recipe);
+        }
+
+        return buildRecipeResponse(recipe, actorUserId);
+    }
 }

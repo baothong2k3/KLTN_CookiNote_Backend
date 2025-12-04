@@ -132,4 +132,6 @@ public interface RecipeService {
      * @param recipeId    ID công thức
      */
     void restoreRecipe(Long actorUserId, Long recipeId);
+
+    RecipeResponse updateNutrition(Long actorUserId, Long recipeId, UpdateNutritionRequest req);
 }
