@@ -10,10 +10,12 @@ package fit.kltn_cookinote_backend.services.impl;/*
  */
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fit.kltn_cookinote_backend.dtos.NutritionInfo;
 import fit.kltn_cookinote_backend.dtos.request.ChatRequest;
 import fit.kltn_cookinote_backend.dtos.request.GenerateRecipeRequest;
 import fit.kltn_cookinote_backend.dtos.response.ChatResponse;
 import fit.kltn_cookinote_backend.dtos.response.GeneratedRecipeResponse;
+import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.services.AiRecipeService;
 import fit.kltn_cookinote_backend.services.GeminiApiClient;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -204,5 +207,40 @@ public class AiRecipeServiceImpl implements AiRecipeService {
                 
                 TRẢ LỜI CỦA BẠN:
                 """, userMessage);
+    }
+
+    @Override
+    public NutritionInfo estimateNutrition(Recipe recipe) {
+        try {
+            // 1. Tổng hợp nguyên liệu thành chuỗi string
+            String ingredientsStr = recipe.getIngredients().stream()
+                    .map(i -> "- " + i.getName() + ": " + i.getQuantity())
+                    .collect(Collectors.joining("\n"));
+
+            // 2. Tạo prompt yêu cầu JSON
+            String prompt = String.format("""
+                    Bạn là chuyên gia dinh dưỡng. Hãy phân tích món ăn: "%s".
+                    Danh sách nguyên liệu:
+                    %s
+                    
+                    NHIỆM VỤ: Ước lượng tổng lượng Calo (kcal) và số lượng khẩu phần (người ăn) dựa trên nguyên liệu trên.
+                    YÊU CẦU OUTPUT: Trả về duy nhất 1 JSON object hợp lệ, không có markdown (```json), không giải thích thêm.
+                    Format: {"calories": <số nguyên>, "servings": <số nguyên>}
+                    Ví dụ: {"calories": 1500, "servings": 4}
+                    """, recipe.getTitle(), ingredientsStr);
+
+            // 3. Gọi AI
+            String jsonResponse = geminiApiClient.getGeneratedJson(prompt);
+
+            // 4. Parse JSON
+            // Lưu ý: Gemini có thể trả về ```json ... ```, cần làm sạch chuỗi nếu hàm getGeneratedJson chưa xử lý
+            String cleanJson = jsonResponse.replace("```json", "").replace("```", "").trim();
+
+            return objectMapper.readValue(cleanJson, NutritionInfo.class);
+
+        } catch (Exception e) {
+            log.error("Lỗi khi ước tính dinh dưỡng cho recipe ID {}: {}", recipe.getId(), e.getMessage());
+            return null;
+        }
     }
 }

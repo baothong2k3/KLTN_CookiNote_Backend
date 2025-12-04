@@ -16,7 +16,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
+
+import java.time.Duration;
 
 @Service
 @Slf4j
@@ -55,6 +59,16 @@ public class GeminiApiClient {
                     .body(Mono.just(requestBody), GeminiRequest.class)
                     .retrieve()
                     .bodyToMono(GeminiResponse.class)
+                    .retryWhen(Retry.backoff(3, Duration.ofSeconds(2)) // Thử lại tối đa 3 lần, giãn cách 2s, 4s...
+                            .filter(throwable ->
+                                    // Chỉ thử lại nếu gặp lỗi 503 (Server Busy) hoặc 429 (Rate Limit)
+                                    throwable instanceof WebClientResponseException.ServiceUnavailable ||
+                                            throwable instanceof WebClientResponseException.TooManyRequests
+                            )
+                            .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) ->
+                                    // Nếu hết 3 lần vẫn lỗi thì ném lỗi ra ngoài như bình thường
+                                    retrySignal.failure()
+                            ))
                     .block(); // Chờ kết quả
 
             if (response == null || response.getFirstCandidateText() == null) {
@@ -87,6 +101,16 @@ public class GeminiApiClient {
                     .body(Mono.just(requestBody), GeminiRequest.class)
                     .retrieve()
                     .bodyToMono(GeminiResponse.class)
+                    .retryWhen(Retry.backoff(3, Duration.ofSeconds(2)) // Thử lại tối đa 3 lần, giãn cách 2s, 4s...
+                            .filter(throwable ->
+                                    // Chỉ thử lại nếu gặp lỗi 503 (Server Busy) hoặc 429 (Rate Limit)
+                                    throwable instanceof WebClientResponseException.ServiceUnavailable ||
+                                            throwable instanceof WebClientResponseException.TooManyRequests
+                            )
+                            .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) ->
+                                    // Nếu hết 3 lần vẫn lỗi thì ném lỗi ra ngoài như bình thường
+                                    retrySignal.failure()
+                            ))
                     .block();
 
             if (response == null || response.getFirstCandidateText() == null) {
