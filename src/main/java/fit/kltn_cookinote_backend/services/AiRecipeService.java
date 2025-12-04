@@ -9,10 +9,12 @@ package fit.kltn_cookinote_backend.services;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.NutritionInfo;
 import fit.kltn_cookinote_backend.dtos.request.ChatRequest;
 import fit.kltn_cookinote_backend.dtos.request.GenerateRecipeRequest;
 import fit.kltn_cookinote_backend.dtos.response.ChatResponse;
 import fit.kltn_cookinote_backend.dtos.response.GeneratedRecipeResponse;
+import fit.kltn_cookinote_backend.entities.Recipe;
 
 /**
  * Service xử lý các nghiệp vụ liên quan đến AI tạo công thức.
@@ -37,4 +39,6 @@ public interface AiRecipeService {
     GeneratedRecipeResponse enrichRecipe(GeneratedRecipeResponse rawData);
 
     ChatResponse chatWithAi(ChatRequest request);
+
+    NutritionInfo estimateNutrition(Recipe recipe);
 }
