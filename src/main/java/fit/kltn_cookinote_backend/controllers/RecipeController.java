@@ -579,4 +579,16 @@ public class RecipeController {
         recipeService.restoreRecipe(authUser.getUserId(), recipeId);
         return ResponseEntity.ok(ApiResponse.success("Khôi phục công thức thành công.", httpReq.getRequestURI()));
     }
+
+    @PatchMapping("/{recipeId}/nutrition")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<RecipeResponse>> updateNutrition(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @Valid @RequestBody UpdateNutritionRequest req,
+            HttpServletRequest httpReq
+    ) {
+        RecipeResponse data = recipeService.updateNutrition(authUser.getUserId(), recipeId, req);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin dinh dưỡng thành công", data, httpReq.getRequestURI()));
+    }
 }

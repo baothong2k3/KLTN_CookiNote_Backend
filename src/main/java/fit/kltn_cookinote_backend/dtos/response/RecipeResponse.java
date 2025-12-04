@@ -39,6 +39,8 @@ public record RecipeResponse(
         Integer ratingCount,
         Integer commentCount,
         Integer myRating,
+        Integer calories,
+        Integer servings,
         List<IngredientDto> ingredients,
         List<StepDto> steps,
         List<CommentResponse> comments
@@ -109,6 +111,8 @@ public record RecipeResponse(
                 .commentCount(r.getCommentCount())
                 .myRating(myRating)
                 .ingredients(ingDtos)
+                .calories(r.getCalories())
+                .servings(r.getServings())
                 .steps(stepDtos)
                 .comments(comments)
                 .build();
