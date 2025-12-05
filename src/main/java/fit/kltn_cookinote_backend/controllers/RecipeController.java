@@ -594,13 +594,13 @@ public class RecipeController {
 
     @PostMapping("/suggest-personalized")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<List<RecipeResponse>>> suggestPersonalized(
+    public ResponseEntity<ApiResponse<List<PersonalizedRecipeResponse>>> suggestPersonalized(
             @AuthenticationPrincipal User authUser, // Lấy user hiện tại
             @Valid @RequestBody PersonalizedSuggestionRequest req,
             HttpServletRequest httpReq
     ) {
         // Truyền authUser.getUserId() vào service
-        List<RecipeResponse> data = recipeService.getPersonalizedSuggestions(authUser.getUserId(), req);
+        List<PersonalizedRecipeResponse> data = recipeService.getPersonalizedSuggestions(authUser.getUserId(), req);
 
         return ResponseEntity.ok(ApiResponse.success("Đề xuất thực đơn thành công", data, httpReq.getRequestURI()));
     }

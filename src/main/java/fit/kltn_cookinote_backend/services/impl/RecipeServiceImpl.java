@@ -1079,9 +1079,9 @@ public class RecipeServiceImpl implements RecipeService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RecipeResponse> getPersonalizedSuggestions(Long currentUserId, PersonalizedSuggestionRequest req) { // Thêm currentUserId vào tham số
+    public List<PersonalizedRecipeResponse> getPersonalizedSuggestions(Long currentUserId, PersonalizedSuggestionRequest req) {
 
-        // 1. Xây dựng Semantic Query (chỉ thêm các trường không null)
+        // 1. Xây dựng Semantic Query
         StringBuilder semanticQuery = new StringBuilder("Tìm món ăn.");
         if (req.healthCondition() != null) semanticQuery.append(" Tốt cho: ").append(req.healthCondition()).append(".");
         if (req.dishCharacteristics() != null) semanticQuery.append(" Đặc điểm: ").append(req.dishCharacteristics()).append(".");
@@ -1091,33 +1091,28 @@ public class RecipeServiceImpl implements RecipeService {
         List<Double> userVector = geminiApiClient.getEmbedding(semanticQuery.toString());
         List<Recipe> candidates;
 
-        // 3. Lấy toàn bộ và lọc (Logic quan trọng bạn yêu cầu)
+        // 3. Lấy toàn bộ và lọc
         List<Recipe> allRecipes = recipeRepository.findAll();
-
         Stream<Recipe> stream = allRecipes.stream()
-                .filter(r -> !r.isDeleted()) // Chưa xóa
-                .filter(r -> r.getEmbeddingVector() != null); // Đã có vector
+                .filter(r -> !r.isDeleted())
+                .filter(r -> r.getEmbeddingVector() != null);
 
-        // *** LOGIC LỌC QUYỀN (Goal 3) ***
-        // Lấy recipe nều: (Privacy là PUBLIC) HOẶC (Là chủ sở hữu recipe)
         stream = stream.filter(r ->
                 r.getPrivacy() == Privacy.PUBLIC ||
                         (r.getUser() != null && r.getUser().getUserId().equals(currentUserId))
         );
 
         if (!userVector.isEmpty()) {
-            // Có vector -> Tính điểm tương đồng
-            candidates = stream
+            candidates = stream.parallel() // Xử lý song song
                     .map(r -> Map.entry(r, calculateCosineSimilarity(userVector, parseVector(r.getEmbeddingVector()))))
                     .sorted(Map.Entry.<Recipe, Double>comparingByValue().reversed())
-                    .limit(20) // Lấy Top 20
+                    .limit(6)
                     .map(Map.Entry::getKey)
                     .collect(Collectors.toList());
         } else {
-            // Không vector -> Lấy đại 20 cái mới nhất
             candidates = stream
                     .sorted(Comparator.comparing(Recipe::getCreatedAt).reversed())
-                    .limit(20)
+                    .limit(6)
                     .collect(Collectors.toList());
         }
 
@@ -1125,46 +1120,50 @@ public class RecipeServiceImpl implements RecipeService {
             throw new EntityNotFoundException("Không tìm thấy món ăn phù hợp.");
         }
 
-        // 4. Gọi AI xử lý (Dùng DTO Mới)
+        // 4. Gọi AI xử lý
         List<AiMenuSuggestion> aiSuggestions = aiRecipeService.suggestPersonalizedMenu(req, candidates);
 
-        // 5. Map về RecipeResponse
-        List<RecipeResponse> finalResult = new ArrayList<>();
+        // 5. Map về PersonalizedRecipeResponse
+        List<PersonalizedRecipeResponse> finalResult = new ArrayList<>();
+
         for (AiMenuSuggestion aiItem : aiSuggestions) {
             Recipe original = candidates.stream()
                     .filter(r -> r.getId().equals(aiItem.getOriginalRecipeId()))
                     .findFirst().orElse(null);
 
             if (original != null) {
-                // Map Ingredients
-                List<RecipeResponse.IngredientDto> adjustedIngs = aiItem.getIngredients().stream()
-                        .map(i -> RecipeResponse.IngredientDto.builder()
+                // Map Ingredients từ AI suggestion (đã được tính lại định lượng)
+                List<PersonalizedRecipeResponse.IngredientDto> adjustedIngs = aiItem.getIngredients().stream()
+                        .map(i -> PersonalizedRecipeResponse.IngredientDto.builder()
                                 .name(i.getName())
                                 .quantity(i.getQuantity())
                                 .build())
                         .toList();
 
-                // Build Response (Giữ ảnh/steps gốc, thay nội dung từ AI)
-                RecipeResponse res = RecipeResponse.builder()
-                        .id(original.getId())
-                        .title(aiItem.getTitle())
+                // Map Steps từ Recipe gốc (AI không trả về step để tiết kiệm token, ta lấy từ DB)
+                List<PersonalizedRecipeResponse.StepDto> steps = original.getSteps().stream()
+                        .sorted(Comparator.comparing(RecipeStep::getStepNo)) // Đảm bảo thứ tự
+                        .map(s -> PersonalizedRecipeResponse.StepDto.builder()
+                                .stepNo(s.getStepNo())
+                                .content(s.getContent())
+                                .build())
+                        .toList();
+
+                // Build Response mới
+                PersonalizedRecipeResponse res = PersonalizedRecipeResponse.builder()
+                        .originalRecipeId(original.getId()) // ID gốc
+                        .title(aiItem.getTitle())           // Tên món (AI có thể chỉnh sửa nhẹ)
                         .description(aiItem.getDescription()) // Lý do AI chọn
-                        .imageUrl(original.getImageUrl())
-                        .calories(aiItem.getCalories())
-                        .servings(aiItem.getServings())
+                        .imageUrl(original.getImageUrl())   // Ảnh gốc
+                        .calories(aiItem.getCalories())     // Calo AI tính
+                        .servings(aiItem.getServings())     // Khẩu phần user yêu cầu
                         .difficulty(original.getDifficulty())
                         .prepareTime(original.getPrepareTime())
                         .cookTime(original.getCookTime())
-                        .ownerName(original.getUser().getDisplayName()) // Thêm thông tin chủ sở hữu
                         .ingredients(adjustedIngs)
-                        .steps(original.getSteps().stream().map(s ->
-                                RecipeResponse.StepDto.builder()
-                                        .stepNo(s.getStepNo())
-                                        .content(s.getContent())
-                                        // map images...
-                                        .build()
-                        ).toList())
+                        .steps(steps)
                         .build();
+
                 finalResult.add(res);
             }
         }

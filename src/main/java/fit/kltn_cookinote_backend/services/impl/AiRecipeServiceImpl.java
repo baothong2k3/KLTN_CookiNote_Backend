@@ -354,7 +354,7 @@ public class AiRecipeServiceImpl implements AiRecipeService {
             %s
             
             NHIỆM VỤ:
-            1. Chọn 3-5 món phù hợp nhất từ danh sách trên.
+            1. Chọn chính xác 3 món phù hợp nhất từ danh sách trên.
             2. Tính toán lại định lượng (quantity) sao cho phù hợp với %d người ăn và calo mục tiêu.
             
             OUTPUT JSON (Mảng đối tượng AiMenuSuggestion):

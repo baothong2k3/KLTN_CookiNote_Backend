@@ -135,5 +135,5 @@ public interface RecipeService {
 
     RecipeResponse updateNutrition(Long actorUserId, Long recipeId, UpdateNutritionRequest req);
 
-    List<RecipeResponse> getPersonalizedSuggestions(Long currentUserId, PersonalizedSuggestionRequest req);
+    List<PersonalizedRecipeResponse> getPersonalizedSuggestions(Long currentUserId, PersonalizedSuggestionRequest req);
 }
