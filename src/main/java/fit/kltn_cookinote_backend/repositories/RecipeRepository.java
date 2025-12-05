@@ -11,6 +11,7 @@ package fit.kltn_cookinote_backend.repositories;/*
 
 import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.enums.Privacy;
+import fit.kltn_cookinote_backend.projections.RecipeVectorInfo;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -137,4 +138,16 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
     // Tìm các recipe chưa được vector hóa (chưa xóa)
     @Query("SELECT r FROM Recipe r WHERE r.deleted = false AND r.embeddingVector IS NULL")
     List<Recipe> findRecipesMissingEmbedding(Pageable pageable);
+
+    // [TỐI ƯU 1] Chỉ lấy các trường cần thiết để tính toán Vector (Projection)
+    @Query("SELECT r.id as id, r.user.userId as ownerId, r.privacy as privacy, r.embeddingVector as embeddingVector " +
+            "FROM Recipe r " +
+            "WHERE r.deleted = false AND r.embeddingVector IS NOT NULL")
+    List<RecipeVectorInfo> findAllVectorProjections();
+
+    @Query("SELECT DISTINCT r FROM Recipe r " +
+            "LEFT JOIN FETCH r.user " +
+            "LEFT JOIN FETCH r.category " +
+            "WHERE r.id IN :ids")
+    List<Recipe> findAllDetailsByIds(@Param("ids") List<Long> ids);
 }
