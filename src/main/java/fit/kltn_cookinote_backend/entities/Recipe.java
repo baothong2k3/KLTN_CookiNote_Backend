@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.entities;/*
  * @version: 1.0
  */
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import fit.kltn_cookinote_backend.enums.Difficulty;
 import fit.kltn_cookinote_backend.enums.Privacy;
 import jakarta.persistence.*;
@@ -106,6 +107,11 @@ public class Recipe {
 
     @Column(name = "servings")
     private Integer servings;
+
+    // Lưu vector embedding dưới dạng chuỗi JSON (ví dụ: "[0.01, -0.2, ...]")
+    @JsonIgnore // Không trả về frontend
+    @Column(name = "embedding_vector", columnDefinition = "json")
+    private String embeddingVector;
 
     // children
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
