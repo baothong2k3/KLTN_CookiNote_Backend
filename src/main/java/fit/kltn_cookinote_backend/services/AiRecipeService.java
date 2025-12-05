@@ -41,4 +41,7 @@ public interface AiRecipeService {
     ChatResponse chatWithAi(ChatRequest request);
 
     NutritionInfo estimateNutrition(Recipe recipe);
+
+    // Hàm chạy ngầm để tính và update dinh dưỡng
+    void updateNutritionBackground(Long recipeId);
 }

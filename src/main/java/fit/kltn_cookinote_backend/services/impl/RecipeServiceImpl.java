@@ -17,6 +17,7 @@ import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.*;
+import fit.kltn_cookinote_backend.services.AiRecipeService;
 import fit.kltn_cookinote_backend.services.CloudinaryService;
 import fit.kltn_cookinote_backend.services.CommentService;
 import fit.kltn_cookinote_backend.services.RecipeService;
@@ -73,6 +74,7 @@ public class RecipeServiceImpl implements RecipeService {
     private final Cloudinary cloudinary;
     private final RecipeStepImageRepository stepImageRepository;
     private final RecipeCoverImageHistoryRepository coverImageHistoryRepository;
+    private final AiRecipeService aiRecipeService;
 
     @Value("${app.cloudinary.recipe-folder}")
     private String recipeFolder;
@@ -291,6 +293,9 @@ public class RecipeServiceImpl implements RecipeService {
         em.flush();
         em.clear();
 
+        // Vì hàm này là @Async, nó sẽ trả về ngay lập tức, không block API
+        aiRecipeService.updateNutritionBackground(savedRecipe.getId());
+
         // 8. Tải lại đầy đủ (bao gồm cả ảnh) và Trả về
         Recipe finalRecipe = recipeRepository.findDetailById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Lỗi khi tải lại recipe: " + recipeId));
@@ -314,6 +319,9 @@ public class RecipeServiceImpl implements RecipeService {
 
         // 4. Lưu và trả về
         Recipe saved = recipeRepository.saveAndFlush(recipe);
+
+        // Vì hàm này là @Async, nó sẽ trả về ngay lập tức, không block API
+        aiRecipeService.updateNutritionBackground(saved.getId());
         return RecipeResponse.from(saved, false, null, List.of());
     }
 

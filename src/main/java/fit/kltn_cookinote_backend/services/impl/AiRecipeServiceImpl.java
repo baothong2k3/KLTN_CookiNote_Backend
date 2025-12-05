@@ -16,11 +16,15 @@ import fit.kltn_cookinote_backend.dtos.request.GenerateRecipeRequest;
 import fit.kltn_cookinote_backend.dtos.response.ChatResponse;
 import fit.kltn_cookinote_backend.dtos.response.GeneratedRecipeResponse;
 import fit.kltn_cookinote_backend.entities.Recipe;
+import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.services.AiRecipeService;
 import fit.kltn_cookinote_backend.services.GeminiApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -32,6 +36,8 @@ public class AiRecipeServiceImpl implements AiRecipeService {
 
     private final GeminiApiClient geminiApiClient;
     private final ObjectMapper objectMapper;
+    private final RecipeRepository recipeRepository;
+    private final PlatformTransactionManager transactionManager;
 
     @Override
     public GeneratedRecipeResponse generateRecipe(GenerateRecipeRequest request) {
@@ -241,6 +247,58 @@ public class AiRecipeServiceImpl implements AiRecipeService {
         } catch (Exception e) {
             log.error("Lỗi khi ước tính dinh dưỡng cho recipe ID {}: {}", recipe.getId(), e.getMessage());
             return null;
+        }
+    }
+
+    @Override
+    @Async // Chạy luồng riêng
+    public void updateNutritionBackground(Long recipeId) {
+        try {
+            // 1. Tải dữ liệu ban đầu chỉ để lấy thông tin gửi cho AI (Nguyên liệu...)
+            // Không cần Transaction ở đây để tránh lock DB lâu
+            Recipe rawRecipe = recipeRepository.findById(recipeId).orElse(null);
+
+            if (rawRecipe == null) return;
+
+            log.info("Async: Đang gọi AI tính calo cho món '{}'...", rawRecipe.getTitle());
+
+            // 2. Gọi AI (Tốn thời gian 3-10s)
+            NutritionInfo info = estimateNutrition(rawRecipe);
+
+            if (info != null) {
+                // 3. Sau khi có kết quả, mở Transaction NHANH để cập nhật an toàn
+                TransactionTemplate template = new TransactionTemplate(transactionManager);
+
+                template.execute(status -> {
+                    // [QUAN TRỌNG] Tải lại Recipe mới nhất từ DB ngay thời điểm này
+                    Recipe latestRecipe = recipeRepository.findById(recipeId).orElse(null);
+
+                    if (latestRecipe != null) {
+                        boolean updated = false;
+
+                        // [QUAN TRỌNG] Chỉ điền nếu User CHƯA nhập (vẫn là null)
+                        if (latestRecipe.getCalories() == null) {
+                            latestRecipe.setCalories(info.calories());
+                            updated = true;
+                        } else {
+                            log.info("Bỏ qua cập nhật Calo vì User đã tự nhập: {}", latestRecipe.getCalories());
+                        }
+
+                        if (latestRecipe.getServings() == null) {
+                            latestRecipe.setServings(info.servings());
+                            updated = true;
+                        }
+
+                        if (updated) {
+                            recipeRepository.save(latestRecipe);
+                            log.info("Async: Đã cập nhật bổ sung dinh dưỡng cho Recipe ID {}", recipeId);
+                        }
+                    }
+                    return null;
+                });
+            }
+        } catch (Exception e) {
+            log.error("Lỗi job chạy ngầm updateNutrition: {}", e.getMessage());
         }
     }
 }
