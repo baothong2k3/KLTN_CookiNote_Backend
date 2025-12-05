@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.services;/*
  * @version: 1.0
  */
 
+import com.fasterxml.jackson.databind.JsonNode;
 import fit.kltn_cookinote_backend.dtos.request.GeminiRequest;
 import fit.kltn_cookinote_backend.dtos.response.GeminiResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,9 @@ import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @Slf4j
@@ -123,6 +127,49 @@ public class GeminiApiClient {
         } catch (Exception e) {
             log.error("Lỗi khi gọi Gemini API (chat): {}", e.getMessage(), e);
             throw new RuntimeException("Lỗi khi kết nối với trợ lý AI: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gọi API tạo Embedding từ văn bản.
+     * Model sử dụng: text-embedding-004
+     */
+    public List<Double> getEmbedding(String text) {
+        // Endpoint cho embedding
+        String uri = "/v1beta/models/text-embedding-004:embedContent";
+
+        try {
+            // Cấu trúc request body theo document của Gemini
+            // { "model": "...", "content": { "parts": [{ "text": "..." }] } }
+            var requestBody = Map.of(
+                    "model", "models/text-embedding-004",
+                    "content", Map.of("parts", List.of(Map.of("text", text)))
+            );
+
+            // Gọi API
+            JsonNode response = webClient.post()
+                    .uri(uriBuilder -> uriBuilder.path(uri).queryParam("key", apiKey).build())
+                    .body(Mono.just(requestBody), Map.class)
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    // Retry nếu lỗi server (503) hoặc quá tải (429)
+                    .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
+                            .filter(throwable -> throwable instanceof WebClientResponseException.ServiceUnavailable ||
+                                    throwable instanceof WebClientResponseException.TooManyRequests))
+                    .block();
+
+            // Parse kết quả: { "embedding": { "values": [ ... ] } }
+            if (response != null && response.has("embedding") && response.get("embedding").has("values")) {
+                List<Double> vector = new ArrayList<>();
+                for (JsonNode val : response.get("embedding").get("values")) {
+                    vector.add(val.asDouble());
+                }
+                return vector;
+            }
+            return List.of(); // Trả về rỗng nếu lỗi
+        } catch (Exception e) {
+            log.error("Lỗi lấy embedding từ Gemini: {}", e.getMessage());
+            return List.of();
         }
     }
 }

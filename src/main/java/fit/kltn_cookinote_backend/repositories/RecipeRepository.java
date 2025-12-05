@@ -133,4 +133,8 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
     // Chỉ lấy các recipe chưa xóa (deleted = false)
     @Query("SELECT r FROM Recipe r WHERE r.deleted = false AND (r.calories IS NULL OR r.servings IS NULL)")
     List<Recipe> findRecipesMissingNutrition(Pageable pageable);
+
+    // Tìm các recipe chưa được vector hóa (chưa xóa)
+    @Query("SELECT r FROM Recipe r WHERE r.deleted = false AND r.embeddingVector IS NULL")
+    List<Recipe> findRecipesMissingEmbedding(Pageable pageable);
 }
