@@ -1101,7 +1101,7 @@ public class RecipeServiceImpl implements RecipeService {
         log.info("Loaded {} recipe vectors in {}ms", vectorInfos.size(), System.currentTimeMillis() - startTime);
 
         // 4. [TỐI ƯU] Tính toán song song (Parallel Stream) & Manual Parse JSON
-        List<Long> topRecipeIds = vectorInfos.parallelStream()
+        List<Long> topRecipeIds = vectorInfos.stream()
                 .filter(r -> checkPrivacyFast(r, currentUserId)) // Kiểm tra quyền nhanh trên DTO
                 .map(r -> {
                     // Parse vector thủ công (nhanh hơn Jackson nhiều)
