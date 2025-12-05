@@ -10,6 +10,7 @@ package fit.kltn_cookinote_backend.services.impl;/*
  */
 
 import com.cloudinary.Cloudinary;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
@@ -17,10 +18,7 @@ import fit.kltn_cookinote_backend.entities.*;
 import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.enums.Role;
 import fit.kltn_cookinote_backend.repositories.*;
-import fit.kltn_cookinote_backend.services.AiRecipeService;
-import fit.kltn_cookinote_backend.services.CloudinaryService;
-import fit.kltn_cookinote_backend.services.CommentService;
-import fit.kltn_cookinote_backend.services.RecipeService;
+import fit.kltn_cookinote_backend.services.*;
 import fit.kltn_cookinote_backend.utils.CloudinaryUtils;
 import fit.kltn_cookinote_backend.utils.ImageValidationUtils;
 import fit.kltn_cookinote_backend.utils.ShoppingListUtils;
@@ -53,6 +51,7 @@ import java.time.ZoneOffset;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -75,6 +74,7 @@ public class RecipeServiceImpl implements RecipeService {
     private final RecipeStepImageRepository stepImageRepository;
     private final RecipeCoverImageHistoryRepository coverImageHistoryRepository;
     private final AiRecipeService aiRecipeService;
+    private final GeminiApiClient geminiApiClient;
 
     @Value("${app.cloudinary.recipe-folder}")
     private String recipeFolder;
@@ -1075,5 +1075,121 @@ public class RecipeServiceImpl implements RecipeService {
         }
 
         return buildRecipeResponse(recipe, actorUserId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RecipeResponse> getPersonalizedSuggestions(Long currentUserId, PersonalizedSuggestionRequest req) { // Thêm currentUserId vào tham số
+
+        // 1. Xây dựng Semantic Query (chỉ thêm các trường không null)
+        StringBuilder semanticQuery = new StringBuilder("Tìm món ăn.");
+        if (req.healthCondition() != null) semanticQuery.append(" Tốt cho: ").append(req.healthCondition()).append(".");
+        if (req.dishCharacteristics() != null) semanticQuery.append(" Đặc điểm: ").append(req.dishCharacteristics()).append(".");
+        if (req.mealType() != null) semanticQuery.append(" Bữa: ").append(req.mealType()).append(".");
+
+        // 2. Lấy Vector
+        List<Double> userVector = geminiApiClient.getEmbedding(semanticQuery.toString());
+        List<Recipe> candidates;
+
+        // 3. Lấy toàn bộ và lọc (Logic quan trọng bạn yêu cầu)
+        List<Recipe> allRecipes = recipeRepository.findAll();
+
+        Stream<Recipe> stream = allRecipes.stream()
+                .filter(r -> !r.isDeleted()) // Chưa xóa
+                .filter(r -> r.getEmbeddingVector() != null); // Đã có vector
+
+        // *** LOGIC LỌC QUYỀN (Goal 3) ***
+        // Lấy recipe nều: (Privacy là PUBLIC) HOẶC (Là chủ sở hữu recipe)
+        stream = stream.filter(r ->
+                r.getPrivacy() == Privacy.PUBLIC ||
+                        (r.getUser() != null && r.getUser().getUserId().equals(currentUserId))
+        );
+
+        if (!userVector.isEmpty()) {
+            // Có vector -> Tính điểm tương đồng
+            candidates = stream
+                    .map(r -> Map.entry(r, calculateCosineSimilarity(userVector, parseVector(r.getEmbeddingVector()))))
+                    .sorted(Map.Entry.<Recipe, Double>comparingByValue().reversed())
+                    .limit(20) // Lấy Top 20
+                    .map(Map.Entry::getKey)
+                    .collect(Collectors.toList());
+        } else {
+            // Không vector -> Lấy đại 20 cái mới nhất
+            candidates = stream
+                    .sorted(Comparator.comparing(Recipe::getCreatedAt).reversed())
+                    .limit(20)
+                    .collect(Collectors.toList());
+        }
+
+        if (candidates.isEmpty()) {
+            throw new EntityNotFoundException("Không tìm thấy món ăn phù hợp.");
+        }
+
+        // 4. Gọi AI xử lý (Dùng DTO Mới)
+        List<AiMenuSuggestion> aiSuggestions = aiRecipeService.suggestPersonalizedMenu(req, candidates);
+
+        // 5. Map về RecipeResponse
+        List<RecipeResponse> finalResult = new ArrayList<>();
+        for (AiMenuSuggestion aiItem : aiSuggestions) {
+            Recipe original = candidates.stream()
+                    .filter(r -> r.getId().equals(aiItem.getOriginalRecipeId()))
+                    .findFirst().orElse(null);
+
+            if (original != null) {
+                // Map Ingredients
+                List<RecipeResponse.IngredientDto> adjustedIngs = aiItem.getIngredients().stream()
+                        .map(i -> RecipeResponse.IngredientDto.builder()
+                                .name(i.getName())
+                                .quantity(i.getQuantity())
+                                .build())
+                        .toList();
+
+                // Build Response (Giữ ảnh/steps gốc, thay nội dung từ AI)
+                RecipeResponse res = RecipeResponse.builder()
+                        .id(original.getId())
+                        .title(aiItem.getTitle())
+                        .description(aiItem.getDescription()) // Lý do AI chọn
+                        .imageUrl(original.getImageUrl())
+                        .calories(aiItem.getCalories())
+                        .servings(aiItem.getServings())
+                        .difficulty(original.getDifficulty())
+                        .prepareTime(original.getPrepareTime())
+                        .cookTime(original.getCookTime())
+                        .ownerName(original.getUser().getDisplayName()) // Thêm thông tin chủ sở hữu
+                        .ingredients(adjustedIngs)
+                        .steps(original.getSteps().stream().map(s ->
+                                RecipeResponse.StepDto.builder()
+                                        .stepNo(s.getStepNo())
+                                        .content(s.getContent())
+                                        // map images...
+                                        .build()
+                        ).toList())
+                        .build();
+                finalResult.add(res);
+            }
+        }
+        return finalResult;
+    }
+
+    private double calculateCosineSimilarity(List<Double> v1, List<Double> v2) {
+        if (v1 == null || v2 == null || v1.size() != v2.size()) return 0.0;
+        double dotProduct = 0.0;
+        double normA = 0.0;
+        double normB = 0.0;
+        for (int i = 0; i < v1.size(); i++) {
+            dotProduct += v1.get(i) * v2.get(i);
+            normA += Math.pow(v1.get(i), 2);
+            normB += Math.pow(v2.get(i), 2);
+        }
+        if (normA == 0 || normB == 0) return 0.0;
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+
+    private List<Double> parseVector(String json) {
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<Double>>() {});
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
     }
 }

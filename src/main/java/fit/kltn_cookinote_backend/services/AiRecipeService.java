@@ -12,9 +12,13 @@ package fit.kltn_cookinote_backend.services;/*
 import fit.kltn_cookinote_backend.dtos.NutritionInfo;
 import fit.kltn_cookinote_backend.dtos.request.ChatRequest;
 import fit.kltn_cookinote_backend.dtos.request.GenerateRecipeRequest;
+import fit.kltn_cookinote_backend.dtos.request.PersonalizedSuggestionRequest;
+import fit.kltn_cookinote_backend.dtos.response.AiMenuSuggestion;
 import fit.kltn_cookinote_backend.dtos.response.ChatResponse;
 import fit.kltn_cookinote_backend.dtos.response.GeneratedRecipeResponse;
 import fit.kltn_cookinote_backend.entities.Recipe;
+
+import java.util.List;
 
 /**
  * Service xử lý các nghiệp vụ liên quan đến AI tạo công thức.
@@ -44,4 +48,6 @@ public interface AiRecipeService {
 
     // Hàm chạy ngầm để tính và update dinh dưỡng
     void updateNutritionBackground(Long recipeId);
+
+    List<AiMenuSuggestion> suggestPersonalizedMenu(PersonalizedSuggestionRequest req, List<Recipe> candidates);
 }

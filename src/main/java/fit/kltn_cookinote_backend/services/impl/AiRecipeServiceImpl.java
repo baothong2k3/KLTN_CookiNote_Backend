@@ -9,10 +9,13 @@ package fit.kltn_cookinote_backend.services.impl;/*
  * @version: 1.0
  */
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.kltn_cookinote_backend.dtos.NutritionInfo;
 import fit.kltn_cookinote_backend.dtos.request.ChatRequest;
 import fit.kltn_cookinote_backend.dtos.request.GenerateRecipeRequest;
+import fit.kltn_cookinote_backend.dtos.request.PersonalizedSuggestionRequest;
+import fit.kltn_cookinote_backend.dtos.response.AiMenuSuggestion;
 import fit.kltn_cookinote_backend.dtos.response.ChatResponse;
 import fit.kltn_cookinote_backend.dtos.response.GeneratedRecipeResponse;
 import fit.kltn_cookinote_backend.entities.Recipe;
@@ -26,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -300,5 +304,110 @@ public class AiRecipeServiceImpl implements AiRecipeService {
         } catch (Exception e) {
             log.error("Lỗi job chạy ngầm updateNutrition: {}", e.getMessage());
         }
+    }
+
+    @Override
+    public List<AiMenuSuggestion> suggestPersonalizedMenu(PersonalizedSuggestionRequest req, List<Recipe> candidates) {
+        if (candidates.isEmpty()) return new ArrayList<>();
+
+        // 1. Chuẩn bị dữ liệu Candidates
+        StringBuilder candidatesJson = new StringBuilder("[");
+        for (Recipe r : candidates) {
+            int orgCal = r.getCalories() != null ? r.getCalories() : 0;
+            int orgServ = r.getServings() != null ? r.getServings() : 1;
+            String ingText = r.getIngredients().stream()
+                    .map(i -> i.getName() + " (" + i.getQuantity() + ")")
+                    .collect(Collectors.joining(", "));
+
+            candidatesJson.append(String.format(
+                    "{\"id\":%d, \"title\":\"%s\", \"originalCalories\":%d, \"originalServings\":%d, \"ingredients\":\"%s\"},",
+                    r.getId(), r.getTitle().replace("\"", ""), orgCal, orgServ, ingText.replace("\"", "")
+            ));
+        }
+        if (candidatesJson.length() > 1) candidatesJson.deleteCharAt(candidatesJson.length() - 1);
+        candidatesJson.append("]");
+
+        // 2. Xử lý logic ưu tiên Calo (Mục 3 bạn hỏi)
+        int userServings = req.servings() != null ? req.servings() : 1;
+        int userCalories = calculateTargetCalories(req); // Hàm này ở dưới
+
+        // 3. Xây dựng Prompt (Chỉ đưa thông tin có thật)
+        String healthInfo = req.healthCondition() != null ? "- Tình trạng sức khỏe: " + req.healthCondition() : "";
+        String dishInfo = req.dishCharacteristics() != null ? "- Đặc điểm món mong muốn: " + req.dishCharacteristics() : "";
+        String mealInfo = req.mealType() != null ? "- Bữa ăn: " + req.mealType() : "";
+        String heightWeightInfo = (req.height() != null && req.weight() != null)
+                ? String.format("- Thể trạng: %.0fcm, %.0fkg", req.height(), req.weight())
+                : "";
+
+        String prompt = String.format("""
+            Bạn là chuyên gia dinh dưỡng.
+            
+            THÔNG TIN NGƯỜI DÙNG:
+            - Số người ăn (Target Servings): %d
+            - Calo mục tiêu (Tổng cho bữa này): ~%d Kcal
+            %s
+            %s
+            %s
+            %s
+            
+            DANH SÁCH CÔNG THỨC GỐC (DATABASE):
+            %s
+            
+            NHIỆM VỤ:
+            1. Chọn 3-5 món phù hợp nhất từ danh sách trên.
+            2. Tính toán lại định lượng (quantity) sao cho phù hợp với %d người ăn và calo mục tiêu.
+            
+            OUTPUT JSON (Mảng đối tượng AiMenuSuggestion):
+            [
+              {
+                "originalRecipeId": <ID gốc>,
+                "title": "<Tên món>",
+                "description": "<Lý do phù hợp>",
+                "calories": <Số calo tổng sau khi chỉnh>,
+                "servings": %d,
+                "ingredients": [ {"name": "...", "quantity": "..."} ]
+              }
+            ]
+            """,
+                userServings, userCalories,
+                healthInfo, dishInfo, mealInfo, heightWeightInfo,
+                candidatesJson.toString(),
+                userServings, userServings
+        );
+
+        // 4. Gọi AI
+        String jsonResponse = geminiApiClient.getGeneratedJson(prompt);
+        try {
+            return objectMapper.readValue(jsonResponse, new TypeReference<List<AiMenuSuggestion>>() {});
+        } catch (Exception e) {
+            log.error("Lỗi parse JSON AiMenuSuggestion: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    // Logic xử lý dữ liệu thiếu
+    private int calculateTargetCalories(PersonalizedSuggestionRequest req) {
+        // Ưu tiên 1: User nhập cứng số Calo
+        if (req.targetCalories() != null) return req.targetCalories();
+
+        // Ưu tiên 2: Có đủ dữ liệu để tính TDEE
+        if (req.weight() != null && req.height() != null && req.age() != null && req.gender() != null) {
+            double bmr;
+            if ("MALE".equalsIgnoreCase(req.gender())) {
+                bmr = 10 * req.weight() + 6.25 * req.height() - 5 * req.age() + 5;
+            } else {
+                bmr = 10 * req.weight() + 6.25 * req.height() - 5 * req.age() - 161;
+            }
+            double activityFactor = switch (req.activityLevel() != null ? req.activityLevel() : "MODERATE") {
+                case "LOW" -> 1.2;
+                case "HIGH" -> 1.7;
+                default -> 1.375;
+            };
+            // Chia 3 cho 1 bữa chính
+            return (int) ((bmr * activityFactor) / 3);
+        }
+
+        // Fallback: Trả về mức trung bình (ví dụ 600-700 kcal)
+        return 700;
     }
 }
