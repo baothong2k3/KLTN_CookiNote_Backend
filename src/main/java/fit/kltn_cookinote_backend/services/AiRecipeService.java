@@ -15,6 +15,7 @@ import fit.kltn_cookinote_backend.dtos.request.GenerateRecipeRequest;
 import fit.kltn_cookinote_backend.dtos.request.PersonalizedSuggestionRequest;
 import fit.kltn_cookinote_backend.dtos.response.AiMenuSuggestion;
 import fit.kltn_cookinote_backend.dtos.response.ChatResponse;
+import fit.kltn_cookinote_backend.dtos.response.ForkSuggestResponse;
 import fit.kltn_cookinote_backend.dtos.response.GeneratedRecipeResponse;
 import fit.kltn_cookinote_backend.entities.Recipe;
 
@@ -50,4 +51,10 @@ public interface AiRecipeService {
     void updateNutritionBackground(Long recipeId);
 
     List<AiMenuSuggestion> suggestPersonalizedMenu(PersonalizedSuggestionRequest req, List<Recipe> candidates);
+
+    /**
+     * Sửa đổi công thức dựa trên ID và yêu cầu người dùng.
+     * Chạy trong Transaction để đảm bảo load được ingredients/steps.
+     */
+    ForkSuggestResponse modifyRecipe(Long recipeId, String userRequest);
 }
