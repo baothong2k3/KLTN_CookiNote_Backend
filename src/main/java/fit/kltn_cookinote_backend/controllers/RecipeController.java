@@ -380,11 +380,11 @@ public class RecipeController {
      */
     @PostMapping("/{recipeId}/fork-suggest")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<GeneratedRecipeResponse>> suggestForkWithAi(
-            @AuthenticationPrincipal User authUser,
-            @PathVariable Long recipeId,
-            @Valid @RequestBody AiModifyRecipeRequest req,
-            HttpServletRequest httpReq
+    public ResponseEntity<ApiResponse<ForkSuggestResponse>> suggestForkWithAi(
+                                                                               @AuthenticationPrincipal User authUser,
+                                                                               @PathVariable Long recipeId,
+                                                                               @Valid @RequestBody AiModifyRecipeRequest req,
+                                                                               HttpServletRequest httpReq
     ) {
         // 1. Kiểm tra quyền (Vẫn cần fetch nhẹ để check owner/privacy)
         Recipe originalRecipe = recipeRepository.findDetailById(recipeId)
@@ -397,8 +397,8 @@ public class RecipeController {
             throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền xem công thức này.");
         }
 
-        // 2. Gọi Service với ID (Service sẽ tự fetch lại data đầy đủ trong Transaction)
-        GeneratedRecipeResponse data = aiRecipeService.modifyRecipe(recipeId, req.modificationRequest());
+        // 2. Gọi Service với ID (Service sẽ tự fetch lại data đầy đủ trong Transaction và trả về DTO mới)
+        ForkSuggestResponse data = aiRecipeService.modifyRecipe(recipeId, req.modificationRequest());
 
         return ResponseEntity.ok(ApiResponse.success(
                 "AI đã điều chỉnh công thức theo yêu cầu. Vui lòng kiểm tra lại trước khi lưu.",

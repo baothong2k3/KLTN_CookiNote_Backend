@@ -17,8 +17,10 @@ import fit.kltn_cookinote_backend.dtos.request.GenerateRecipeRequest;
 import fit.kltn_cookinote_backend.dtos.request.PersonalizedSuggestionRequest;
 import fit.kltn_cookinote_backend.dtos.response.AiMenuSuggestion;
 import fit.kltn_cookinote_backend.dtos.response.ChatResponse;
+import fit.kltn_cookinote_backend.dtos.response.ForkSuggestResponse;
 import fit.kltn_cookinote_backend.dtos.response.GeneratedRecipeResponse;
 import fit.kltn_cookinote_backend.entities.Recipe;
+import fit.kltn_cookinote_backend.enums.Privacy;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.services.AiRecipeService;
 import fit.kltn_cookinote_backend.services.GeminiApiClient;
@@ -415,17 +417,14 @@ public class AiRecipeServiceImpl implements AiRecipeService {
 
     @Override
     @Transactional
-    public GeneratedRecipeResponse modifyRecipe(Long recipeId, String userRequest) {
+    public ForkSuggestResponse modifyRecipe(Long recipeId, String userRequest) {
         // 1. Tải lại Recipe trong Transaction hiện tại
-        // Lúc này, ingredients và steps sẽ được Hibernate tải tự động khi truy cập
         Recipe originalRecipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new EntityNotFoundException("Công thức không tồn tại: " + recipeId));
 
         // 2. Chuyển đổi công thức sang JSON string
-        // Do đang trong Transaction, getIngredients() sẽ không bị lỗi LazyInit
         String originalJson = convertRecipeToJsonString(originalRecipe);
 
-        // Kiểm tra log để chắc chắn dữ liệu không rỗng
         if (originalJson.equals("{}")) {
             throw new RuntimeException("Lỗi: Không thể lấy dữ liệu chi tiết của công thức gốc.");
         }
@@ -462,8 +461,29 @@ public class AiRecipeServiceImpl implements AiRecipeService {
 
         log.info("Gửi yêu cầu Smart Fork cho Recipe ID: {}", recipeId);
 
-        // 4. Gọi AI
-        return callAiAndParse(prompt, "Smart Fork: " + originalRecipe.getTitle());
+        // 4. Gọi AI để lấy dữ liệu generated
+        GeneratedRecipeResponse aiData = callAiAndParse(prompt, "Smart Fork: " + originalRecipe.getTitle());
+
+        // 5. [FIX QUAN TRỌNG] Tự động đánh số lại stepNo để đảm bảo không bị null
+        if (aiData.getSteps() != null && !aiData.getSteps().isEmpty()) {
+            for (int i = 0; i < aiData.getSteps().size(); i++) {
+                // Gán stepNo = index + 1 (1, 2, 3...)
+                aiData.getSteps().get(i).setStepNo(i + 1);
+            }
+        }
+
+        // 6. Map sang ForkSuggestResponse kèm Category ID gốc và Privacy mặc định
+        return ForkSuggestResponse.builder()
+                .categoryId(originalRecipe.getCategory() != null ? originalRecipe.getCategory().getId() : null)
+                .title(aiData.getTitle())
+                .description(aiData.getDescription())
+                .prepareTime(aiData.getPrepareTime())
+                .cookTime(aiData.getCookTime())
+                .difficulty(aiData.getDifficulty())
+                .privacy(Privacy.PRIVATE) // Yêu cầu mặc định PRIVATE
+                .ingredients(aiData.getIngredients())
+                .steps(aiData.getSteps())
+                .build();
     }
 
     /**
