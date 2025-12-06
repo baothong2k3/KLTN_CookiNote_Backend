@@ -151,9 +151,5 @@ public class Recipe {
 
     @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<WeeklyMenu> weeklyMenus = new ArrayList<>();
-
-    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
     private List<DailyMenu> dailyMenus = new ArrayList<>();
 }

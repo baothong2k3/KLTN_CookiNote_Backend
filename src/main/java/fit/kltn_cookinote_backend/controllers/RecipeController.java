@@ -11,9 +11,12 @@ package fit.kltn_cookinote_backend.controllers;/*
 
 import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
+import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.entities.User;
 import fit.kltn_cookinote_backend.enums.Privacy;
+import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.services.*;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +43,8 @@ public class RecipeController {
     private final FavoriteService favoriteService;
     private final ShareService shareService;
     private final RecipeImportService recipeImportService;
+    private final AiRecipeService aiRecipeService;
+    private final RecipeRepository recipeRepository;
 
     @PostMapping("/import-from-url")
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
@@ -366,6 +371,40 @@ public class RecipeController {
     ) {
         RecipeResponse data = recipeService.forkRecipe(authUser.getUserId(), originalRecipeId, req);
         return ResponseEntity.ok(ApiResponse.success("Sao chép và tùy chỉnh công thức thành công.", data, httpReq.getRequestURI()));
+    }
+
+    /**
+     * API hỗ trợ Fork thông minh: Nhận yêu cầu sửa đổi và trả về công thức mới (Preview).
+     * Frontend sẽ dùng dữ liệu này để điền vào form ForkRecipeRequest.
+     * Endpoint: POST /recipes/{id}/fork-suggest
+     */
+    @PostMapping("/{recipeId}/fork-suggest")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<GeneratedRecipeResponse>> suggestForkWithAi(
+            @AuthenticationPrincipal User authUser,
+            @PathVariable Long recipeId,
+            @Valid @RequestBody AiModifyRecipeRequest req,
+            HttpServletRequest httpReq
+    ) {
+        // 1. Kiểm tra quyền (Vẫn cần fetch nhẹ để check owner/privacy)
+        Recipe originalRecipe = recipeRepository.findDetailById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Công thức gốc không tồn tại: " + recipeId));
+
+        Long ownerId = originalRecipe.getUser().getUserId();
+        boolean isOwner = authUser.getUserId().equals(ownerId);
+
+        if (originalRecipe.getPrivacy() == Privacy.PRIVATE && !isOwner) {
+            throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền xem công thức này.");
+        }
+
+        // 2. Gọi Service với ID (Service sẽ tự fetch lại data đầy đủ trong Transaction)
+        GeneratedRecipeResponse data = aiRecipeService.modifyRecipe(recipeId, req.modificationRequest());
+
+        return ResponseEntity.ok(ApiResponse.success(
+                "AI đã điều chỉnh công thức theo yêu cầu. Vui lòng kiểm tra lại trước khi lưu.",
+                data,
+                httpReq.getRequestURI()
+        ));
     }
 
     @GetMapping("/search")

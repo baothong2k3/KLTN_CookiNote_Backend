@@ -22,11 +22,13 @@ import fit.kltn_cookinote_backend.entities.Recipe;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.services.AiRecipeService;
 import fit.kltn_cookinote_backend.services.GeminiApiClient;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
@@ -409,5 +411,90 @@ public class AiRecipeServiceImpl implements AiRecipeService {
 
         // Fallback: Trả về mức trung bình (ví dụ 600-700 kcal)
         return 700;
+    }
+
+    @Override
+    @Transactional
+    public GeneratedRecipeResponse modifyRecipe(Long recipeId, String userRequest) {
+        // 1. Tải lại Recipe trong Transaction hiện tại
+        // Lúc này, ingredients và steps sẽ được Hibernate tải tự động khi truy cập
+        Recipe originalRecipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new EntityNotFoundException("Công thức không tồn tại: " + recipeId));
+
+        // 2. Chuyển đổi công thức sang JSON string
+        // Do đang trong Transaction, getIngredients() sẽ không bị lỗi LazyInit
+        String originalJson = convertRecipeToJsonString(originalRecipe);
+
+        // Kiểm tra log để chắc chắn dữ liệu không rỗng
+        if (originalJson.equals("{}")) {
+            throw new RuntimeException("Lỗi: Không thể lấy dữ liệu chi tiết của công thức gốc.");
+        }
+
+        // 3. Xây dựng Prompt
+        String prompt = String.format("""
+            Bạn là một đầu bếp chuyên nghiệp và chuyên gia dinh dưỡng.
+            
+            NHIỆM VỤ:
+            Hãy chỉnh sửa công thức nấu ăn gốc dưới đây dựa trên yêu cầu của người dùng.
+            
+            CÔNG THỨC GỐC (JSON):
+            %s
+            
+            YÊU CẦU CỦA NGƯỜI DÙNG:
+            "%s"
+            
+            YÊU CẦU OUTPUT:
+            1. Giữ nguyên cấu trúc JSON của công thức gốc.
+            2. Thay đổi nguyên liệu, các bước thực hiện, thời gian, độ khó, mô tả... sao cho phù hợp nhất với yêu cầu của người dùng.
+            3. Nếu yêu cầu liên quan đến khẩu phần (servings), hãy tính toán lại định lượng (quantity) của nguyên liệu.
+            4. Trả về duy nhất 1 JSON object, KHÔNG dùng Markdown (```json).
+            5. Các trường bắt buộc phải có trong JSON trả về (giống cấu trúc ForkRecipeRequest):
+               - title (String)
+               - description (String)
+               - prepareTime (Integer)
+               - cookTime (Integer)
+               - difficulty (String: EASY, MEDIUM, HARD)
+               - ingredients (Array: {name, quantity})
+               - steps (Array: {stepNo, content, suggestedTime, tips})
+            
+            Lưu ý: Giữ lại Category ID của công thức gốc nếu không có yêu cầu đổi, nhưng trong JSON output không cần trường categoryId.
+            """, originalJson, userRequest);
+
+        log.info("Gửi yêu cầu Smart Fork cho Recipe ID: {}", recipeId);
+
+        // 4. Gọi AI
+        return callAiAndParse(prompt, "Smart Fork: " + originalRecipe.getTitle());
+    }
+
+    /**
+     * Helper: Tạo chuỗi mô tả công thức gốc gọn gàng để gửi cho AI
+     */
+    private String convertRecipeToJsonString(Recipe r) {
+        try {
+            // Tạo một object map đơn giản để tránh lỗi vòng lặp của Jackson với Entity
+            var simpleMap = java.util.Map.of(
+                    "title", r.getTitle(),
+                    "description", r.getDescription() != null ? r.getDescription() : "",
+                    "prepareTime", r.getPrepareTime() != null ? r.getPrepareTime() : 0,
+                    "cookTime", r.getCookTime() != null ? r.getCookTime() : 0,
+                    "difficulty", r.getDifficulty() != null ? r.getDifficulty().name() : "MEDIUM",
+                    "servings", r.getServings() != null ? r.getServings() : 1,
+                    "calories", r.getCalories() != null ? r.getCalories() : 0,
+                    "ingredients", r.getIngredients().stream().map(i -> java.util.Map.of(
+                            "name", i.getName(),
+                            "quantity", i.getQuantity() != null ? i.getQuantity() : ""
+                    )).toList(),
+                    "steps", r.getSteps().stream().map(s -> java.util.Map.of(
+                            "stepNo", s.getStepNo(),
+                            "content", s.getContent(),
+                            "suggestedTime", s.getSuggestedTime() != null ? s.getSuggestedTime() : 0,
+                            "tips", s.getTips() != null ? s.getTips() : ""
+                    )).toList()
+            );
+            return objectMapper.writeValueAsString(simpleMap);
+        } catch (Exception e) {
+            log.error("Lỗi convert recipe to string", e);
+            return "{}";
+        }
     }
 }

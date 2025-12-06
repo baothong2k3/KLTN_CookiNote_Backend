@@ -50,4 +50,10 @@ public interface AiRecipeService {
     void updateNutritionBackground(Long recipeId);
 
     List<AiMenuSuggestion> suggestPersonalizedMenu(PersonalizedSuggestionRequest req, List<Recipe> candidates);
+
+    /**
+     * Sửa đổi công thức dựa trên ID và yêu cầu người dùng.
+     * Chạy trong Transaction để đảm bảo load được ingredients/steps.
+     */
+    GeneratedRecipeResponse modifyRecipe(Long recipeId, String userRequest);
 }
