@@ -78,6 +78,13 @@ public class AiRecipeServiceImpl implements AiRecipeService {
                 response.setTitle(dishNameQuery);
             }
 
+            // Đánh số lại stepNo cho generateRecipe luôn để đồng bộ
+            if (!response.getSteps().isEmpty()) {
+                for (int i = 0; i < response.getSteps().size(); i++) {
+                    response.getSteps().get(i).setStepNo(i + 1);
+                }
+            }
+
             log.info("Tạo và parse công thức từ AI thành công cho: {}", dishNameQuery);
             return response;
 
@@ -150,6 +157,13 @@ public class AiRecipeServiceImpl implements AiRecipeService {
             if (response.getIngredients() == null) response.setIngredients(List.of());
             if (response.getSteps() == null) response.setSteps(List.of());
             if (response.getTitle() == null) response.setTitle(contextInfo);
+
+            // --- Tự động đánh số lại stepNo (1, 2, 3...) nếu AI trả về null ---
+            if (!response.getSteps().isEmpty()) {
+                for (int i = 0; i < response.getSteps().size(); i++) {
+                    response.getSteps().get(i).setStepNo(i + 1);
+                }
+            }
 
             return response;
         } catch (Exception e) {
