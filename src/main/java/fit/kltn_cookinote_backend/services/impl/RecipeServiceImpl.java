@@ -10,8 +10,8 @@ package fit.kltn_cookinote_backend.services.impl;/*
  */
 
 import com.cloudinary.Cloudinary;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fit.kltn_cookinote_backend.dtos.SuggestionHistoryItem;
 import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.*;
@@ -32,7 +32,10 @@ import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -52,7 +55,6 @@ import java.time.ZoneOffset;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -76,6 +78,11 @@ public class RecipeServiceImpl implements RecipeService {
     private final RecipeCoverImageHistoryRepository coverImageHistoryRepository;
     private final AiRecipeService aiRecipeService;
     private final GeminiApiClient geminiApiClient;
+    private final SuggestionHistoryService suggestionHistoryService;
+
+    @Lazy
+    @Autowired
+    private RecipeService self; // Để gọi hàm cache
 
     @Value("${app.cloudinary.recipe-folder}")
     private String recipeFolder;
@@ -1080,8 +1087,20 @@ public class RecipeServiceImpl implements RecipeService {
 
     // CÁC PHƯƠNG THỨC VỀ GỢI Ý CÔNG THỨC CÁ NHÂN HÓA BẰNG AI
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<PersonalizedRecipeResponse> getPersonalizedSuggestions(Long currentUserId, PersonalizedSuggestionRequest req) {
+        // 1. Lưu lịch sử (Luôn chạy)
+        suggestionHistoryService.save(currentUserId, req);
+
+        // 2. Gọi logic tính toán (có Cache) thông qua Proxy 'self'
+        return self.calculateSuggestionsWithCache(currentUserId, req);
+    }
+
+    // HÀM TÍNH TOÁN LOGIC (ĐƯỢC CACHE)
+    @Override
+    @Cacheable(value = "personalizedSuggestions", key = "{#currentUserId, #req}")
+    public List<PersonalizedRecipeResponse> calculateSuggestionsWithCache(Long currentUserId, PersonalizedSuggestionRequest req) {
+        log.info("Cache miss! Calculating suggestions for user {}", currentUserId);
         long startTime = System.currentTimeMillis();
 
         // 1. Xây dựng Semantic Query
@@ -1096,21 +1115,19 @@ public class RecipeServiceImpl implements RecipeService {
             throw new RuntimeException("Không thể tạo vector từ yêu cầu của bạn.");
         }
 
-        // 3. [TỐI ƯU] Lấy Projection (chỉ ID và Vector) thay vì toàn bộ Entity
+        // 3. Lấy Projection
         List<RecipeVectorInfo> vectorInfos = recipeRepository.findAllVectorProjections();
-        log.info("Loaded {} recipe vectors in {}ms", vectorInfos.size(), System.currentTimeMillis() - startTime);
 
-        // 4. [TỐI ƯU] Tính toán song song (Parallel Stream) & Manual Parse JSON
+        // 4. Tính toán song song
         List<Long> topRecipeIds = vectorInfos.stream()
-                .filter(r -> checkPrivacyFast(r, currentUserId)) // Kiểm tra quyền nhanh trên DTO
+                .filter(r -> checkPrivacyFast(r, currentUserId))
                 .map(r -> {
-                    // Parse vector thủ công (nhanh hơn Jackson nhiều)
                     List<Double> recipeVector = parseVectorFast(r.getEmbeddingVector());
                     double score = calculateCosineSimilarity(userVector, recipeVector);
                     return Map.entry(r.getId(), score);
                 })
-                .sorted(Map.Entry.<Long, Double>comparingByValue().reversed()) // Sắp xếp giảm dần theo điểm
-                .limit(6) // Lấy top 6
+                .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
+                .limit(6)
                 .map(Map.Entry::getKey)
                 .toList();
 
@@ -1118,13 +1135,13 @@ public class RecipeServiceImpl implements RecipeService {
             throw new EntityNotFoundException("Không tìm thấy món ăn phù hợp.");
         }
 
-        // 5. [TỐI ƯU] Lấy chi tiết đầy đủ của 6 món ăn này (1 query duy nhất)
+        // 5. Lấy chi tiết đầy đủ
         List<Recipe> candidates = recipeRepository.findAllDetailsByIds(topRecipeIds);
 
-        // 6. Gọi AI để generate menu (Giữ nguyên logic cũ)
+        // 6. Gọi AI để generate menu
         List<AiMenuSuggestion> aiSuggestions = aiRecipeService.suggestPersonalizedMenu(req, candidates);
 
-        // 7. Map về Response (Giữ nguyên logic cũ)
+        // 7. Map về Response
         List<PersonalizedRecipeResponse> finalResult = new ArrayList<>();
         for (AiMenuSuggestion aiItem : aiSuggestions) {
             Recipe original = candidates.stream()
@@ -1132,7 +1149,6 @@ public class RecipeServiceImpl implements RecipeService {
                     .findFirst().orElse(null);
 
             if (original != null) {
-                // Map ingredients
                 List<PersonalizedRecipeResponse.IngredientDto> adjustedIngs = aiItem.getIngredients().stream()
                         .map(i -> PersonalizedRecipeResponse.IngredientDto.builder()
                                 .name(i.getName())
@@ -1214,4 +1230,10 @@ public class RecipeServiceImpl implements RecipeService {
     }
     // Kết thúc các phương thức về gợi ý công thức cá nhân hóa bằng AI
     //----------------------------------------------------------------
+
+    @Override
+    public PageResult<SuggestionHistoryItem> getPersonalizedHistory(Long userId, int page, int size) {
+        // Delegate sang service lịch sử
+        return suggestionHistoryService.getHistory(userId, page, size);
+    }
 }

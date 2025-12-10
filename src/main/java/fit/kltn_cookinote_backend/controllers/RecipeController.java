@@ -9,6 +9,7 @@ package fit.kltn_cookinote_backend.controllers;/*
  * @version: 1.0
  */
 
+import fit.kltn_cookinote_backend.dtos.SuggestionHistoryItem;
 import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.Recipe;
@@ -642,5 +643,19 @@ public class RecipeController {
         List<PersonalizedRecipeResponse> data = recipeService.getPersonalizedSuggestions(authUser.getUserId(), req);
 
         return ResponseEntity.ok(ApiResponse.success("Đề xuất thực đơn thành công", data, httpReq.getRequestURI()));
+    }
+
+    @GetMapping("/personalized-history")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<PageResult<SuggestionHistoryItem>>> getPersonalizedHistory(
+            @AuthenticationPrincipal User authUser,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            HttpServletRequest httpReq
+    ) {
+        // Gọi service
+        PageResult<SuggestionHistoryItem> data = recipeService.getPersonalizedHistory(authUser.getUserId(), page, size);
+
+        return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử gợi ý thành công", data, httpReq.getRequestURI()));
     }
 }
