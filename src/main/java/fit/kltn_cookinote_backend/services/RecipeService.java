@@ -141,4 +141,13 @@ public interface RecipeService {
     PageResult<SuggestionHistoryItem> getPersonalizedHistory(Long userId, int page, int size);
 
     List<PersonalizedRecipeResponse> calculateSuggestionsWithCache(Long currentUserId, PersonalizedSuggestionRequest req);
+
+    /**
+     * Lưu công thức từ gợi ý cá nhân hóa của AI.
+     * - Mặc định Privacy = PRIVATE (nếu null).
+     * - Mặc định Category ID = 8 (nếu null).
+     * - Không sao chép Image URL từ công thức gốc.
+     * - Lưu reference tới Original Recipe.
+     */
+    RecipeResponse savePersonalizedRecipe(Long userId, SavePersonalizedRecipeRequest req);
 }

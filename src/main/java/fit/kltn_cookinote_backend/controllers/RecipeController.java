@@ -658,4 +658,24 @@ public class RecipeController {
 
         return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử gợi ý thành công", data, httpReq.getRequestURI()));
     }
+
+    /**
+     * Lưu công thức cá nhân hóa từ gợi ý của AI.
+     * Endpoint: POST /recipes/save-personalized
+     */
+    @PostMapping("/save-personalized")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<RecipeResponse>> savePersonalizedRecipe(
+            @AuthenticationPrincipal User authUser,
+            @Valid @RequestBody SavePersonalizedRecipeRequest req,
+            HttpServletRequest httpReq
+    ) {
+        RecipeResponse data = recipeService.savePersonalizedRecipe(authUser.getUserId(), req);
+
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã lưu công thức cá nhân hóa vào bộ sưu tập của bạn.",
+                data,
+                httpReq.getRequestURI()
+        ));
+    }
 }

@@ -47,7 +47,9 @@ public record PersonalizedRecipeResponse(
     @Builder
     public record StepDto(
             Integer stepNo,
-            String content
+            String content,
+            String tips,
+            Integer suggestedTime
     ) implements Serializable {
     }
 }
