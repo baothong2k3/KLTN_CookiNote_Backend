@@ -10,8 +10,8 @@ package fit.kltn_cookinote_backend.services.impl;/*
  */
 
 import com.cloudinary.Cloudinary;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fit.kltn_cookinote_backend.dtos.SuggestionHistoryItem;
 import fit.kltn_cookinote_backend.dtos.request.*;
 import fit.kltn_cookinote_backend.dtos.response.*;
 import fit.kltn_cookinote_backend.entities.*;
@@ -32,7 +32,10 @@ import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -52,7 +55,6 @@ import java.time.ZoneOffset;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -76,6 +78,11 @@ public class RecipeServiceImpl implements RecipeService {
     private final RecipeCoverImageHistoryRepository coverImageHistoryRepository;
     private final AiRecipeService aiRecipeService;
     private final GeminiApiClient geminiApiClient;
+    private final SuggestionHistoryService suggestionHistoryService;
+
+    @Lazy
+    @Autowired
+    private RecipeService self; // Để gọi hàm cache
 
     @Value("${app.cloudinary.recipe-folder}")
     private String recipeFolder;
@@ -1080,14 +1087,27 @@ public class RecipeServiceImpl implements RecipeService {
 
     // CÁC PHƯƠNG THỨC VỀ GỢI Ý CÔNG THỨC CÁ NHÂN HÓA BẰNG AI
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<PersonalizedRecipeResponse> getPersonalizedSuggestions(Long currentUserId, PersonalizedSuggestionRequest req) {
+        // 1. Lưu lịch sử (Luôn chạy)
+        suggestionHistoryService.save(currentUserId, req);
+
+        // 2. Gọi logic tính toán (có Cache) thông qua Proxy 'self'
+        return self.calculateSuggestionsWithCache(currentUserId, req);
+    }
+
+    // HÀM TÍNH TOÁN LOGIC (ĐƯỢC CACHE)
+    @Override
+    @Cacheable(value = "personalizedSuggestions", key = "{#currentUserId, #req}")
+    public List<PersonalizedRecipeResponse> calculateSuggestionsWithCache(Long currentUserId, PersonalizedSuggestionRequest req) {
+        log.info("Cache miss! Calculating suggestions for user {}", currentUserId);
         long startTime = System.currentTimeMillis();
 
         // 1. Xây dựng Semantic Query
         StringBuilder semanticQuery = new StringBuilder("Tìm món ăn.");
         if (req.healthCondition() != null) semanticQuery.append(" Tốt cho: ").append(req.healthCondition()).append(".");
-        if (req.dishCharacteristics() != null) semanticQuery.append(" Đặc điểm: ").append(req.dishCharacteristics()).append(".");
+        if (req.dishCharacteristics() != null)
+            semanticQuery.append(" Đặc điểm: ").append(req.dishCharacteristics()).append(".");
         if (req.mealType() != null) semanticQuery.append(" Bữa: ").append(req.mealType()).append(".");
 
         // 2. Lấy Vector của User từ Gemini API
@@ -1096,21 +1116,19 @@ public class RecipeServiceImpl implements RecipeService {
             throw new RuntimeException("Không thể tạo vector từ yêu cầu của bạn.");
         }
 
-        // 3. [TỐI ƯU] Lấy Projection (chỉ ID và Vector) thay vì toàn bộ Entity
+        // 3. Lấy Projection
         List<RecipeVectorInfo> vectorInfos = recipeRepository.findAllVectorProjections();
-        log.info("Loaded {} recipe vectors in {}ms", vectorInfos.size(), System.currentTimeMillis() - startTime);
 
-        // 4. [TỐI ƯU] Tính toán song song (Parallel Stream) & Manual Parse JSON
+        // 4. Tính toán song song
         List<Long> topRecipeIds = vectorInfos.stream()
-                .filter(r -> checkPrivacyFast(r, currentUserId)) // Kiểm tra quyền nhanh trên DTO
+                .filter(r -> checkPrivacyFast(r, currentUserId))
                 .map(r -> {
-                    // Parse vector thủ công (nhanh hơn Jackson nhiều)
                     List<Double> recipeVector = parseVectorFast(r.getEmbeddingVector());
                     double score = calculateCosineSimilarity(userVector, recipeVector);
                     return Map.entry(r.getId(), score);
                 })
-                .sorted(Map.Entry.<Long, Double>comparingByValue().reversed()) // Sắp xếp giảm dần theo điểm
-                .limit(6) // Lấy top 6
+                .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
+                .limit(6)
                 .map(Map.Entry::getKey)
                 .toList();
 
@@ -1118,13 +1136,13 @@ public class RecipeServiceImpl implements RecipeService {
             throw new EntityNotFoundException("Không tìm thấy món ăn phù hợp.");
         }
 
-        // 5. [TỐI ƯU] Lấy chi tiết đầy đủ của 6 món ăn này (1 query duy nhất)
+        // 5. Lấy chi tiết đầy đủ
         List<Recipe> candidates = recipeRepository.findAllDetailsByIds(topRecipeIds);
 
-        // 6. Gọi AI để generate menu (Giữ nguyên logic cũ)
+        // 6. Gọi AI để generate menu
         List<AiMenuSuggestion> aiSuggestions = aiRecipeService.suggestPersonalizedMenu(req, candidates);
 
-        // 7. Map về Response (Giữ nguyên logic cũ)
+        // 7. Map về Response
         List<PersonalizedRecipeResponse> finalResult = new ArrayList<>();
         for (AiMenuSuggestion aiItem : aiSuggestions) {
             Recipe original = candidates.stream()
@@ -1132,7 +1150,6 @@ public class RecipeServiceImpl implements RecipeService {
                     .findFirst().orElse(null);
 
             if (original != null) {
-                // Map ingredients
                 List<PersonalizedRecipeResponse.IngredientDto> adjustedIngs = aiItem.getIngredients().stream()
                         .map(i -> PersonalizedRecipeResponse.IngredientDto.builder()
                                 .name(i.getName())
@@ -1145,6 +1162,8 @@ public class RecipeServiceImpl implements RecipeService {
                         .map(s -> PersonalizedRecipeResponse.StepDto.builder()
                                 .stepNo(s.getStepNo())
                                 .content(s.getContent())
+                                .tips(s.getTips())
+                                .suggestedTime(s.getSuggestedTime())
                                 .build())
                         .toList();
 
@@ -1214,4 +1233,86 @@ public class RecipeServiceImpl implements RecipeService {
     }
     // Kết thúc các phương thức về gợi ý công thức cá nhân hóa bằng AI
     //----------------------------------------------------------------
+
+    @Override
+    public PageResult<SuggestionHistoryItem> getPersonalizedHistory(Long userId, int page, int size) {
+        // Delegate sang service lịch sử
+        return suggestionHistoryService.getHistory(userId, page, size);
+    }
+
+    @Override
+    @Transactional
+    public RecipeResponse savePersonalizedRecipe(Long userId, SavePersonalizedRecipeRequest req) {
+        // 1. Tải User hiện tại
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User không tồn tại: " + userId));
+
+        // 2. Kiểm tra công thức gốc (để set relation)
+        Recipe originalRecipe = recipeRepository.findById(req.originalRecipeId())
+                .orElseThrow(() -> new EntityNotFoundException("Công thức gốc không tồn tại: " + req.originalRecipeId()));
+
+        // 3. Xử lý Default Values
+        // Mặc định Privacy là PRIVATE nếu không gửi lên
+        Privacy privacy = (req.privacy() != null) ? req.privacy() : Privacy.PRIVATE;
+
+        // Mặc định Category là 8 nếu không gửi lên
+        Long targetCategoryId = (req.categoryId() != null) ? req.categoryId() : 8L;
+        Category category = categoryRepository.findById(targetCategoryId)
+                .orElseThrow(() -> new EntityNotFoundException("Category không tồn tại: " + targetCategoryId));
+
+        // 4. Tạo Recipe Entity mới
+        Recipe newRecipe = Recipe.builder()
+                .user(user)
+                .originalRecipe(originalRecipe) // Link tới công thức gốc
+                .category(category)
+                .title(req.title())
+                .description(req.description())
+                .prepareTime(req.prepareTime())
+                .cookTime(req.cookTime())
+                .difficulty(req.difficulty())
+                .calories(req.calories())
+                .servings(req.servings())
+                .privacy(privacy)
+                .imageUrl(null)
+                .view(0L)
+                .averageRating(0.0)
+                .ratingCount(0)
+                .commentCount(0)
+                .createdAt(LocalDateTime.now(ZoneOffset.UTC))
+                .build();
+
+        // 5. Xử lý Ingredients (Map từ request)
+        if (req.ingredients() != null) {
+            List<RecipeIngredient> ingredients = req.ingredients().stream()
+                    .map(i -> RecipeIngredient.builder()
+                            .recipe(newRecipe)
+                            .name(i.name())
+                            .quantity(i.quantity())
+                            .build())
+                    .collect(Collectors.toList());
+            newRecipe.setIngredients(ingredients);
+        }
+
+        // 6. Xử lý Steps (Map từ request)
+        // Lưu ý: Request từ AI có thể chỉ có stepNo và content, các trường khác null -> OK
+        if (req.steps() != null) {
+            List<RecipeStep> steps = req.steps().stream()
+                    .map(s -> RecipeStep.builder()
+                            .recipe(newRecipe)
+                            .stepNo(s.stepNo())
+                            .content(s.content())
+                            .suggestedTime(s.suggestedTime()) // Có thể null
+                            .tips(s.tips())                   // Có thể null
+                            .images(new ArrayList<>())        // Step mới chưa có ảnh
+                            .build())
+                    .collect(Collectors.toList());
+            newRecipe.setSteps(steps);
+        }
+
+        // 7. Lưu xuống DB
+        Recipe saved = recipeRepository.save(newRecipe);
+
+        // 8. Trả về Response
+        return buildRecipeResponse(saved, userId);
+    }
 }

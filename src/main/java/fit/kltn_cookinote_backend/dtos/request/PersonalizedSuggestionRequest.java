@@ -12,6 +12,8 @@ package fit.kltn_cookinote_backend.dtos.request;/*
 import fit.kltn_cookinote_backend.enums.MealType;
 import jakarta.validation.constraints.Min;
 
+import java.io.Serializable;
+
 public record PersonalizedSuggestionRequest(
         // 1. Mong muốn cụ thể
         @Min(value = 50, message = "Calo tối thiểu là 50")
@@ -30,4 +32,5 @@ public record PersonalizedSuggestionRequest(
         Integer age,
         String gender, // "MALE", "FEMALE"
         String activityLevel // "LOW", "MODERATE", "HIGH"
-) {}
+) implements Serializable {
+}
