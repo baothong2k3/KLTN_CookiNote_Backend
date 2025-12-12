@@ -206,10 +206,21 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(IOException.class)
-    public ResponseEntity<ApiResponse<Void>> handleIO(HttpServletRequest req) {
+    public ResponseEntity<ApiResponse<Void>> handleIO(IOException ex, HttpServletRequest req) {
+        // 1. Kiểm tra lỗi "Broken pipe" hoặc ClientAbortException (thường gặp khi client ngắt kết nối SSE/Stream)
+        // Nếu client đã ngắt, không cần trả về response body làm gì (vì cũng không gửi được)
+        if (ex.getMessage() != null && (ex.getMessage().contains("Broken pipe") || ex.getMessage().contains("connection was aborted"))) {
+            return null; // Trả về null để Spring bỏ qua việc ghi response
+        }
+
+        // 2. Xử lý các lỗi IO thực sự khác (ví dụ lỗi upload ảnh)
         HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR; // 500
+
+        // Cập nhật thông báo lỗi chung chung hơn thay vì chỉ "file ảnh"
+        String message = "Lỗi xử lý dữ liệu đầu vào/đầu ra (I/O).";
+
         return ResponseEntity.status(status)
-                .body(ApiResponse.error(status.value(), "Không thể xử lý file ảnh.", req.getRequestURI()));
+                .body(ApiResponse.error(status.value(), message, req.getRequestURI()));
     }
 
     @ExceptionHandler({NoResourceFoundException.class})

@@ -747,6 +747,10 @@ public class RecipeServiceImpl implements RecipeService {
         newRecipe.setSteps(steps);
 
         Recipe saved = recipeRepository.save(newRecipe);
+
+        // Gọi AI tính toán dinh dưỡng ngầm (Async)
+        aiRecipeService.updateNutritionBackground(saved.getId());
+
         return RecipeResponse.from(saved, false, null, List.of());
     }
 
@@ -1311,6 +1315,9 @@ public class RecipeServiceImpl implements RecipeService {
 
         // 7. Lưu xuống DB
         Recipe saved = recipeRepository.save(newRecipe);
+
+        // Gọi AI tính toán dinh dưỡng ngầm (Async)
+        aiRecipeService.updateNutritionBackground(saved.getId());
 
         // 8. Trả về Response
         return buildRecipeResponse(saved, userId);
