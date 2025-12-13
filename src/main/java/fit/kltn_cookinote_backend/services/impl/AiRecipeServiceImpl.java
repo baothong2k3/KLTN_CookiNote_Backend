@@ -251,7 +251,7 @@ public class AiRecipeServiceImpl implements AiRecipeService {
                     Danh sách nguyên liệu:
                     %s
                     
-                    NHIỆM VỤ: Ước lượng tổng lượng Calo (kcal) và số lượng khẩu phần (người ăn) dựa trên nguyên liệu trên.
+                    NHIỆM VỤ: Dựa vào các tiêu chuẩn y tế, hãy ước lượng tổng lượng Calo (kcal) và số lượng khẩu phần (người ăn) dựa trên nguyên liệu trên.
                     YÊU CẦU OUTPUT: Trả về duy nhất 1 JSON object hợp lệ, không có markdown (```json), không giải thích thêm.
                     Format: {"calories": <số nguyên>, "servings": <số nguyên>}
                     Ví dụ: {"calories": 1500, "servings": 4}
