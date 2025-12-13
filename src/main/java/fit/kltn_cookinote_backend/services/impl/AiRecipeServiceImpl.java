@@ -251,7 +251,10 @@ public class AiRecipeServiceImpl implements AiRecipeService {
                     Danh sách nguyên liệu:
                     %s
                     
-                    NHIỆM VỤ: Ước lượng tổng lượng Calo (kcal) và số lượng khẩu phần (người ăn) dựa trên nguyên liệu trên.
+                    NHIỆM VỤ CHI TIẾT:
+                            1. Tra cứu Calo: Ưu tiên sử dụng số liệu từ 'Bảng thành phần thực phẩm Việt Nam' (Viện Dinh dưỡng Quốc gia - NIN) cho các nguyên liệu địa phương. Với nguyên liệu quốc tế, hãy dùng 'USDA FoodData Central'.
+                            2. Tính toán: Tổng hợp tổng lượng Calo (Kcal) của toàn bộ món ăn.
+                            3. Ước lượng khẩu phần (Servings): Dựa trên tổng Calo, hãy chia số người ăn sao cho mỗi khẩu phần cung cấp khoảng 500-700 Kcal (tiêu chuẩn bữa chính của người Việt).
                     YÊU CẦU OUTPUT: Trả về duy nhất 1 JSON object hợp lệ, không có markdown (```json), không giải thích thêm.
                     Format: {"calories": <số nguyên>, "servings": <số nguyên>}
                     Ví dụ: {"calories": 1500, "servings": 4}
