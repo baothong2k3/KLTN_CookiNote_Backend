@@ -408,13 +408,26 @@ public class RecipeServiceImpl implements RecipeService {
         int s = Math.min((size > 0 ? size : DEFAULT_SIZE), MAX_SIZE);
         Pageable pageable = PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        boolean selfView = viewerUserIdOrNull != null && viewerUserIdOrNull.equals(ownerUserId);
+        // 1. Kiểm tra xem người xem có phải là chính chủ không
+        boolean isOwner = viewerUserIdOrNull != null && viewerUserIdOrNull.equals(ownerUserId);
 
-        Page<Recipe> pageData = selfView
-                ? recipeRepository.findByUser_UserId(ownerUserId, pageable)
+        // 2. Kiểm tra xem người xem có phải là ADMIN không
+        boolean isAdmin = false;
+        if (viewerUserIdOrNull != null && !isOwner) { // Nếu là owner rồi thì không cần check admin nữa cho đỡ tốn query
+            // Cần truy vấn DB để lấy Role (hoặc bạn có thể truyền User object từ Controller xuống để tối ưu)
+            isAdmin = userRepository.findById(viewerUserIdOrNull)
+                    .map(u -> u.getRole() == Role.ADMIN)
+                    .orElse(false);
+        }
+
+        // 3. Quyết định xem full hay xem hạn chế
+        boolean canViewAll = isOwner || isAdmin;
+
+        Page<Recipe> pageData = canViewAll
+                ? recipeRepository.findByUser_UserId(ownerUserId, pageable) // Xem tất cả (Public, Shared, Private)
                 : recipeRepository.findByUser_UserIdAndPrivacyIn(
                 ownerUserId,
-                EnumSet.of(Privacy.SHARED, Privacy.PUBLIC),
+                EnumSet.of(Privacy.SHARED, Privacy.PUBLIC), // Chỉ xem Public, Shared
                 pageable
         );
 
