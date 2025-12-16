@@ -17,9 +17,12 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -227,5 +230,23 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleNoResource(NoResourceFoundException ex, HttpServletRequest req) {
         return ResponseEntity.status(404)
                 .body(ApiResponse.error(404, "Not found: " + req.getRequestURI(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleEmailNotVerified(EmailNotVerifiedException ex, WebRequest req) {
+        // Tạo object data chỉ chứa email
+        Map<String, String> data = new HashMap<>();
+        data.put("email", ex.getEmail());
+
+        // Sử dụng Builder thay vì hàm static ApiResponse.error
+        ApiResponse<Object> response = ApiResponse.builder()
+                .code(HttpStatus.FORBIDDEN.value())
+                .message(ex.getMessage())
+                .data(data) // Truyền data vào đây
+                .timestamp(java.time.Instant.now())
+                .path(req.getDescription(false).replace("uri=", ""))
+                .build();
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 }

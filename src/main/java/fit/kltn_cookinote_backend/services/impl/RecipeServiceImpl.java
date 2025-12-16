@@ -403,9 +403,9 @@ public class RecipeServiceImpl implements RecipeService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResult<RecipeCardResponse> listByOwner(Long ownerUserId, Long viewerUserIdOrNull, int page, int size) {
+    public PageResult<RecipeCardResponse> listByOwner(Long ownerUserId, Long viewerUserIdOrNull, Long categoryId, int page, int size) {
         int p = Math.max(0, page);
-        int s = Math.min((size > 0 ? size : DEFAULT_SIZE), MAX_SIZE);
+        int s = Math.min((size > 0 ? size : 12), 20); // DEFAULT_SIZE=12, MAX_SIZE=20
         Pageable pageable = PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         // 1. Kiểm tra xem người xem có phải là chính chủ không
@@ -413,8 +413,7 @@ public class RecipeServiceImpl implements RecipeService {
 
         // 2. Kiểm tra xem người xem có phải là ADMIN không
         boolean isAdmin = false;
-        if (viewerUserIdOrNull != null && !isOwner) { // Nếu là owner rồi thì không cần check admin nữa cho đỡ tốn query
-            // Cần truy vấn DB để lấy Role (hoặc bạn có thể truyền User object từ Controller xuống để tối ưu)
+        if (viewerUserIdOrNull != null && !isOwner) {
             isAdmin = userRepository.findById(viewerUserIdOrNull)
                     .map(u -> u.getRole() == Role.ADMIN)
                     .orElse(false);
@@ -423,11 +422,13 @@ public class RecipeServiceImpl implements RecipeService {
         // 3. Quyết định xem full hay xem hạn chế
         boolean canViewAll = isOwner || isAdmin;
 
+        // Sử dụng các method mới hỗ trợ lọc category
         Page<Recipe> pageData = canViewAll
-                ? recipeRepository.findByUser_UserId(ownerUserId, pageable) // Xem tất cả (Public, Shared, Private)
-                : recipeRepository.findByUser_UserIdAndPrivacyIn(
+                ? recipeRepository.findByOwnerAndCategory(ownerUserId, categoryId, pageable)
+                : recipeRepository.findByOwnerAndCategoryAndPrivacyIn(
                 ownerUserId,
-                EnumSet.of(Privacy.SHARED, Privacy.PUBLIC), // Chỉ xem Public, Shared
+                categoryId,
+                EnumSet.of(Privacy.SHARED, Privacy.PUBLIC),
                 pageable
         );
 
@@ -578,26 +579,27 @@ public class RecipeServiceImpl implements RecipeService {
     /**
      * Xem danh sách công thức đã xoá (chỉ ADMIN hoặc chủ sở hữu)
      *
-     * @param actor
-     * @param filterUserId
-     * @param page
-     * @param size
-     * @return
      */
     @Override
     @Transactional(readOnly = true)
-    public PageResult<RecipeCardResponse> listDeletedRecipes(User actor, Long filterUserId, int page, int size) {
+    public PageResult<RecipeCardResponse> listDeletedRecipes(User actor, Long filterUserId, Long categoryId, int page, int size) {
         int p = Math.max(0, page);
-        int s = Math.min((size > 0 ? size : DEFAULT_SIZE), MAX_SIZE);
+        int s = Math.min((size > 0 ? size : 12), 20); // DEFAULT_SIZE=12, MAX_SIZE=20
         Pageable pageable = PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "deletedAt"));
 
-        Page<Recipe> pageData;
+        Long targetUserId;
 
+        // Phân quyền:
+        // - Nếu là ADMIN: được phép xem của bất kỳ ai (filterUserId) hoặc tất cả (null).
+        // - Nếu là USER: chỉ được phép xem của chính mình (bỏ qua filterUserId gửi lên).
         if (actor.getRole() == Role.ADMIN) {
-            pageData = recipeRepository.findDeleted(filterUserId, pageable);
+            targetUserId = filterUserId;
         } else {
-            pageData = recipeRepository.findDeleted(actor.getUserId(), pageable);
+            targetUserId = actor.getUserId();
         }
+
+        // Gọi Repository mới
+        Page<Recipe> pageData = recipeRepository.findDeletedWithFilter(targetUserId, categoryId, pageable);
 
         return PageResult.of(pageData.map(RecipeCardResponse::from));
     }
