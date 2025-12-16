@@ -11,6 +11,7 @@ package fit.kltn_cookinote_backend.controllers;/*
 
 import fit.kltn_cookinote_backend.dtos.request.ChatRequest;
 import fit.kltn_cookinote_backend.dtos.request.GenerateRecipeRequest;
+import fit.kltn_cookinote_backend.dtos.request.ImportRecipeRequest;
 import fit.kltn_cookinote_backend.dtos.response.ApiResponse;
 import fit.kltn_cookinote_backend.dtos.response.ChatResponse;
 import fit.kltn_cookinote_backend.dtos.response.GeneratedRecipeResponse;
@@ -88,5 +89,15 @@ public class AiController {
                 data,
                 httpReq.getRequestURI()
         ));
+    }
+
+    @PostMapping("/import-from-url")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<ApiResponse<GeneratedRecipeResponse>> importRecipeFromUrl(
+            @Valid @RequestBody ImportRecipeRequest req,
+            HttpServletRequest httpReq
+    ) {
+        GeneratedRecipeResponse data = aiRecipeService.importFromUrl(req);
+        return ResponseEntity.ok(ApiResponse.success("AI đã phân tích công thức thành công từ URL", data, httpReq.getRequestURI()));
     }
 }

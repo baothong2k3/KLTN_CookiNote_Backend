@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.kltn_cookinote_backend.dtos.NutritionInfo;
 import fit.kltn_cookinote_backend.dtos.request.ChatRequest;
 import fit.kltn_cookinote_backend.dtos.request.GenerateRecipeRequest;
+import fit.kltn_cookinote_backend.dtos.request.ImportRecipeRequest;
 import fit.kltn_cookinote_backend.dtos.request.PersonalizedSuggestionRequest;
 import fit.kltn_cookinote_backend.dtos.response.AiMenuSuggestion;
 import fit.kltn_cookinote_backend.dtos.response.ChatResponse;
@@ -27,13 +28,19 @@ import fit.kltn_cookinote_backend.services.GeminiApiClient;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -46,6 +53,9 @@ public class AiRecipeServiceImpl implements AiRecipeService {
     private final ObjectMapper objectMapper;
     private final RecipeRepository recipeRepository;
     private final PlatformTransactionManager transactionManager;
+
+    private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    private static final int TIMEOUT_MS = 20000;
 
     @Override
     public GeneratedRecipeResponse generateRecipe(GenerateRecipeRequest request) {
@@ -533,5 +543,128 @@ public class AiRecipeServiceImpl implements AiRecipeService {
             log.error("Lỗi convert recipe to string", e);
             return "{}";
         }
+    }
+
+    @Override
+    public GeneratedRecipeResponse importFromUrl(ImportRecipeRequest request) {
+        String url = normalizeUrl(request.url());
+        log.info("AI Service: Bắt đầu import từ URL: {}", url);
+
+        // 1. Lấy nội dung text sạch từ HTML
+        String pageContent = fetchAndCleanContent(url);
+
+        // 2. Tạo prompt validation & extraction
+        String prompt = buildExtractionPrompt(url, pageContent);
+
+        // 3. Gọi Gemini
+        String jsonResponse = geminiApiClient.getGeneratedJson(prompt);
+
+        try {
+            GeneratedRecipeResponse response = objectMapper.readValue(jsonResponse, GeneratedRecipeResponse.class);
+
+            // 4. Kiểm tra tín hiệu từ AI xem có phải recipe không
+            if ("INVALID_CONTENT".equals(response.getTitle())) {
+                throw new IllegalArgumentException("URL này không chứa công thức nấu ăn hợp lệ (hoặc là trang danh sách/bán hàng).");
+            }
+
+            // 5. Xử lý null safety
+            if (response.getIngredients() == null) response.setIngredients(Collections.emptyList());
+            if (response.getSteps() == null) response.setSteps(Collections.emptyList());
+
+            // Đánh số step nếu thiếu
+            if (!response.getSteps().isEmpty()) {
+                for (int i = 0; i < response.getSteps().size(); i++) {
+                    response.getSteps().get(i).setStepNo(i + 1);
+                }
+            }
+
+            log.info("AI Service: Import thành công món '{}'", response.getTitle());
+            return response;
+
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("AI Import Error: {}", e.getMessage());
+            throw new RuntimeException("Không thể trích xuất dữ liệu công thức từ trang web này.");
+        }
+    }
+
+    // --- Các hàm Helper Private cho Import URL ---
+
+    private String fetchAndCleanContent(String url) {
+        try {
+            Document doc = Jsoup.connect(url)
+                    .userAgent(USER_AGENT)
+                    .timeout(TIMEOUT_MS)
+                    .followRedirects(true)
+                    .get();
+
+            // Loại bỏ rác
+            doc.select("script, style, meta, link, noscript, iframe, svg, header, footer, nav, aside, .ads, .comment, .sidebar, .menu").remove();
+
+            String pageTitle = doc.title();
+            Element body = doc.body();
+            String textContent = body != null ? body.text() : doc.text();
+
+            // Cắt bớt nếu quá dài để tiết kiệm token (khoảng 15k ký tự)
+            if (textContent.length() > 15000) {
+                textContent = textContent.substring(0, 15000);
+            }
+
+            return "Page Title: " + pageTitle + "\n\nContent: " + textContent;
+        } catch (IOException e) {
+            throw new RuntimeException("Không thể truy cập URL: " + url + " (Lỗi kết nối/Chặn Bot).");
+        }
+    }
+
+    private String normalizeUrl(String raw) {
+        String trimmed = raw == null ? "" : raw.trim();
+        if (trimmed.isEmpty()) throw new IllegalArgumentException("URL không được để trống.");
+        if (!trimmed.startsWith("http")) trimmed = "https://" + trimmed;
+        try {
+            URI.create(trimmed);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("URL không hợp lệ.");
+        }
+        return trimmed;
+    }
+
+    private String buildExtractionPrompt(String url, String content) {
+        return String.format("""
+                Bạn là hệ thống AI trích xuất công thức nấu ăn (Recipe Parser).
+                
+                URL: %s
+                NỘI DUNG TRANG WEB (Text Cleaned):
+                ---
+                %s
+                ---
+                
+                NHIỆM VỤ:
+                1. VALIDATION: Kiểm tra xem nội dung trên có phải là hướng dẫn chi tiết cho MỘT món ăn cụ thể không?
+                   - Nếu là trang tin tức, danh sách sản phẩm, bán hàng, hoặc không có các bước nấu ăn -> Trả về title="INVALID_CONTENT".
+                
+                2. EXTRACTION: Nếu hợp lệ, trích xuất ra JSON. Dịch sang Tiếng Việt nếu cần.
+                
+                QUY TẮC QUAN TRỌNG VỀ THỜI GIAN (suggestedTime):
+                                - Với mỗi bước (step), BẮT BUỘC phải có `suggestedTime` (tính bằng phút).
+                                - Nếu bài viết ghi rõ thời gian (ví dụ: "hầm 30 phút"), hãy lấy số đó.
+                                - Nếu bài viết KHÔNG ghi thời gian, bạn hãy DÙNG KINH NGHIỆM ĐẦU BẾP ĐỂ TỰ ƯỚC LƯỢNG.
+                                  + Ví dụ: "Rửa rau" -> 5 phút, "Phi hành thơm" -> 3 phút, "Luộc gà" -> 20 phút, "Kho thịt" -> 30 phút.
+                                  + Đừng để 0 hoặc null trừ khi bước đó chỉ mất vài giây (như "tắt bếp").
+                
+                OUTPUT FORMAT (JSON Only):
+                Trường hợp KHÔNG HỢP LỆ: {"title": "INVALID_CONTENT"}
+                
+                Trường hợp HỢP LỆ:
+                {
+                  "title": "Tên món",
+                  "description": "Mô tả ngắn",
+                  "prepareTime": Số phút (int),
+                  "cookTime": Số phút (int),
+                  "difficulty": "EASY/MEDIUM/HARD",
+                  "ingredients": [{"name": "...", "quantity": "..."}],
+                  "steps": [{"stepNo": 1, "content": "...", "suggestedTime": int, "tips": "..."}]
+                }
+                """, url, content);
     }
 }
