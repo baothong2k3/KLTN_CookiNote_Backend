@@ -12,6 +12,7 @@ package fit.kltn_cookinote_backend.services;/*
 import fit.kltn_cookinote_backend.dtos.NutritionInfo;
 import fit.kltn_cookinote_backend.dtos.request.ChatRequest;
 import fit.kltn_cookinote_backend.dtos.request.GenerateRecipeRequest;
+import fit.kltn_cookinote_backend.dtos.request.ImportRecipeRequest;
 import fit.kltn_cookinote_backend.dtos.request.PersonalizedSuggestionRequest;
 import fit.kltn_cookinote_backend.dtos.response.AiMenuSuggestion;
 import fit.kltn_cookinote_backend.dtos.response.ChatResponse;
@@ -57,4 +58,11 @@ public interface AiRecipeService {
      * Chạy trong Transaction để đảm bảo load được ingredients/steps.
      */
     ForkSuggestResponse modifyRecipe(Long recipeId, String userRequest);
+
+    /**
+     * Trích xuất công thức từ URL bất kỳ bằng cách sử dụng AI.
+     * @param request Chứa URL cần import.
+     * @return Dữ liệu công thức đã được chuẩn hóa.
+     */
+    GeneratedRecipeResponse importFromUrl(ImportRecipeRequest request);
 }
