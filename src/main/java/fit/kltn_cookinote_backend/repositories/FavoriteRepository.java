@@ -22,6 +22,15 @@ import java.util.Optional;
 public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
     Optional<Favorite> findByUser_UserIdAndRecipe_Id(Long userId, Long recipeId);
 
+    // [NEW] Lấy danh sách yêu thích có hỗ trợ lọc theo Category
+    @Query("SELECT f FROM Favorite f " +
+            "JOIN f.recipe r " +
+            "WHERE f.user.userId = :userId " +
+            "AND (:categoryId IS NULL OR r.category.id = :categoryId) " +
+            "ORDER BY f.createdAt DESC") // Sắp xếp mới nhất lên đầu
+    List<Favorite> findByUserAndFilter(@Param("userId") Long userId,
+                                       @Param("categoryId") Long categoryId);
+
     List<Favorite> findByRecipe_Id(Long recipeId);
 
     List<Favorite> findByUser_UserIdOrderByIdDesc(Long userId);

@@ -23,9 +23,12 @@ public interface FavoriteService {
     void addRecipeToFavorites(Long userId, Long recipeId);
 
     /**
-     * Lấy danh sách các công thức yêu thích của người dùng.
+     * Lấy danh sách công thức yêu thích của user.
+     * * @param userId ID người dùng
+     * @param categoryId ID danh mục để lọc (có thể null)
+     * @return Danh sách RecipeCardResponse
      */
-    List<RecipeCardResponse> getFavoriteRecipes(Long userId);
+    List<RecipeCardResponse> getFavoriteRecipes(Long userId, Long categoryId);
 
     /**
      * Xóa một công thức khỏi danh sách yêu thích của người dùng.

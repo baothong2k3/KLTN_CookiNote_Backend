@@ -70,8 +70,10 @@ public class CookedHistoryServiceImpl implements CookedHistoryService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<CookedHistoryResponse> getCookedHistory(Long userId) {
-        List<CookedHistory> historyList = cookedHistoryRepository.findByUser_UserIdOrderByCookedAtDesc(userId);
+    public List<CookedHistoryResponse> getCookedHistory(Long userId, Long categoryId) {
+        // Sử dụng method mới trong repository để hỗ trợ lọc
+        List<CookedHistory> historyList = cookedHistoryRepository.findByUserAndFilter(userId, categoryId);
+
         return historyList.stream()
                 .map(CookedHistoryResponse::from)
                 .collect(Collectors.toList());

@@ -46,15 +46,16 @@ public class CookedHistoryController {
 
     /**
      * API để lấy lịch sử các món đã nấu của người dùng hiện tại.
-     * Endpoint: GET /me/cooked-history
+     * Endpoint: GET /cooked-history/me?categoryId=...
      */
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<CookedHistoryResponse>>> getMyCookedHistory(
             @AuthenticationPrincipal User authUser,
+            @RequestParam(required = false) Long categoryId, // [NEW] Param tùy chọn
             HttpServletRequest httpReq) {
 
-        List<CookedHistoryResponse> data = cookedHistoryService.getCookedHistory(authUser.getUserId());
+        List<CookedHistoryResponse> data = cookedHistoryService.getCookedHistory(authUser.getUserId(), categoryId);
         return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử nấu ăn thành công", data, httpReq.getRequestURI()));
     }
 }
