@@ -157,12 +157,14 @@ public class RecipeController {
     public ResponseEntity<ApiResponse<PageResult<RecipeCardResponse>>> listByOwner(
             @AuthenticationPrincipal User authUser,
             @PathVariable Long ownerId,
+            @RequestParam(value = "categoryId", required = false) Long categoryId, // [NEW]
             @RequestParam(value = "page", required = false, defaultValue = "0") int page,
             @RequestParam(value = "size", required = false, defaultValue = "12") int size,
             HttpServletRequest httpReq
     ) {
         Long viewerId = (authUser != null) ? authUser.getUserId() : null;
-        PageResult<RecipeCardResponse> data = recipeService.listByOwner(ownerId, viewerId, page, size);
+        // Truyền categoryId vào service
+        PageResult<RecipeCardResponse> data = recipeService.listByOwner(ownerId, viewerId, categoryId, page, size);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức theo chủ sở hữu thành công", data, httpReq.getRequestURI()));
     }
 
@@ -173,11 +175,13 @@ public class RecipeController {
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<PageResult<RecipeCardResponse>>> listMine(
             @AuthenticationPrincipal User authUser,
+            @RequestParam(value = "categoryId", required = false) Long categoryId, // [NEW]
             @RequestParam(value = "page", required = false, defaultValue = "0") int page,
             @RequestParam(value = "size", required = false, defaultValue = "12") int size,
             HttpServletRequest httpReq
     ) {
-        PageResult<RecipeCardResponse> data = recipeService.listByOwner(authUser.getUserId(), authUser.getUserId(), page, size);
+        // Truyền categoryId vào service
+        PageResult<RecipeCardResponse> data = recipeService.listByOwner(authUser.getUserId(), authUser.getUserId(), categoryId, page, size);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức của tôi thành công", data, httpReq.getRequestURI()));
     }
 
@@ -275,16 +279,23 @@ public class RecipeController {
 
     /**
      * Lấy danh sách các công thức yêu thích của người dùng hiện tại.
-     * GET /recipes/me/favorites
+     * Endpoint: GET /recipes/me/favorites?categoryId=...
      */
     @GetMapping("/me/favorites")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<RecipeCardResponse>>> getMyFavorites(
             @AuthenticationPrincipal User authUser,
+            @RequestParam(required = false) Long categoryId, // [NEW] Thêm param categoryId
             HttpServletRequest httpReq
     ) {
-        List<RecipeCardResponse> data = favoriteService.getFavoriteRecipes(authUser.getUserId());
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức yêu thích thành công", data, httpReq.getRequestURI()));
+        // Truyền categoryId vào service
+        List<RecipeCardResponse> data = favoriteService.getFavoriteRecipes(authUser.getUserId(), categoryId);
+
+        return ResponseEntity.ok(ApiResponse.success(
+                "Lấy danh sách công thức yêu thích thành công",
+                data,
+                httpReq.getRequestURI()
+        ));
     }
 
     /**
@@ -323,23 +334,20 @@ public class RecipeController {
 
     /**
      * Danh sách công thức đã xóa (ADMIN: tất cả; USER: của mình).
-     *
-     * @param authUser
-     * @param page
-     * @param size
-     * @param httpReq
-     * @return
+     * Endpoint: GET /recipes/deleted?categoryId=...
      */
     @GetMapping("/deleted")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     public ResponseEntity<ApiResponse<PageResult<RecipeCardResponse>>> listDeleted(
             @AuthenticationPrincipal User authUser,
-            @RequestParam(value = "userId", required = false) Long userId,
+            @RequestParam(value = "userId", required = false) Long userId, // Chỉ có tác dụng nếu là ADMIN
+            @RequestParam(value = "categoryId", required = false) Long categoryId, // [NEW] Lọc theo category
             @RequestParam(value = "page", required = false, defaultValue = "0") int page,
             @RequestParam(value = "size", required = false, defaultValue = "12") int size,
             HttpServletRequest httpReq
     ) {
-        PageResult<RecipeCardResponse> data = recipeService.listDeletedRecipes(authUser, userId, page, size);
+        // Truyền thêm categoryId vào service
+        PageResult<RecipeCardResponse> data = recipeService.listDeletedRecipes(authUser, userId, categoryId, page, size);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách công thức đã xóa thành công", data, httpReq.getRequestURI()));
     }
 

@@ -150,4 +150,32 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
             "LEFT JOIN FETCH r.category " +
             "WHERE r.id IN :ids")
     List<Recipe> findAllDetailsByIds(@Param("ids") List<Long> ids);
+
+    // [CẬP NHẬT] Thay thế hoặc bổ sung cho findByUser_UserId
+    // Tìm công thức của user, có lọc category (dành cho owner/admin xem tất cả)
+    @Query("SELECT r FROM Recipe r WHERE r.user.userId = :ownerId AND (:categoryId IS NULL OR r.category.id = :categoryId) AND r.deleted = false")
+    Page<Recipe> findByOwnerAndCategory(@Param("ownerId") Long ownerId,
+                                        @Param("categoryId") Long categoryId,
+                                        Pageable pageable);
+
+    // [CẬP NHẬT] Thay thế hoặc bổ sung cho findByUser_UserIdAndPrivacyIn
+    // Tìm công thức của user, có lọc category và privacy (dành cho người xem khác)
+    @Query("SELECT r FROM Recipe r WHERE r.user.userId = :ownerId AND (:categoryId IS NULL OR r.category.id = :categoryId) AND r.privacy IN :privacies AND r.deleted = false")
+    Page<Recipe> findByOwnerAndCategoryAndPrivacyIn(@Param("ownerId") Long ownerId,
+                                                    @Param("categoryId") Long categoryId,
+                                                    @Param("privacies") Collection<Privacy> privacies,
+                                                    Pageable pageable);
+
+    // [MỚI] Tìm các recipe đã xóa, hỗ trợ lọc theo User và Category
+    // Logic:
+    // - deleted = true
+    // - userId: Nếu null thì lấy hết (dành cho Admin xem tất cả), nếu có thì lọc theo user đó
+    // - categoryId: Nếu null thì lấy hết, nếu có thì lọc theo category
+    @Query("SELECT r FROM Recipe r " +
+            "WHERE r.deleted = true " +
+            "AND (:userId IS NULL OR r.user.userId = :userId) " +
+            "AND (:categoryId IS NULL OR r.category.id = :categoryId)")
+    Page<Recipe> findDeletedWithFilter(@Param("userId") Long userId,
+                                       @Param("categoryId") Long categoryId,
+                                       Pageable pageable);
 }

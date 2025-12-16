@@ -26,8 +26,9 @@ public interface CookedHistoryService {
     /**
      * Lấy danh sách lịch sử các món đã nấu của người dùng.
      *
-     * @param userId ID người dùng.
+     * @param userId     ID người dùng.
+     * @param categoryId ID danh mục để lọc (có thể null).
      * @return Danh sách các món đã nấu, sắp xếp mới nhất trước.
      */
-    List<CookedHistoryResponse> getCookedHistory(Long userId);
+    List<CookedHistoryResponse> getCookedHistory(Long userId, Long categoryId);
 }

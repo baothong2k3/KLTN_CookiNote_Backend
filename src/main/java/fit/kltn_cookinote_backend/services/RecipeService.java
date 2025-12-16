@@ -46,7 +46,11 @@ public interface RecipeService {
 
     PageResult<RecipeCardResponse> listPopular(int page, int size);
 
-    PageResult<RecipeCardResponse> listByOwner(Long ownerUserId, Long viewerUserIdOrNull, int page, int size);
+    /**
+     * Lấy danh sách recipe của một owner, có xét quyền xem và lọc theo danh mục.
+     * @param categoryId ID danh mục để lọc (có thể null)
+     */
+    PageResult<RecipeCardResponse> listByOwner(Long ownerUserId, Long viewerUserIdOrNull, Long categoryId, int page, int size);
 
     List<RecipeStepItem> getSteps(Long viewerUserIdOrNull, Long recipeId);
 
@@ -56,7 +60,13 @@ public interface RecipeService {
 
     void deleteRecipe(Long actorUserId, Long recipeId);
 
-    PageResult<RecipeCardResponse> listDeletedRecipes(User actor, Long filterUserId, int page, int size);
+    /**
+     * Lấy danh sách recipe đã xóa (deleted = true).
+     * @param actor User thực hiện (để check role)
+     * @param filterUserId ID user cần lọc (Admin có thể null để xem all, User thường thì param này bị ignore)
+     * @param categoryId ID category cần lọc (có thể null)
+     */
+    PageResult<RecipeCardResponse> listDeletedRecipes(User actor, Long filterUserId, Long categoryId, int page, int size);
 
     /**
      * Xóa vĩnh viễn một công thức đã bị soft-delete.

@@ -55,19 +55,20 @@ public class FavoriteServiceImpl implements FavoriteService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RecipeCardResponse> getFavoriteRecipes(Long userId) {
-        List<Favorite> favorites = favoriteRepository.findByUser_UserIdOrderByIdDesc(userId);
+    public List<RecipeCardResponse> getFavoriteRecipes(Long userId, Long categoryId) {
+        // Gọi repo với tham số filter
+        List<Favorite> favorites = favoriteRepository.findByUserAndFilter(userId, categoryId);
+
+        // Map từ Entity Favorite sang DTO Response
+        // Lưu ý: Favorite chứa Recipe, ta cần map Recipe đó ra RecipeCardResponse
         return favorites.stream()
-                .map(fav -> {
-                    if (fav.getRecipe() != null) {
-                        return RecipeCardResponse.from(fav.getRecipe());
-                    } else {
-                        return RecipeCardResponse.builder()
-                                .id(null)
-                                .title("[ĐÃ XÓA] " + fav.getOriginalRecipeTitle())
-                                .deleted(true)
-                                .build();
-                    }
+                .map(favorite -> {
+                    // Logic mapping ở đây tùy thuộc vào project của bạn đang dùng Mapper hay static method from()
+                    // Ví dụ nếu dùng static method trong DTO:
+                    return RecipeCardResponse.from(favorite.getRecipe());
+
+                    // Hoặc nếu dùng Mapper:
+                    // return recipeMapper.toCardResponse(favorite.getRecipe());
                 })
                 .collect(Collectors.toList());
     }

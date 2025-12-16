@@ -25,6 +25,15 @@ public interface CookedHistoryRepository extends JpaRepository<CookedHistory, Lo
     // Tìm tất cả lịch sử nấu ăn của một user, sắp xếp mới nhất trước
     List<CookedHistory> findByUser_UserIdOrderByCookedAtDesc(Long userId);
 
+    // [NEW] Tìm lịch sử nấu ăn có lọc theo category
+    @Query("SELECT ch FROM CookedHistory ch " +
+            "LEFT JOIN ch.recipe r " +
+            "WHERE ch.user.userId = :userId " +
+            "AND (:categoryId IS NULL OR r.category.id = :categoryId) " +
+            "ORDER BY ch.cookedAt DESC")
+    List<CookedHistory> findByUserAndFilter(@Param("userId") Long userId,
+                                            @Param("categoryId") Long categoryId);
+
     // Cập nhật cờ isRecipeDeleted cho tất cả entry liên quan đến recipeId
     @Modifying
     @Transactional
