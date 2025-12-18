@@ -43,6 +43,7 @@ public class IngredientCategoryService {
         String key = ingredientName.toLowerCase().trim();
         // Tìm chính xác hoặc chứa từ khóa
         return categoryMap.entrySet().stream()
+                .sorted((e1, e2) -> Integer.compare(e2.getKey().length(), e1.getKey().length()))
                 .filter(entry -> key.contains(entry.getKey()))
                 .map(Map.Entry::getValue)
                 .findFirst()
