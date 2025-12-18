@@ -158,6 +158,62 @@ public class ShoppingListServiceImpl implements ShoppingListService {
         return result;
     }
 
+    // --- Hàm mới: Map và gộp các item trùng tên (Dùng cho Category) ---
+    private List<GroupedShoppingListResponse.ShoppingListItem> mapAndMergeItems(List<ShoppingList> items) {
+        // 1. Gom nhóm theo tên nguyên liệu (đã chuẩn hóa) để tìm các mục trùng
+        Map<String, List<ShoppingList>> groupedByName = items.stream()
+                .collect(Collectors.groupingBy(
+                        item -> item.getIngredient().trim().toLowerCase(), // Key chuẩn hóa chữ thường
+                        LinkedHashMap::new, // Giữ thứ tự hiển thị
+                        Collectors.toList()
+                ));
+
+        List<GroupedShoppingListResponse.ShoppingListItem> result = new ArrayList<>();
+
+        // 2. Duyệt qua từng nhóm nguyên liệu trùng tên
+        groupedByName.forEach((key, duplicates) -> {
+            // Lấy item đầu tiên làm đại diện (để lấy ID, tên gốc...)
+            ShoppingList first = duplicates.get(0);
+
+            if (duplicates.size() == 1) {
+                // Nếu không trùng, map như bình thường
+                result.add(GroupedShoppingListResponse.ShoppingListItem.builder()
+                        .id(first.getId())
+                        .ingredient(first.getIngredient())
+                        .quantity(first.getQuantity())
+                        .checked(first.getChecked())
+                        .isFromRecipe(first.getIsFromRecipe())
+                        .build());
+            } else {
+                // Nếu có trùng -> GỘP
+
+                // Gộp quantity bằng dấu " + "
+                String mergedQuantity = duplicates.stream()
+                        .map(ShoppingList::getQuantity)
+                        .filter(q -> q != null && !q.trim().isEmpty())
+                        .collect(Collectors.joining(" + "));
+
+                // Logic gộp trạng thái Checked:
+                // (Ví dụ: Chỉ checked khi TẤT CẢ đều checked, hoặc dùng trạng thái của cái đầu tiên)
+                // Ở đây mình dùng logic: Nếu item đại diện chưa check -> hiển thị chưa check.
+                Boolean isChecked = first.getChecked();
+
+                // Logic gộp isFromRecipe: Nếu có bất kỳ cái nào từ recipe -> true
+                Boolean isFromRecipe = duplicates.stream().anyMatch(sl -> Boolean.TRUE.equals(sl.getIsFromRecipe()));
+
+                result.add(GroupedShoppingListResponse.ShoppingListItem.builder()
+                        .id(first.getId()) // Lưu ý: Chỉ thao tác (xóa/check) được trên item đầu tiên
+                        .ingredient(first.getIngredient())
+                        .quantity(mergedQuantity.isEmpty() ? null : mergedQuantity)
+                        .checked(isChecked)
+                        .isFromRecipe(isFromRecipe)
+                        .build());
+            }
+        });
+
+        return result;
+    }
+
     private GroupedShoppingListResponse buildCategoryResponse(String catName, List<ShoppingList> items) {
         // Sắp xếp: Chưa mua lên đầu
         items.sort(Comparator.comparing(ShoppingList::getChecked).thenComparing(ShoppingList::getId));
@@ -168,7 +224,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                 .recipeImageUrl(getIcon(catName)) // Tái sử dụng field image làm icon
                 .isRecipeDeleted(false)
                 .type("CATEGORY")             // <--- Đánh dấu loại
-                .items(mapToItems(items))
+                .items(mapAndMergeItems(items))
                 .build();
     }
 
