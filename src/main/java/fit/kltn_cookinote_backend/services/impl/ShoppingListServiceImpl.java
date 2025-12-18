@@ -250,13 +250,16 @@ public class ShoppingListServiceImpl implements ShoppingListService {
             case "Hải sản" -> "https://img.icons8.com/?size=100&id=5bywjoHvTs4U&format=png&color=000000";
 
             // Sửa case này cho khớp JSON: "Rau củ & Trái cây"
-            case "Rau củ & Trái cây", "Rau củ quả" -> "https://img.icons8.com/?size=100&id=cpa3RyNsYJkU&format=png&color=000000";
+            case "Rau củ & Trái cây", "Rau củ quả" ->
+                    "https://img.icons8.com/?size=100&id=cpa3RyNsYJkU&format=png&color=000000";
 
             // Sửa case này cho khớp
-            case "Trứng - Sữa & Chế phẩm", "Trứng & Sữa" -> "https://img.icons8.com/?size=100&id=12874&format=png&color=000000";
+            case "Trứng - Sữa & Chế phẩm", "Trứng & Sữa" ->
+                    "https://img.icons8.com/?size=100&id=12874&format=png&color=000000";
 
             // Sửa case này cho khớp JSON: "Gia vị & Đồ khô"
-            case "Gia vị & Đồ khô", "Đồ khô & Gia vị" -> "https://img.icons8.com/?size=100&id=12898&format=png&color=000000";
+            case "Gia vị & Đồ khô", "Đồ khô & Gia vị" ->
+                    "https://img.icons8.com/?size=100&id=12898&format=png&color=000000";
 
             // Thêm case mới xuất hiện trong JSON của bạn
             case "Gạo - Bột & Ngũ cốc" -> "https://img.icons8.com/?size=100&id=24467&format=png&color=000000";
@@ -719,16 +722,17 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
         // BƯỚC 2: LẤY ỨNG VIÊN TỪ DATABASE
         // Khi query DB, chúng ta vẫn dùng normalize CƠ BẢN, vì DB chứa tên thô.
-        List<String> originalNormalizedKeys = ingredientNames.stream()
-                .map(ShoppingListUtils::normalize) // Dùng normalize cơ bản
-                .filter(s -> !s.isEmpty())
+        List<String> expandedKeys = ingredientNames.stream()
+                .map(name -> synonymService.getAllVariants(name))
+                .flatMap(List::stream)
                 .distinct()
                 .toList();
 
         Pageable candidatesPageable = PageRequest.of(0, CANDIDATE_POOL_SIZE);
 
+        // Query DB bằng danh sách đã mở rộng
         Page<Recipe> candidates = recipeRepository.findCandidateRecipesByIngredients(
-                originalNormalizedKeys, // Dùng key normalize cơ bản để query DB
+                expandedKeys,
                 candidatesPageable
         );
 
