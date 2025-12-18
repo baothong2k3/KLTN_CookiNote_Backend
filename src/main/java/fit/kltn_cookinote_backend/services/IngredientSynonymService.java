@@ -19,10 +19,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Dịch vụ này tải một từ điển đồng nghĩa (synonyms) cho nguyên liệu
@@ -40,45 +37,49 @@ public class IngredientSynonymService {
     // Ví dụ: "nuoc duong" -> "duong"
     private Map<String, String> synonymMap = Collections.emptyMap();
 
+    private Map<String, List<String>> standardToVariantsMap = Collections.emptyMap();
+
     private static final String SYNONYM_FILE = "ingredient-synonyms.json";
 
     @PostConstruct
     public void loadData() {
         try (InputStream inputStream = new ClassPathResource(SYNONYM_FILE).getInputStream()) {
-
-            // 1. Đọc file JSON: Map<String, List<String>>
-            TypeReference<Map<String, List<String>>> typeRef = new TypeReference<>() {
-            };
+            TypeReference<Map<String, List<String>>> typeRef = new TypeReference<>() {};
             Map<String, List<String>> rawData = objectMapper.readValue(inputStream, typeRef);
 
-            // 2. Đảo ngược Map để tra cứu
             Map<String, String> processedMap = new HashMap<>();
 
+            // Map mới để lưu quan hệ 1 chiều từ Chuẩn -> Biến thể
+            Map<String, List<String>> reverseMap = new HashMap<>();
+
             for (Map.Entry<String, List<String>> entry : rawData.entrySet()) {
-                // Tên chuẩn (ví dụ: "bột mì")
                 String standardName = ShoppingListUtils.normalize(entry.getKey());
 
-                // Bản thân tên chuẩn cũng là 1 key
+                // Lưu danh sách biến thể cho từ chuẩn này (bao gồm cả chính nó)
+                List<String> variants = new ArrayList<>();
+                variants.add(standardName); // Thêm chính nó
+
+                // Thêm bản thân nó vào map tra cứu xuôi
                 processedMap.put(standardName, standardName);
 
-                // Các biến thể (ví dụ: "bột mì đa dụng", "nước đường")
                 for (String variant : entry.getValue()) {
                     String normalizedVariant = ShoppingListUtils.normalize(variant);
+                    variants.add(normalizedVariant); // Thêm biến thể vào list
+
                     if (!processedMap.containsKey(normalizedVariant)) {
                         processedMap.put(normalizedVariant, standardName);
-                    } else {
-                        log.debug("Từ đồng nghĩa '{}' (chuẩn hóa: '{}') được định nghĩa cho nhiều hơn 1 từ chuẩn. Giữ lại giá trị cũ.",
-                                variant, normalizedVariant);
                     }
                 }
+
+                reverseMap.put(standardName, variants);
             }
 
             this.synonymMap = Collections.unmodifiableMap(processedMap);
-            log.info("Tải thành công {} từ đồng nghĩa (đã đảo ngược) từ {}", this.synonymMap.size(), SYNONYM_FILE);
+            this.standardToVariantsMap = Collections.unmodifiableMap(reverseMap); // Lưu lại
 
+            log.info("Tải thành công dữ liệu đồng nghĩa.");
         } catch (Exception e) {
-            log.error("Không thể tải file từ đồng nghĩa: {}. Sẽ sử dụng normalize cơ bản.", SYNONYM_FILE, e);
-            this.synonymMap = Collections.emptyMap();
+            log.error("Lỗi tải file đồng nghĩa", e);
         }
     }
 
@@ -98,5 +99,15 @@ public class IngredientSynonymService {
         // Nếu "thit ba chi" có trong map, nó sẽ trả về "thit lon"
         // Nếu "cai thia" không có trong map, nó sẽ trả về "cai thia"
         return synonymMap.getOrDefault(normalized, normalized);
+    }
+
+    /**
+     * Lấy tất cả các biến thể từ một từ khóa bất kỳ.
+     * VD input "thịt lợn" -> ["thịt lợn", "thịt lợn quay", "sườn non"...]
+     * VD input "thịt lợn quay" -> (chuẩn hóa về "thịt lợn") -> ["thịt lợn", "thịt lợn quay"...]
+     */
+    public List<String> getAllVariants(String rawName) {
+        String standard = getStandardizedName(rawName); // Quy về chuẩn trước: "thịt lợn quay" -> "thịt lợn"
+        return standardToVariantsMap.getOrDefault(standard, List.of(ShoppingListUtils.normalize(rawName)));
     }
 }
