@@ -19,6 +19,7 @@ public record GroupedShoppingListResponse(
         String recipeTitle,
         String recipeImageUrl,
         Boolean isRecipeDeleted,
+        String type,
         List<ShoppingListItem> items
 ) {
     @Builder

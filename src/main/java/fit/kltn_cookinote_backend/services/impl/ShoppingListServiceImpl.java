@@ -20,6 +20,7 @@ import fit.kltn_cookinote_backend.repositories.RecipeIngredientRepository;
 import fit.kltn_cookinote_backend.repositories.RecipeRepository;
 import fit.kltn_cookinote_backend.repositories.ShoppingListRepository;
 import fit.kltn_cookinote_backend.repositories.UserRepository;
+import fit.kltn_cookinote_backend.services.IngredientCategoryService;
 import fit.kltn_cookinote_backend.services.IngredientClassificationService;
 import fit.kltn_cookinote_backend.services.IngredientSynonymService;
 import fit.kltn_cookinote_backend.services.ShoppingListService;
@@ -51,7 +52,164 @@ public class ShoppingListServiceImpl implements ShoppingListService {
     private final IngredientClassificationService ingredientClassificationService;
     private final IngredientSynonymService synonymService;
 
+    private final IngredientCategoryService ingredientCategoryService;
+
     private static final int CANDIDATE_POOL_SIZE = 10;
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<GroupedShoppingListResponse> getAllShoppingLists(Long userId, String groupBy) {
+        List<ShoppingList> allItems = shoppingListRepository.findByUser_UserIdOrderByIdDesc(userId);
+
+        // 1. GOM NHÓM THEO DANH MỤC (CATEGORY)
+        if ("category".equalsIgnoreCase(groupBy)) {
+            return groupByCategory(allItems);
+        }
+
+        // 2. GOM NHÓM THEO CÔNG THỨC (RECIPE - Mặc định)
+        return groupByRecipe(allItems);
+    }
+
+    // --- Logic gom nhóm theo Recipe (Refactor từ code cũ của bạn) ---
+    private List<GroupedShoppingListResponse> groupByRecipe(List<ShoppingList> allItems) {
+        Map<String, List<ShoppingList>> grouped = new LinkedHashMap<>();
+
+        // Logic gom nhóm giữ nguyên như cũ
+        for (ShoppingList item : allItems) {
+            String key;
+            if (item.getRecipe() != null) {
+                key = "recipe-" + item.getRecipe().getId();
+            } else if (item.getOriginalRecipeTitle() != null) {
+                key = "deleted-" + item.getOriginalRecipeTitle();
+            } else {
+                key = "standalone";
+            }
+            grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(item);
+        }
+
+        List<GroupedShoppingListResponse> result = new ArrayList<>();
+        grouped.forEach((key, items) -> {
+            ShoppingList firstItem = items.get(0);
+            Recipe recipe = firstItem.getRecipe();
+
+            Long recipeId = null;
+            String title;
+            String imageUrl = null;
+            Boolean isDeleted = false;
+
+            if (recipe != null) {
+                recipeId = recipe.getId();
+                title = Boolean.TRUE.equals(firstItem.getIsRecipeDeleted())
+                        ? "[ĐÃ XÓA] " + recipe.getTitle()
+                        : recipe.getTitle();
+                imageUrl = recipe.getImageUrl();
+                isDeleted = Boolean.TRUE.equals(firstItem.getIsRecipeDeleted());
+            } else if (firstItem.getOriginalRecipeTitle() != null) {
+                title = "[ĐÃ XÓA] " + firstItem.getOriginalRecipeTitle();
+                isDeleted = true;
+            } else {
+                title = "Khác";
+            }
+
+            result.add(GroupedShoppingListResponse.builder()
+                    .recipeId(recipeId)
+                    .recipeTitle(title)
+                    .recipeImageUrl(imageUrl)
+                    .isRecipeDeleted(isDeleted)
+                    .type("RECIPE") // <--- Đánh dấu loại
+                    .items(mapToItems(items))
+                    .build());
+        });
+        return result;
+    }
+
+    // --- Logic gom nhóm theo Category (Mới) ---
+    private List<GroupedShoppingListResponse> groupByCategory(List<ShoppingList> allItems) {
+        // Gom nhóm
+        Map<String, List<ShoppingList>> grouped = allItems.stream()
+                .collect(Collectors.groupingBy(item ->
+                        ingredientCategoryService.getCategory(item.getIngredient())
+                ));
+
+        List<GroupedShoppingListResponse> result = new ArrayList<>();
+
+        // Định nghĩa thứ tự hiển thị ưu tiên khi đi siêu thị
+        List<String> priority = List.of(
+                "Rau củ & Trái cây",       // Khớp với JSON
+                "Thịt & Gia cầm",
+                "Hải sản",                 // Khớp với JSON
+                "Trứng - Sữa & Chế phẩm",  // Cập nhật tên cho chuẩn
+                "Gạo - Bột & Ngũ cốc",     // Khớp với JSON
+                "Gia vị & Đồ khô",         // Khớp với JSON
+                "Đồ uống",
+                "Khác"                     // Luôn để Khác cuối cùng trong list này
+        );
+
+        // Duyệt theo thứ tự ưu tiên
+        for (String catName : priority) {
+            if (grouped.containsKey(catName)) {
+                result.add(buildCategoryResponse(catName, grouped.remove(catName)));
+            }
+        }
+
+        // Các nhóm còn lại (nếu có)
+        grouped.forEach((catName, items) -> result.add(buildCategoryResponse(catName, items)));
+
+        return result;
+    }
+
+    private GroupedShoppingListResponse buildCategoryResponse(String catName, List<ShoppingList> items) {
+        // Sắp xếp: Chưa mua lên đầu
+        items.sort(Comparator.comparing(ShoppingList::getChecked).thenComparing(ShoppingList::getId));
+
+        return GroupedShoppingListResponse.builder()
+                .recipeId(null)               // Category không có ID Long, để null
+                .recipeTitle(catName)         // Tái sử dụng field title
+                .recipeImageUrl(getIcon(catName)) // Tái sử dụng field image làm icon
+                .isRecipeDeleted(false)
+                .type("CATEGORY")             // <--- Đánh dấu loại
+                .items(mapToItems(items))
+                .build();
+    }
+
+    private List<GroupedShoppingListResponse.ShoppingListItem> mapToItems(List<ShoppingList> items) {
+        return items.stream()
+                .map(item -> GroupedShoppingListResponse.ShoppingListItem.builder()
+                        .id(item.getId())
+                        .ingredient(item.getIngredient())
+                        .quantity(item.getQuantity())
+                        .checked(item.getChecked())
+                        .isFromRecipe(item.getIsFromRecipe())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    // --- Cập nhật hàm lấy Icon cho khớp tên ---
+    private String getIcon(String catName) {
+        if (catName == null) return "https://img.icons8.com/color/96/shopping-basket-2.png";
+
+        // Dùng contains hoặc switch case chính xác
+        return switch (catName) {
+            case "Thịt & Gia cầm" -> "https://img.icons8.com/?size=100&id=1vzbQymCwtpJ&format=png&color=000000";
+            case "Hải sản" -> "https://img.icons8.com/?size=100&id=5bywjoHvTs4U&format=png&color=000000";
+
+            // Sửa case này cho khớp JSON: "Rau củ & Trái cây"
+            case "Rau củ & Trái cây", "Rau củ quả" -> "https://img.icons8.com/?size=100&id=cpa3RyNsYJkU&format=png&color=000000";
+
+            // Sửa case này cho khớp
+            case "Trứng - Sữa & Chế phẩm", "Trứng & Sữa" -> "https://img.icons8.com/?size=100&id=12874&format=png&color=000000";
+
+            // Sửa case này cho khớp JSON: "Gia vị & Đồ khô"
+            case "Gia vị & Đồ khô", "Đồ khô & Gia vị" -> "https://img.icons8.com/?size=100&id=12898&format=png&color=000000";
+
+            // Thêm case mới xuất hiện trong JSON của bạn
+            case "Gạo - Bột & Ngũ cốc" -> "https://img.icons8.com/?size=100&id=24467&format=png&color=000000";
+
+            case "Đồ uống" -> "https://img.icons8.com/?size=100&id=lyMuG44EXuxH&format=png&color=000000";
+
+            default -> "https://img.icons8.com/?size=100&id=107457&format=png&color=000000"; // Icon cho nhóm "Khác"
+        };
+    }
 
     /**
      * Helper method to get existing shopping list items for a user and recipe,
