@@ -224,7 +224,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                 .recipeImageUrl(getIcon(catName)) // Tái sử dụng field image làm icon
                 .isRecipeDeleted(false)
                 .type("CATEGORY")             // <--- Đánh dấu loại
-                .items(mapAndMergeItems(items))
+                .items(mapToItems(items))
                 .build();
     }
 
