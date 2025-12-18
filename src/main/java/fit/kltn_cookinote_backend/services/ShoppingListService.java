@@ -99,4 +99,6 @@ public interface ShoppingListService {
      * @return Thông tin mục đã được cập nhật.
      */
     ShoppingListResponse uncheckItem(Long userId, Long itemId);
+
+    List<GroupedShoppingListResponse> getAllShoppingLists(Long userId, String groupBy);
 }

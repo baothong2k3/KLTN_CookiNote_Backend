@@ -136,16 +136,24 @@ public class ShoppingListController {
     }
 
     /**
-     * Lấy toàn bộ danh sách mua sắm của người dùng, gom nhóm theo công thức.
+     * Lấy danh sách mua sắm.
+     * Param: ?groupBy=recipe (mặc định) HOẶC ?groupBy=category
      */
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<GroupedShoppingListResponse>>> getAllShoppingLists(
             @AuthenticationPrincipal User authUser,
+            @RequestParam(name = "groupBy", defaultValue = "recipe") String groupBy,
             HttpServletRequest req
     ) {
-        List<GroupedShoppingListResponse> data = shoppingListService.getAllGroupedByRecipe(authUser.getUserId());
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách mua sắm thành công", data, req.getRequestURI()));
+        // Gọi hàm service đã sửa đổi
+        List<GroupedShoppingListResponse> data = shoppingListService.getAllShoppingLists(authUser.getUserId(), groupBy);
+
+        return ResponseEntity.ok(ApiResponse.success(
+                "Lấy danh sách mua sắm thành công (" + groupBy + ")",
+                data,
+                req.getRequestURI()
+        ));
     }
 
     /**
