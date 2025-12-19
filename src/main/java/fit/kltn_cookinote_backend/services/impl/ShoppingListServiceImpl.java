@@ -224,7 +224,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
                 .recipeImageUrl(getIcon(catName)) // Tái sử dụng field image làm icon
                 .isRecipeDeleted(false)
                 .type("CATEGORY")             // <--- Đánh dấu loại
-                .items(mapToItems(items))
+                .items(mapAndMergeItems(items))
                 .build();
     }
 
@@ -809,7 +809,7 @@ public class ShoppingListServiceImpl implements ShoppingListService {
 
         if (startItem < totalItems) {
             int toIndex = Math.min(startItem + pageSize, totalItems);
-            paginatedList = scoredSuggestions.subList(startItem, toIndex);
+            paginatedList = scoredSuggestions.subList(startItem, toIndex).stream().limit(3).toList();
         } else {
             paginatedList = Collections.emptyList();
         }
